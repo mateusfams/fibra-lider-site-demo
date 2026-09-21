@@ -1,0 +1,41 @@
+# Local runtime
+.env
+.env.*
+!.env.example
+
+# OS/editor
+Thumbs.db
+.DS_Store
+.vscode/
+
+# Future Node app
+node_modules/
+.next/
+dist/
+coverage/
+__pycache__/
+
+# Local databases/backups
+*.sqlite
+*.db
+*.bak
+
+# Local validation screenshots
+app/site-*.png
+app/admin-*.png
+app/page-*.png
+app/*.png
+app/.edge-*/
+app/.edge-profile/
+app/assets/img/hero-family-fiber.png
+
+# Private development memory and source material
+AGENTS.md
+CODEX.md
+PRODUCT_BLUEPRINT.md
+DESIGN.md
+CHANGELOG.md
+docs/
+project-history/
+VISUAL IDEAL/
+scripts/

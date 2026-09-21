@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#061426">
+    <meta name="description" content="Planos de internet 100% fibra optica da Fibra Lider em Sumare e regiao.">
+    <meta name="robots" content="index,follow">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <title>Fibra Lider | Internet Fibra Optica em Sumare e Regiao</title>
+    <link rel="canonical" href="https://fibralider.net.br/">
+    <link rel="icon" href="./assets/img/fibra-lider-icon.png">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="preload" as="image" href="./assets/img/hero-family-fiber.jpg">
+    <link rel="stylesheet" href="./assets/vendor/leaflet.css">
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <script defer src="./assets/vendor/lucide.min.js"></script>
+    <script defer src="./assets/vendor/leaflet.js"></script>
+    <script defer src="./assets/js/data.js"></script>
+    <script defer src="./assets/js/app.js"></script>
+  </head>
+  <body class="public-site">
+    <a class="skip-link" href="#conteudo">Ir para o conteudo</a>
+
+    <header class="site-header" id="topo">
+      <div class="service-strip">
+        <div class="shell service-strip__inner">
+          <p><i data-lucide="map-pin"></i> Internet fibra optica em Sumare e regiao</p>
+          <div class="service-strip__links">
+            <a id="header-phone" href="tel:+551920422062"><i data-lucide="phone"></i> (19) 2042-2062</a>
+            <a id="header-client-area" href="https://sgp.fibralider.net.br/accounts/central/login" target="_blank" rel="noopener"><i data-lucide="user-round"></i> Area do cliente</a>
+          </div>
+        </div>
+      </div>
+      <div class="nav-shell shell">
+        <a class="site-logo" href="#topo" aria-label="Fibra Lider - inicio">
+          <img id="site-logo" src="./assets/img/fibra-lider-logo-dark.png" alt="Fibra Lider">
+        </a>
+        <nav class="site-nav" id="site-nav" aria-label="Navegacao principal"></nav>
+        <div class="header-actions">
+          <button class="icon-button theme-toggle" id="site-theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">
+            <i data-lucide="moon"></i>
+          </button>
+          <a class="button button--primary header-cta" id="header-whatsapp" href="#" target="_blank" rel="noopener">
+            <i data-lucide="message-circle"></i><span>Falar com a gente</span>
+          </a>
+          <button class="icon-button mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
+            <i data-lucide="menu"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="conteudo">
+      <section class="hero-slider page-section" id="inicio" data-section="hero" aria-label="Destaques Fibra Lider">
+        <div id="hero-slides"></div>
+        <div class="hero-controls shell">
+          <div class="hero-dots" id="hero-dots" aria-label="Selecionar destaque"></div>
+          <div class="hero-arrows" id="hero-arrows">
+            <button class="icon-button icon-button--glass" id="hero-prev" type="button" aria-label="Destaque anterior"><i data-lucide="arrow-left"></i></button>
+            <button class="icon-button icon-button--glass" id="hero-next" type="button" aria-label="Proximo destaque"><i data-lucide="arrow-right"></i></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="proof-band page-section" data-section="proof" aria-label="Diferenciais">
+        <div class="shell proof-grid" id="proof-grid"></div>
+      </section>
+
+      <section class="section plans-section page-section" id="planos" data-section="plans">
+        <div class="shell">
+          <div class="section-heading section-heading--split">
+            <div>
+              <span class="eyebrow" id="plans-eyebrow">Planos residenciais</span>
+              <h2 id="plans-title">Escolha sua velocidade. O resto e com a gente.</h2>
+            </div>
+            <p id="plans-description"></p>
+          </div>
+          <div class="filter-tabs" id="plan-filters" role="tablist" aria-label="Tipos de plano"></div>
+          <div class="plans-grid" id="plans-grid"></div>
+          <div class="plans-footer">
+            <p>Todos os planos estao sujeitos a consulta de viabilidade e condicoes comerciais.</p>
+            <button class="text-button" id="show-all-plans" type="button">Ver todos os planos <i data-lucide="arrow-right"></i></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section benefits-section page-section" id="beneficios" data-section="benefits">
+        <div class="shell benefits-layout">
+          <div class="benefits-copy">
+            <span class="eyebrow" id="benefits-eyebrow"></span>
+            <h2 id="benefits-title"></h2>
+            <p id="benefits-description"></p>
+            <a class="button button--dark" href="#cobertura">Consultar minha rua <i data-lucide="arrow-right"></i></a>
+          </div>
+          <div class="benefit-list" id="benefits-grid"></div>
+        </div>
+      </section>
+
+      <section class="section entertainment-section page-section" id="entretenimento" data-section="apps">
+        <div class="shell entertainment-layout">
+          <div class="entertainment-copy">
+            <span class="eyebrow eyebrow--light" id="apps-eyebrow"></span>
+            <h2 id="apps-title"></h2>
+            <p>Filmes, series, musica, esportes, leitura e seguranca digital para completar sua experiencia.</p>
+            <a class="button button--light" href="#planos">Ver combos <i data-lucide="arrow-right"></i></a>
+          </div>
+          <div class="app-orbit" id="apps-grid" aria-label="Aplicativos disponiveis"></div>
+        </div>
+      </section>
+
+      <section class="section business-section page-section" id="empresas" data-section="business">
+        <div class="shell business-layout">
+          <div class="business-visual">
+            <img src="./assets/img/banner-business-fiber.jpg" alt="Equipe conectada pela Fibra Lider Empresas" loading="lazy">
+            <div class="business-signal">
+              <span><i data-lucide="activity"></i> Monitoramento</span>
+              <strong>Conexao preparada para seu negocio</strong>
+            </div>
+          </div>
+          <div class="business-copy">
+            <span class="eyebrow" id="business-eyebrow"></span>
+            <h2 id="business-title"></h2>
+            <p id="business-description"></p>
+            <ul class="check-list">
+              <li><i data-lucide="circle-check"></i> Link dedicado para empresas e eventos</li>
+              <li><i data-lucide="circle-check"></i> Projeto conforme a necessidade do local</li>
+              <li><i data-lucide="circle-check"></i> Atendimento tecnico regional</li>
+            </ul>
+            <a class="button button--primary" id="business-whatsapp" href="#" target="_blank" rel="noopener">Solicitar proposta <i data-lucide="arrow-up-right"></i></a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section coverage-section page-section" id="cobertura" data-section="coverage">
+        <div class="shell coverage-layout">
+          <div class="coverage-copy">
+            <span class="eyebrow" id="coverage-eyebrow"></span>
+            <h2 id="coverage-title"></h2>
+            <p id="coverage-description"></p>
+            <form class="coverage-form" id="coverage-form">
+              <label>
+                <span>Cidade</span>
+                <select id="coverage-city" name="city" required></select>
+              </label>
+              <label>
+                <span>Bairro</span>
+                <input id="coverage-neighborhood" name="neighborhood" type="text" placeholder="Digite seu bairro" required>
+              </label>
+              <button class="button button--primary" type="submit">Consultar agora <i data-lucide="search"></i></button>
+            </form>
+            <div class="coverage-result" id="coverage-result" hidden></div>
+          </div>
+          <div class="coverage-map" aria-label="Mapa interativo da cobertura regional">
+            <div class="real-map" id="public-coverage-map"></div>
+            <div class="map-fallback" id="public-map-fallback" hidden></div>
+            <div class="map-legend"><span></span> Cobertura e interesse por regiao</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section testimonials-section page-section" data-section="testimonials">
+        <div class="shell">
+          <div class="section-heading section-heading--center">
+            <span class="eyebrow" id="testimonial-eyebrow"></span>
+            <h2 id="testimonial-title"></h2>
+          </div>
+          <div class="testimonials-grid" id="testimonials-grid"></div>
+        </div>
+      </section>
+
+      <section class="section faq-section page-section" id="duvidas" data-section="faq">
+        <div class="shell faq-layout">
+          <div class="faq-heading">
+            <span class="eyebrow" id="faq-eyebrow"></span>
+            <h2 id="faq-title"></h2>
+            <p>Ainda ficou com alguma duvida? Nossa equipe conversa com voce pelo WhatsApp.</p>
+            <a class="text-button" id="faq-whatsapp" href="#" target="_blank" rel="noopener">Falar com atendimento <i data-lucide="arrow-up-right"></i></a>
+          </div>
+          <div class="faq-list" id="faq-list"></div>
+        </div>
+      </section>
+
+      <section class="section support-section page-section" id="atendimento" data-section="support">
+        <div class="shell">
+          <div class="section-heading section-heading--split section-heading--light">
+            <div>
+              <span class="eyebrow eyebrow--light" id="support-eyebrow"></span>
+              <h2 id="support-title"></h2>
+            </div>
+            <p>Encontre rapidamente o canal que voce precisa.</p>
+          </div>
+          <div class="support-grid" id="support-grid"></div>
+        </div>
+      </section>
+
+      <section class="final-cta page-section" data-section="final">
+        <div class="shell final-cta__inner">
+          <div>
+            <span class="eyebrow eyebrow--light">Fibra Lider</span>
+            <h2 id="final-title"></h2>
+            <p id="final-description"></p>
+          </div>
+          <div class="final-cta__actions">
+            <a class="button button--light" href="#planos">Ver planos</a>
+            <a class="button button--outline-light" id="final-whatsapp" href="#" target="_blank" rel="noopener">Falar no WhatsApp <i data-lucide="message-circle"></i></a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-main">
+        <div class="footer-brand">
+          <img id="footer-logo" src="./assets/img/fibra-lider-logo.png" alt="Fibra Lider">
+          <p id="footer-description"></p>
+          <div class="social-links">
+            <a id="footer-instagram" class="icon-button icon-button--footer" href="#" target="_blank" rel="noopener" aria-label="Instagram"><i data-lucide="instagram"></i></a>
+            <a id="footer-facebook" class="icon-button icon-button--footer" href="#" target="_blank" rel="noopener" aria-label="Facebook"><i data-lucide="facebook"></i></a>
+            <a id="footer-social-whatsapp" class="icon-button icon-button--footer" href="#" target="_blank" rel="noopener" aria-label="WhatsApp"><i data-lucide="message-circle"></i></a>
+          </div>
+        </div>
+        <div class="footer-links" id="footer-columns"></div>
+        <div class="footer-contact">
+          <h3>Fale com a Fibra Lider</h3>
+          <a id="footer-phone" href="tel:+551920422062"><i data-lucide="phone"></i><span>(19) 2042-2062</span></a>
+          <a id="footer-email" href="mailto:contato@fibralider.net.br"><i data-lucide="mail"></i><span>contato@fibralider.net.br</span></a>
+          <p id="footer-address"><i data-lucide="map-pin"></i><span></span></p>
+        </div>
+      </div>
+      <div class="shell footer-bottom">
+        <p><span id="footer-year"></span> <span id="footer-copyright"></span></p>
+        <p id="footer-company"></p>
+      </div>
+    </footer>
+
+    <a class="floating-whatsapp" id="floating-whatsapp" href="#" target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
+      <i data-lucide="message-circle"></i><span>Posso ajudar?</span>
+    </a>
+
+    <div class="modal" id="campaign-modal" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <article class="campaign-dialog" role="dialog" aria-modal="true" aria-labelledby="campaign-title">
+        <button class="icon-button modal-close" type="button" data-close-modal aria-label="Fechar"><i data-lucide="x"></i></button>
+        <div class="campaign-dialog__media"><img id="campaign-image" src="" alt=""></div>
+        <div class="campaign-dialog__content">
+          <span class="eyebrow" id="campaign-eyebrow"></span>
+          <h2 id="campaign-title"></h2>
+          <p id="campaign-description"></p>
+          <button class="coupon-code" id="campaign-coupon" type="button" title="Copiar cupom"><span></span><i data-lucide="copy"></i></button>
+          <a class="button button--primary" id="campaign-cta" href="#planos">Ver oferta <i data-lucide="arrow-right"></i></a>
+          <small>Consulte disponibilidade e condicoes com a equipe comercial.</small>
+        </div>
+      </article>
+    </div>
+
+    <div class="toast" id="site-toast" role="status" aria-live="polite" hidden></div>
+
+    <aside class="cookie-banner" id="cookie-banner" hidden>
+      <div>
+        <strong>Sua privacidade importa.</strong>
+        <p>Usamos dados essenciais e, com sua permissao, metricas para melhorar sua experiencia.</p>
+      </div>
+      <div class="cookie-actions">
+        <button class="button button--ghost" id="cookie-essential" type="button">Somente essenciais</button>
+        <button class="button button--primary" id="cookie-accept" type="button">Aceitar</button>
+      </div>
+    </aside>
+  </body>
+</html>

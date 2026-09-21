@@ -1,0 +1,328 @@
+(function () {
+  "use strict";
+
+  const STORAGE_KEY = "fibra-lider-studio-state-v7";
+  const EVENTS_KEY = "fibra-lider-studio-events-v2";
+  const SESSION_KEY = "fibra-lider-studio-session-v2";
+
+  function plan(id, categoryId, title, speed, price, featured, badge, note, features) {
+    return { id, categoryId, title, speed, price, period: "mes", featured, active: true, badge, note, features };
+  }
+
+  const defaultState = {
+    meta: {
+      version: "1.1.0-mvp",
+      updatedAt: new Date().toISOString(),
+      publishedAt: new Date().toISOString(),
+      status: "published",
+    },
+    brand: {
+      name: "Fibra Lider",
+      legalName: "FIBRA LIDER TELECOM LTDA",
+      cnpj: "40.044.840/0001-70",
+      tagline: "Internet fibra optica",
+      logo: "./assets/img/fibra-lider-logo.png",
+      logoDark: "./assets/img/fibra-lider-logo-dark.png",
+      icon: "./assets/img/fibra-lider-icon.png",
+      phone: "(19) 2042-2062",
+      whatsapp: "551920422062",
+      whatsappSecondary: "5519984598406",
+      email: "contato@fibralider.net.br",
+      instagram: "https://www.instagram.com/fibralideroficial/",
+      facebook: "https://www.facebook.com/profile.php?id=100085343718942",
+      address: "Av. Soma, 869 - Parque Manoel de Vasconcelos, Sumare - SP",
+      clientAreaUrl: "https://sgp.fibralider.net.br/accounts/central/login",
+      coverageSummary: "Sumare, Hortolandia, Nova Odessa, Campinas e regiao",
+    },
+    theme: {
+      primary: "#0874e7",
+      primaryDark: "#063f83",
+      accent: "#29d884",
+      ink: "#0a1628",
+      muted: "#64748b",
+      surface: "#f4f7fb",
+      panel: "#ffffff",
+      radius: "16",
+      font: "Inter",
+      defaultMode: "light",
+      visitorThemeToggle: true,
+      motion: "comfortable",
+    },
+    navigation: [
+      { id: "nav-plans", label: "Planos", href: "#planos", visible: true },
+      { id: "nav-benefits", label: "Por que a Fibra Lider", href: "#beneficios", visible: true },
+      { id: "nav-coverage", label: "Cobertura", href: "#cobertura", visible: true },
+      { id: "nav-business", label: "Para empresas", href: "#empresas", visible: true },
+      { id: "nav-support", label: "Atendimento", href: "#atendimento", visible: true },
+    ],
+    banners: [
+      {
+        id: "hero-familia",
+        name: "Familia conectada",
+        eyebrow: "Fibra optica em Sumare e regiao",
+        title: "Internet que acompanha o ritmo da sua casa.",
+        subtitle: "Fibra de verdade, Wi-Fi em comodato e atendimento regional para trabalhar, jogar e assistir sem interrupcoes.",
+        image: "./assets/img/hero-family-fiber.jpg",
+        mobileImage: "./assets/img/hero-family-fiber.jpg",
+        primaryLabel: "Conhecer planos",
+        primaryLink: "#planos",
+        secondaryLabel: "Consultar cobertura",
+        secondaryLink: "#cobertura",
+        badge: "Instalacao agil",
+        position: "center",
+        overlay: 64,
+        active: true,
+      },
+      {
+        id: "hero-600",
+        name: "Oferta 600 Mega",
+        eyebrow: "O plano preferido das familias",
+        title: "600 Mega para conectar tudo por R$ 99,90.",
+        subtitle: "Velocidade para varios dispositivos, streaming, estudos e jogos, com suporte proximo quando voce precisar.",
+        image: "./assets/img/banner-streaming-family.jpg",
+        mobileImage: "./assets/img/banner-streaming-family.jpg",
+        primaryLabel: "Quero 600 Mega",
+        primaryLink: "#planos",
+        secondaryLabel: "Falar no WhatsApp",
+        secondaryLink: "whatsapp",
+        badge: "Mais contratado",
+        position: "right",
+        overlay: 70,
+        active: true,
+      },
+      {
+        id: "hero-empresas",
+        name: "Fibra Lider Empresas",
+        eyebrow: "Conectividade para negocios",
+        title: "Sua empresa conectada para crescer sem pausas.",
+        subtitle: "Links dedicados, projetos sob medida e atendimento tecnico regional para operacoes que dependem de estabilidade.",
+        image: "./assets/img/banner-business-fiber.jpg",
+        mobileImage: "./assets/img/banner-business-fiber.jpg",
+        primaryLabel: "Solicitar proposta",
+        primaryLink: "whatsapp",
+        secondaryLabel: "Conhecer solucoes",
+        secondaryLink: "#empresas",
+        badge: "Atendimento consultivo",
+        position: "right",
+        overlay: 66,
+        active: true,
+      },
+    ],
+    slider: { autoplay: true, interval: 6500, showArrows: true, showDots: true, pauseOnHover: true },
+    content: {
+      trustLabel: "Conexao regional, suporte de verdade",
+      plansEyebrow: "Planos residenciais",
+      plansTitle: "Escolha sua velocidade. O resto e com a gente.",
+      plansText: "Compare os planos mais contratados e fale direto com a equipe comercial pelo WhatsApp.",
+      benefitsEyebrow: "Feita para a vida real",
+      benefitsTitle: "Mais estabilidade em cada momento do seu dia.",
+      benefitsText: "Da primeira reuniao da manha ao ultimo episodio da noite, sua casa continua conectada.",
+      appsEyebrow: "Conteudo para todos",
+      appsTitle: "Internet e entretenimento em um so plano.",
+      businessEyebrow: "Fibra Lider Empresas",
+      businessTitle: "Conectividade para sua empresa nao parar.",
+      businessText: "Link dedicado para empresas e eventos, projetos sob medida e atendimento tecnico regional.",
+      coverageEyebrow: "Onde atendemos",
+      coverageTitle: "Consulte a disponibilidade no seu endereco.",
+      coverageText: "Nossa rede esta em expansao na Regiao Metropolitana de Campinas.",
+      testimonialEyebrow: "Quem usa, recomenda",
+      testimonialTitle: "Uma internet proxima de quem conecta.",
+      faqEyebrow: "Duvidas frequentes",
+      faqTitle: "Respostas rapidas antes de contratar.",
+      supportEyebrow: "Central Fibra Lider",
+      supportTitle: "Resolva tudo pelo canal certo.",
+      finalTitle: "Pronto para navegar sem limites?",
+      finalText: "Consulte a cobertura e encontre o melhor plano para sua casa ou empresa.",
+    },
+    categories: [
+      { id: "internet", name: "Internet", description: "Internet fibra optica residencial" },
+      { id: "max", name: "Internet + MAX", description: "Fibra com filmes e series" },
+      { id: "sky", name: "Internet + SKY+", description: "Fibra, TV e streaming" },
+      { id: "sky-paramount", name: "SKY Light + Paramount", description: "Entretenimento completo" },
+      { id: "telefone", name: "Internet + Telefone", description: "Fibra com telefonia fixa" },
+      { id: "completo", name: "Pacote completo", description: "Internet e varios servicos" },
+    ],
+    plans: [
+      plan("internet-300", "internet", "Fibra Essencial", "300 MEGA", 89.9, false, "", "Contrato anual com equipamento em comodato.", ["100% fibra optica", "Wi-Fi em comodato", "Suporte regional", "Instalacao consultiva"]),
+      plan("internet-600", "internet", "Fibra Familia", "600 MEGA", 99.9, true, "Mais contratado", "O melhor equilibrio para casas conectadas.", ["Streaming em alta qualidade", "Jogos com baixa latencia", "Varios dispositivos", "Atendimento local"]),
+      plan("internet-800", "internet", "Fibra Performance", "800 MEGA", 129.9, false, "Alta performance", "Mais velocidade para rotinas intensas.", ["Downloads mais rapidos", "Casa toda conectada", "100% fibra optica", "Wi-Fi em comodato"]),
+      plan("max-300", "max", "Fibra + MAX", "300 MEGA", 119.9, false, "", "Internet e entretenimento em um pacote.", ["MAX incluso", "Wi-Fi em comodato", "Fibra optica", "Suporte especializado"]),
+      plan("max-600", "max", "Fibra + MAX", "600 MEGA", 129.9, true, "Custo-beneficio", "Velocidade e entretenimento para a familia.", ["MAX incluso", "Streaming sem travar", "Jogos online", "Atendimento local"]),
+      plan("max-800", "max", "Fibra + MAX", "800 MEGA", 149.9, false, "", "Experiencia premium para todos os dispositivos.", ["MAX incluso", "Alta performance", "Varios dispositivos", "100% fibra"]),
+      plan("sky-300", "sky", "Fibra + SKY+", "300 MEGA", 169.9, false, "", "Internet e conteudo para toda a casa.", ["SKY+ incluso", "Wi-Fi em comodato", "Streaming", "Suporte local"]),
+      plan("sky-600", "sky", "Fibra + SKY+", "600 MEGA", 179.9, true, "Recomendado", "Um pacote completo para familias.", ["SKY+ incluso", "Jogos e streaming", "100% fibra", "Atendimento especializado"]),
+      plan("sky-800", "sky", "Fibra + SKY+", "800 MEGA", 199.9, false, "", "Mais velocidade com pacote SKY+.", ["SKY+ incluso", "Alta velocidade", "Multidispositivos", "Suporte local"]),
+      plan("sp-600", "sky-paramount", "SKY Light + Paramount", "600 MEGA", 109.9, false, "", "Fibra, canais e filmes em um pacote.", ["SKY Light", "Paramount+", "Fibra optica", "Atendimento local"]),
+      plan("sp-800", "sky-paramount", "SKY Light + Paramount", "800 MEGA", 129.9, true, "Oferta", "Combo de alta velocidade e entretenimento.", ["SKY Light", "Paramount+", "Alta velocidade", "Wi-Fi em comodato"]),
+      plan("sp-1000", "sky-paramount", "SKY Light + Paramount", "1000 MEGA", 179.9, false, "1 Giga", "O plano premium da Fibra Lider.", ["1 GIGA", "SKY Light", "Paramount+", "100% fibra"]),
+      plan("tel-300", "telefone", "Fibra + Telefone", "300 MEGA", 129.9, false, "", "Internet com linha telefonica fixa.", ["Ligacoes ilimitadas", "Todo o Brasil", "Wi-Fi em comodato", "Suporte local"]),
+      plan("tel-600", "telefone", "Fibra + Telefone", "600 MEGA", 139.9, true, "Popular", "Para casa e pequenos negocios.", ["Ligacoes ilimitadas", "600 Mega", "100% fibra", "Atendimento especializado"]),
+      plan("tel-800", "telefone", "Fibra + Telefone", "800 MEGA", 147.9, false, "", "Velocidade alta com telefone fixo.", ["Ligacoes ilimitadas", "800 Mega", "Wi-Fi em comodato", "Suporte local"]),
+      plan("complete-300", "completo", "Pacote Completo", "300 MEGA", 199.7, false, "", "Internet e servicos para toda a familia.", ["Internet fibra", "Entretenimento", "Apps parceiros", "Suporte local"]),
+      plan("complete-600", "completo", "Pacote Completo", "600 MEGA", 209.7, true, "Tudo incluso", "O pacote mais completo da Fibra Lider.", ["Internet fibra", "SKY+ e MAX", "Apps parceiros", "Atendimento especializado"]),
+      plan("complete-800", "completo", "Pacote Completo", "800 MEGA", 239.7, false, "", "Performance e entretenimento sem limites.", ["Internet fibra", "SKY+ e MAX", "Apps parceiros", "Wi-Fi em comodato"]),
+    ],
+    benefits: [
+      { id: "benefit-fiber", icon: "cable", title: "100% fibra optica", text: "Tecnologia do inicio ao fim da rede para entregar mais estabilidade." },
+      { id: "benefit-wifi", icon: "wifi", title: "Wi-Fi para a casa toda", text: "Equipamento em comodato e orientacao para a melhor experiencia." },
+      { id: "benefit-support", icon: "headphones", title: "Suporte da regiao", text: "Uma equipe proxima, pronta para entender e resolver." },
+      { id: "benefit-speed", icon: "gauge", title: "Velocidade de verdade", text: "Planos para estudar, trabalhar, jogar e assistir ao mesmo tempo." },
+    ],
+    apps: [
+      { id: "max", name: "MAX", category: "Filmes e series", logo: "" }, { id: "sky", name: "SKY+", category: "TV e streaming", logo: "" },
+      { id: "paramount", name: "Paramount+", category: "Filmes e series", logo: "" }, { id: "deezer", name: "Deezer", category: "Musica", logo: "" },
+      { id: "playkids", name: "PlayKids", category: "Infantil", logo: "" }, { id: "kaspersky", name: "Kaspersky", category: "Seguranca", logo: "" },
+      { id: "nba", name: "NBA", category: "Esportes", logo: "" }, { id: "ubook", name: "Ubook", category: "Audiobooks", logo: "" },
+    ],
+    regions: [
+      { id: "sumare", name: "Sumare", status: "Cobertura ativa", interest: 94, leads: 86, lat: -22.8217964, lng: -47.2671050, active: true },
+      { id: "hortolandia", name: "Hortolandia", status: "Cobertura ativa", interest: 78, leads: 64, lat: -22.8620175, lng: -47.2164219, active: true },
+      { id: "nova-odessa", name: "Nova Odessa", status: "Expansao monitorada", interest: 62, leads: 41, lat: -22.7805746, lng: -47.2993805, active: true },
+      { id: "campinas", name: "Campinas", status: "Consulta de viabilidade", interest: 49, leads: 32, lat: -22.9056391, lng: -47.0595640, active: true },
+      { id: "paulinia", name: "Paulinia", status: "Expansao futura", interest: 34, leads: 18, lat: -22.7630391, lng: -47.1532213, active: true },
+    ],
+    testimonials: [
+      { id: "review-1", name: "Mariana S.", city: "Sumare", rating: 5, text: "Atendimento rapido e internet estavel mesmo com a casa toda conectada." },
+      { id: "review-2", name: "Carlos A.", city: "Hortolandia", rating: 5, text: "A instalacao foi bem orientada e o plano de 600 Mega atende muito bem." },
+      { id: "review-3", name: "Fernanda M.", city: "Nova Odessa", rating: 5, text: "Consegui falar direto com a equipe e resolver tudo pelo WhatsApp." },
+    ],
+    faq: [
+      { id: "faq-1", question: "Os equipamentos estao inclusos?", answer: "Os planos podem incluir equipamento Wi-Fi em comodato conforme as condicoes comerciais e a viabilidade do endereco." },
+      { id: "faq-2", question: "Como consultar cobertura?", answer: "Informe sua cidade e bairro na consulta do site. A equipe comercial confirma a disponibilidade exata pelo WhatsApp." },
+      { id: "faq-3", question: "Como contratar um plano?", answer: "Escolha o plano e clique em contratar. O WhatsApp abre com velocidade, valor e categoria preenchidos para agilizar o atendimento." },
+      { id: "faq-4", question: "Posso trocar de plano depois?", answer: "Sim. A equipe pode verificar as opcoes de upgrade e os combos disponiveis para o seu endereco." },
+      { id: "faq-5", question: "A Fibra Lider atende empresas?", answer: "Sim. Ha projetos de link dedicado para empresas e eventos, com avaliacao tecnica e proposta personalizada." },
+    ],
+    supportCards: [
+      { id: "support-whatsapp", icon: "message-circle", title: "Atendimento pelo WhatsApp", text: "Contratacao, duvidas e orientacao comercial.", label: "Iniciar conversa", type: "whatsapp", url: "", active: true },
+      { id: "support-client", icon: "user-round", title: "Area do cliente", text: "Acesse faturas, servicos e dados do seu contrato.", label: "Entrar na central", type: "external", url: "https://sgp.fibralider.net.br/accounts/central/login", active: true },
+      { id: "support-speed", icon: "gauge", title: "Teste de velocidade", text: "Verifique o desempenho atual da sua conexao.", label: "Fazer teste", type: "external", url: "https://www.speedtest.net/", active: true },
+      { id: "support-contract", icon: "file-text", title: "Contratos e documentos", text: "Consulte os documentos publicos da Fibra Lider.", label: "Abrir documentos", type: "internal", url: "./pagina.html?slug=contrato-de-adesao", active: true },
+    ],
+    coupons: [
+      { id: "coupon-lider10", code: "LIDER10", title: "Beneficio de adesao", discount: "10% na adesao", description: "Apresente o codigo ao comercial e consulte as condicoes para sua regiao.", planIds: ["internet-600", "internet-800"], startsAt: "2026-09-01", expiresAt: "2026-12-31", usageLimit: 100, used: 27, active: true },
+    ],
+    popupCampaigns: [
+      { id: "popup-lider10", name: "Cupom de boas-vindas", type: "coupon", title: "Uma vantagem para comecar bem.", description: "Use o cupom LIDER10 e consulte as condicoes de adesao com nossa equipe.", eyebrow: "Oferta por tempo limitado", image: "./assets/img/hero-family-fiber.jpg", couponId: "coupon-lider10", ctaLabel: "Quero aproveitar", ctaLink: "#planos", trigger: "delay", delaySeconds: 8, scrollPercent: 45, frequency: "session", startsAt: "2026-09-01", expiresAt: "2026-12-31", active: true },
+    ],
+    whatsapp: {
+      floatingMessage: "Ola Fibra Lider, vim pelo site e preciso de atendimento.",
+      coverageTemplate: "Ola Fibra Lider! Quero consultar cobertura.\n\nCidade: {city}\nBairro: {neighborhood}",
+      planTemplate: "Oi, sou visitante do site e tenho interesse em adquirir o plano:\n\nPlano: {plan}\nVelocidade: {speed}\nValor: {price}\nCategoria: {category}\n\nPode me passar mais informacoes?",
+      businessTemplate: "Ola Fibra Lider, quero saber mais sobre link dedicado para minha empresa ou evento.",
+    },
+    seo: {
+      title: "Fibra Lider | Internet Fibra Optica em Sumare e Regiao",
+      description: "Planos de internet 100% fibra optica em Sumare e regiao. Consulte cobertura e contrate a Fibra Lider pelo WhatsApp.",
+      keywords: "internet fibra optica Sumare, provedor de internet Sumare, Fibra Lider, internet Hortolandia, internet residencial",
+      canonicalUrl: "https://fibralider.net.br/",
+      ogImage: "./assets/img/hero-family-fiber.jpg",
+      serviceArea: "Sumare, Hortolandia, Nova Odessa, Campinas e Regiao Metropolitana de Campinas",
+      googleSiteVerification: "",
+      indexSite: true,
+    },
+    integrations: {
+      consentBanner: true, ga4Enabled: false, ga4Id: "", googleAdsEnabled: false, googleAdsId: "",
+      googleAdsLabel: "", metaPixelEnabled: false, metaPixelId: "", gtmEnabled: false, gtmId: "",
+    },
+    footer: {
+      description: "Internet fibra optica com atendimento regional para residencias e empresas.",
+      copyright: "Fibra Lider Telecom Ltda. Todos os direitos reservados.",
+      columns: [
+        { id: "footer-company", title: "Fibra Lider", links: [{ label: "Por que escolher", href: "#beneficios" }, { label: "Cobertura", href: "#cobertura" }, { label: "Para empresas", href: "#empresas" }] },
+        { id: "footer-plans", title: "Planos", links: [{ label: "Internet", href: "#planos" }, { label: "Internet + MAX", href: "#planos" }, { label: "Internet + SKY+", href: "#planos" }] },
+        { id: "footer-support", title: "Atendimento", links: [{ label: "Area do cliente", href: "https://sgp.fibralider.net.br/accounts/central/login" }, { label: "Teste de velocidade", href: "https://www.speedtest.net/" }, { label: "Contrato de adesao", href: "./pagina.html?slug=contrato-de-adesao" }] },
+      ],
+    },
+    pages: [
+      {
+        id: "page-contrato",
+        slug: "contrato-de-adesao",
+        title: "Contrato de adesao",
+        description: "Consulte as informacoes contratuais dos servicos de internet da Fibra Lider.",
+        status: "published",
+        updatedAt: "2026-09-21",
+        blocks: [
+          { id: "contract-hero", type: "hero", eyebrow: "Documentos Fibra Lider", title: "Contrato de prestacao de servico", text: "Informacoes claras para voce conhecer seus direitos, deveres e as condicoes dos servicos contratados.", visible: true },
+          { id: "contract-intro", type: "text", title: "Contrato de Comunicacao Multimidia", text: "A Fibra Lider disponibiliza o contrato de prestacao de Servico de Comunicacao Multimidia (SCM) para consulta publica. O documento integral apresenta as condicoes de adesao, prestacao do servico, equipamentos, atendimento, suspensao e cancelamento.", visible: true },
+          { id: "contract-notice", type: "callout", title: "Versao juridica integral", text: "Para preservar a integridade do documento vigente, consulte a publicacao oficial da Fibra Lider. Em caso de duvida, fale com nossa equipe antes da contratacao.", visible: true },
+          { id: "contract-document", type: "document", title: "Contrato de prestacao de servico de comunicacao multimidia", text: "Documento vigente publicado pela Fibra Lider, com as clausulas e os dados regulatorios completos.", label: "Consultar contrato integral", url: "https://fibralider.net.br/contrato-de-adesao/", visible: true },
+          { id: "contract-cta", type: "cta", title: "Precisa de ajuda para entender uma condicao?", text: "Nossa equipe esta disponivel para orientar voce antes da contratacao.", label: "Falar no WhatsApp", url: "whatsapp", visible: true }
+        ]
+      }
+    ],
+    pageBlocks: [
+      { id: "hero", label: "Banner principal", type: "hero", visible: true, locked: true, tone: "dark" },
+      { id: "proof", label: "Barra de confianca", type: "proof", visible: true, locked: false, tone: "light" },
+      { id: "plans", label: "Planos", type: "plans", visible: true, locked: true, tone: "light" },
+      { id: "benefits", label: "Beneficios", type: "benefits", visible: true, locked: false, tone: "soft" },
+      { id: "apps", label: "Apps e entretenimento", type: "apps", visible: true, locked: false, tone: "dark" },
+      { id: "business", label: "Solucoes para empresas", type: "business", visible: true, locked: false, tone: "light" },
+      { id: "coverage", label: "Cobertura", type: "coverage", visible: true, locked: false, tone: "soft" },
+      { id: "testimonials", label: "Depoimentos", type: "testimonials", visible: true, locked: false, tone: "light" },
+      { id: "faq", label: "Perguntas frequentes", type: "faq", visible: true, locked: false, tone: "light" },
+      { id: "support", label: "Central de atendimento", type: "support", visible: true, locked: false, tone: "dark" },
+      { id: "final", label: "Chamada final", type: "final", visible: true, locked: true, tone: "brand" },
+    ],
+    dashboardTargets: { monthlyVisitors: 4200, monthlyLeads: 260, conversionRate: 7.4, whatsappResponse: "3 min" },
+  };
+
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function loadJson(key, fallback) {
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : clone(fallback); }
+    catch (error) { console.warn("Nao foi possivel ler os dados locais.", error); return clone(fallback); }
+  }
+  function saveJson(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+  function getState() {
+    const stored = loadJson(STORAGE_KEY, defaultState);
+    const next = { ...clone(defaultState), ...stored };
+    ["meta", "brand", "theme", "slider", "content", "whatsapp", "seo", "integrations", "footer", "dashboardTargets"].forEach(function (key) {
+      next[key] = { ...clone(defaultState[key]), ...(stored[key] || {}) };
+    });
+    ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "pageBlocks", "pages"].forEach(function (key) {
+      next[key] = Array.isArray(stored[key]) ? stored[key] : clone(defaultState[key]);
+    });
+    return next;
+  }
+  function saveState(state, publish) {
+    const next = clone(state);
+    next.meta = { ...(next.meta || {}), updatedAt: new Date().toISOString(), publishedAt: publish ? new Date().toISOString() : next.meta.publishedAt, status: publish ? "published" : "draft" };
+    saveJson(STORAGE_KEY, next);
+    window.dispatchEvent(new CustomEvent("fl:state", { detail: next }));
+    return next;
+  }
+  function resetState() { localStorage.removeItem(STORAGE_KEY); return getState(); }
+  function getEvents() { return loadJson(EVENTS_KEY, []); }
+  function saveEvents(events) { saveJson(EVENTS_KEY, events.slice(-3000)); }
+  function trackEvent(type, payload) {
+    const events = getEvents();
+    const event = { id: "evt_" + Date.now() + "_" + Math.random().toString(16).slice(2), type, payload: payload || {}, path: location.pathname, ts: new Date().toISOString(), viewport: { width: innerWidth, height: innerHeight } };
+    events.push(event); saveEvents(events); return event;
+  }
+  function seedEventsIfEmpty() {
+    const current = getEvents(); if (current.length) return current;
+    const regions = ["Sumare", "Hortolandia", "Nova Odessa", "Campinas", "Paulinia"];
+    const sources = ["Google Organico", "Instagram", "Acesso direto", "Google Ads", "Facebook"];
+    const plans = ["internet-600", "internet-300", "internet-800", "max-600", "sp-800"];
+    const seeded = [];
+    for (let day = 27; day >= 0; day -= 1) {
+      const date = new Date(); date.setDate(date.getDate() - day);
+      const volume = 8 + ((day * 7) % 11);
+      for (let index = 0; index < volume; index += 1) {
+        const region = regions[(day + index) % regions.length];
+        const type = index % 9 === 0 ? "whatsapp_click" : index % 6 === 0 ? "plan_click" : index % 5 === 0 ? "coverage_search" : "page_view";
+        const stamp = new Date(date); stamp.setHours(8 + (index % 12), (index * 13) % 60, 0, 0);
+        seeded.push({ id: "seed_" + day + "_" + index, type, payload: { region, source: sources[(day * 2 + index) % sources.length], planId: plans[(day + index * 2) % plans.length], found: region !== "Paulinia" }, path: "/", ts: stamp.toISOString(), viewport: { width: index % 3 === 0 ? 390 : 1440, height: index % 3 === 0 ? 844 : 900 } });
+      }
+    }
+    saveEvents(seeded); return seeded;
+  }
+  function formatCurrency(value) { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0)); }
+  function categoryName(state, categoryId) { const item = state.categories.find(function (category) { return category.id === categoryId; }); return item ? item.name : "Plano"; }
+  function interpolate(template, values) { return String(template || "").replace(/\{(\w+)\}/g, function (_, key) { return values[key] == null ? "" : String(values[key]); }); }
+  function planMessage(state, item) { return interpolate(state.whatsapp.planTemplate, { plan: item.title, speed: item.speed, price: formatCurrency(item.price), category: categoryName(state, item.categoryId) }); }
+  function whatsappLink(phone, message) { return "https://wa.me/" + String(phone || "").replace(/\D/g, "") + "?text=" + encodeURIComponent(message || ""); }
+  function uid(prefix) { return (prefix || "item") + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  window.FL = { STORAGE_KEY, EVENTS_KEY, SESSION_KEY, defaultState, clone, getState, saveState, resetState, getEvents, saveEvents, trackEvent, seedEventsIfEmpty, formatCurrency, categoryName, interpolate, planMessage, whatsappLink, uid };
+})();

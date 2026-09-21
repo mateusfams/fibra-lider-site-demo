@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="theme-color" content="#081422">
+    <title>Fibra Site OS | Painel</title>
+    <link rel="icon" href="./assets/img/fibra-lider-icon.png">
+    <link rel="stylesheet" href="./assets/vendor/leaflet.css">
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <script defer src="./assets/vendor/lucide.min.js"></script>
+    <script defer src="./assets/vendor/leaflet.js"></script>
+    <script defer src="./assets/js/data.js"></script>
+    <script defer src="./assets/js/admin.js"></script>
+  </head>
+  <body class="admin-body">
+    <div class="admin-login" id="admin-login">
+      <div class="login-visual">
+        <div class="login-visual__brand">
+          <img src="./assets/img/fibra-lider-logo.png" alt="Fibra Lider">
+          <span>Fibra Site OS</span>
+        </div>
+        <div class="login-visual__content">
+          <span class="login-kicker"><i data-lucide="sparkles"></i> Gestao comercial para provedores</span>
+          <h1>Seu site, suas campanhas e seus resultados em um unico lugar.</h1>
+          <div class="login-signal">
+            <div><strong>+18,4%</strong><span>interesse em planos</span></div>
+            <div class="mini-bars"><i style="--h:36%"></i><i style="--h:52%"></i><i style="--h:44%"></i><i style="--h:73%"></i><i style="--h:88%"></i><i style="--h:79%"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="login-form-wrap">
+        <form class="login-form" id="login-form">
+          <input type="text" name="username" value="administrador" autocomplete="username" hidden>
+          <div class="login-mobile-logo"><img src="./assets/img/fibra-lider-logo-dark.png" alt="Fibra Lider"></div>
+          <span class="eyebrow">Painel administrativo</span>
+          <h2>Bem-vindo de volta</h2>
+          <p>Entre para gerenciar a experiencia digital da Fibra Lider.</p>
+          <label class="field">
+            <span>Senha de acesso</span>
+            <span class="input-with-icon"><i data-lucide="lock-keyhole"></i><input id="login-password" type="password" autocomplete="current-password" placeholder="Digite sua senha" required></span>
+          </label>
+          <p class="form-error" id="login-error" hidden>Senha incorreta. Verifique e tente novamente.</p>
+          <button class="button button--primary button--block" type="submit">Entrar no painel <i data-lucide="arrow-right"></i></button>
+          <small>Ambiente local de apresentacao. Nenhum dado sensivel deve ser inserido.</small>
+        </form>
+      </div>
+    </div>
+
+    <div class="admin-app" id="admin-app" hidden>
+      <aside class="admin-sidebar" id="admin-sidebar">
+        <div class="admin-brand">
+          <img src="./assets/img/fibra-lider-icon.png" alt="">
+          <div><strong>Fibra Site</strong><span>OS</span></div>
+        </div>
+        <div class="workspace-switch">
+          <span class="workspace-avatar">FL</span>
+          <div><strong>Fibra Lider</strong><small>Site publicado</small></div>
+          <i data-lucide="chevrons-up-down"></i>
+        </div>
+        <nav class="admin-nav" id="admin-nav" aria-label="Navegacao do painel">
+          <div class="nav-group">
+            <span>Visao geral</span>
+            <button data-panel="dashboard"><i data-lucide="layout-dashboard"></i><b>Dashboard</b></button>
+          </div>
+          <div class="nav-group">
+            <span>Site</span>
+            <button data-panel="builder"><i data-lucide="panels-top-left"></i><b>Construtor</b></button>
+            <button data-panel="pages"><i data-lucide="files"></i><b>Paginas</b></button>
+            <button data-panel="banners"><i data-lucide="gallery-horizontal-end"></i><b>Banners e slides</b></button>
+            <button data-panel="navigation"><i data-lucide="menu"></i><b>Menu e rodape</b></button>
+            <button data-panel="appearance"><i data-lucide="palette"></i><b>Identidade visual</b></button>
+          </div>
+          <div class="nav-group">
+            <span>Conteudo</span>
+            <button data-panel="plans"><i data-lucide="badge-dollar-sign"></i><b>Planos e combos</b><em id="nav-plan-count">0</em></button>
+            <button data-panel="catalog"><i data-lucide="shapes"></i><b>Apps e beneficios</b></button>
+            <button data-panel="coverage"><i data-lucide="map-pinned"></i><b>Cobertura</b></button>
+            <button data-panel="support"><i data-lucide="life-buoy"></i><b>Atendimento</b></button>
+          </div>
+          <div class="nav-group">
+            <span>Marketing</span>
+            <button data-panel="campaigns"><i data-lucide="megaphone"></i><b>Campanhas e cupons</b></button>
+            <button data-panel="seo"><i data-lucide="search-check"></i><b>SEO local</b></button>
+            <button data-panel="pixels"><i data-lucide="scan-line"></i><b>Pixels e analytics</b></button>
+          </div>
+          <div class="nav-group">
+            <span>Audiencia</span>
+            <button data-panel="analytics"><i data-lucide="chart-no-axes-combined"></i><b>Desempenho</b></button>
+            <button data-panel="heatmap"><i data-lucide="map"></i><b>Mapa de interesse</b></button>
+          </div>
+          <div class="nav-group">
+            <span>Sistema</span>
+            <button data-panel="settings"><i data-lucide="settings-2"></i><b>Configuracoes</b></button>
+          </div>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="usage-card">
+            <span><i data-lucide="hard-drive"></i> Armazenamento local</span>
+            <div><i></i></div>
+            <small>Protótipo de apresentação</small>
+          </div>
+          <button id="logout-button" type="button"><i data-lucide="log-out"></i> Sair</button>
+        </div>
+      </aside>
+
+      <div class="admin-workspace">
+        <header class="admin-topbar">
+          <div class="topbar-title">
+            <button class="icon-button sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Abrir menu"><i data-lucide="menu"></i></button>
+            <div>
+              <small>Fibra Lider / <span id="topbar-section">Visao geral</span></small>
+              <h1 id="panel-title">Dashboard</h1>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <span class="save-state" id="save-state"><i class="status-dot"></i> Tudo salvo</span>
+            <button class="icon-button" id="admin-theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema"><i data-lucide="moon"></i></button>
+            <a class="button button--ghost topbar-preview" href="./index.html" target="_blank" rel="noopener"><i data-lucide="external-link"></i> Ver site</a>
+            <button class="button button--primary" id="publish-button" type="button"><i data-lucide="rocket"></i> Publicar</button>
+            <button class="admin-user" type="button" aria-label="Conta">
+              <span>FL</span>
+              <div><strong>Administrador</strong><small>Fibra Lider</small></div>
+              <i data-lucide="chevron-down"></i>
+            </button>
+          </div>
+        </header>
+
+        <main class="admin-main" id="admin-panel" tabindex="-1"></main>
+      </div>
+    </div>
+
+    <div class="admin-modal" id="admin-modal" hidden>
+      <div class="admin-modal__backdrop" data-admin-modal-close></div>
+      <div class="admin-modal__dialog" role="dialog" aria-modal="true">
+        <button class="icon-button admin-modal__close" type="button" data-admin-modal-close aria-label="Fechar"><i data-lucide="x"></i></button>
+        <div id="admin-modal-content"></div>
+      </div>
+    </div>
+
+    <div class="admin-toast" id="admin-toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>
