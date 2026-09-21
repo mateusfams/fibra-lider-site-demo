@@ -2,13 +2,15 @@
   "name": "Fibra Lider",
   "short_name": "Fibra Lider",
   "description": "Internet fibra optica em Sumare e regiao.",
-  "start_url": "/",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#071525",
   "theme_color": "#0874E7",
   "icons": [
     {
-      "src": "/assets/img/fibra-lider-icon.png",
+      "src": "./assets/img/fibra-lider-icon.png",
       "sizes": "192x192",
       "type": "image/png"
     }
