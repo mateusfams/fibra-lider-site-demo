@@ -25,6 +25,7 @@
   let activePanel = "dashboard";
   let selectedBlockId = "hero";
   let builderDevice = "desktop";
+  let builderInspectorTab = "content";
   let activeCampaignTab = "popups";
   let planFilter = "all";
   let pageEditId = null;
@@ -34,6 +35,25 @@
   let pageBuilderMobileTab = "canvas";
   let themePreviewMode = "light";
   let adminMap = null;
+  let builderHistory = [];
+  let builderFuture = [];
+  let builderPreviewTimer = null;
+
+  const HOME_SECTION_LIBRARY = {
+    content: { label: "Conteudo livre", description: "Titulo, texto e botao com alinhamento flexivel.", icon: "text" },
+    media: { label: "Imagem e texto", description: "Composicao editorial com imagem da biblioteca.", icon: "panel-left" },
+    stats: { label: "Indicadores", description: "Numeros, resultados e provas da operacao.", icon: "chart-no-axes-column-increasing" },
+    features: { label: "Grade de recursos", description: "Diferenciais com icones, titulos e descricoes.", icon: "layout-grid" },
+    gallery: { label: "Galeria", description: "Conjunto responsivo de imagens e legendas.", icon: "gallery-horizontal-end" },
+    cta: { label: "Chamada comercial", description: "Faixa de conversao com texto e botao.", icon: "mouse-pointer-click" },
+  };
+
+  const HOME_TEMPLATES = {
+    sales: { label: "Vendas residencial", description: "Planos, beneficios e cobertura logo no inicio.", order: ["hero", "proof", "plans", "benefits", "coverage", "apps", "testimonials", "faq", "support", "business", "final"] },
+    complete: { label: "Institucional completa", description: "Todos os modulos em uma jornada equilibrada.", order: ["hero", "proof", "benefits", "plans", "apps", "business", "coverage", "testimonials", "faq", "support", "final"] },
+    business: { label: "Foco empresarial", description: "Solucoes B2B, confianca, cobertura e contato.", order: ["hero", "proof", "business", "benefits", "coverage", "testimonials", "support", "faq", "final"], hidden: ["plans", "apps"] },
+    lean: { label: "Conversao compacta", description: "Uma home curta para campanhas de aquisicao.", order: ["hero", "proof", "plans", "coverage", "benefits", "testimonials", "faq", "final"], hidden: ["apps", "business", "support"] },
+  };
 
   const THEME_PRESETS = {
     fibra: { label: "Fibra Lider", description: "Azul confiavel e verde comercial", primary: "#0874e7", primaryDark: "#063f83", accent: "#29d884", ink: "#0a1628", surface: "#f4f7fb", panel: "#ffffff", mapAccent: "#0874e7" },
@@ -156,6 +176,44 @@
       : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(destination);
   }
 
+  function builderSnapshot() {
+    return JSON.stringify({ pageBlocks: state.pageBlocks, content: state.content });
+  }
+
+  function recordBuilderHistory() {
+    const snapshot = builderSnapshot();
+    if (builderHistory[builderHistory.length - 1] !== snapshot) builderHistory.push(snapshot);
+    if (builderHistory.length > 40) builderHistory.shift();
+    builderFuture = [];
+  }
+
+  function restoreBuilderSnapshot(snapshot) {
+    const parsed = JSON.parse(snapshot);
+    state.pageBlocks = parsed.pageBlocks;
+    state.content = parsed.content;
+    if (!state.pageBlocks.some(function (block) { return block.id === selectedBlockId; })) selectedBlockId = state.pageBlocks[0].id;
+    state = FL.saveState(state, false);
+  }
+
+  function scheduleBuilderPreview() {
+    clearTimeout(builderPreviewTimer);
+    builderPreviewTimer = setTimeout(function () {
+      const frame = $("#site-preview");
+      if (frame) frame.src = "./index.html?preview=" + Date.now() + "&theme=" + state.builderSettings.previewTheme;
+    }, 480);
+  }
+
+  function homeSectionDefaults(type) {
+    const base = { id: FL.uid("section"), type: "custom-" + type, label: HOME_SECTION_LIBRARY[type].label, visible: true, locked: false, tone: "light", spacing: "normal", container: "normal", alignment: "left", anchor: "", backgroundImage: "", backgroundPosition: "center", hideMobile: false, hideDesktop: false, content: {} };
+    if (type === "content") { base.container = "narrow"; base.alignment = "center"; base.content = { eyebrow: "Fibra Lider", title: "Uma secao feita para a sua mensagem.", text: "Apresente uma novidade, uma area atendida ou um diferencial da sua empresa.", buttonLabel: "Conhecer planos", buttonUrl: "#planos" }; }
+    if (type === "media") { base.content = { eyebrow: "Conexao regional", title: "Tecnologia com atendimento proximo.", text: "Combine uma imagem real com uma mensagem clara para aproximar sua marca do cliente.", image: state.mediaLibrary[0] ? state.mediaLibrary[0].url : state.banners[0].image, imageAlt: "Fibra Lider", imageSide: "left", buttonLabel: "Falar com a equipe", buttonUrl: "whatsapp" }; }
+    if (type === "stats") { base.alignment = "center"; base.content = { eyebrow: "Nossa presenca", title: "Resultados que constroem confianca.", text: "Use numeros reais para mostrar a forca da operacao.", items: "100% | fibra optica\n5 | cidades atendidas\n18 | planos e combos\nSuporte local | perto de voce" }; }
+    if (type === "features") { base.content = { eyebrow: "Diferenciais", title: "Tudo o que o cliente precisa para escolher.", text: "Organize argumentos comerciais em uma grade facil de comparar.", items: "wifi | Wi-Fi para a casa toda | Equipamento e orientacao para melhorar a experiencia.\nheadphones | Atendimento regional | Uma equipe proxima para orientar e resolver.\ngauge | Velocidade de verdade | Planos preparados para trabalho, jogos e streaming." }; }
+    if (type === "gallery") { base.alignment = "center"; base.content = { eyebrow: "Conheca a Fibra Lider", title: "Uma operacao conectada com a regiao.", text: "Mostre estrutura, equipe, instalacoes ou clientes.", items: state.mediaLibrary.slice(0, 3).map(function (item) { return item.url + " | " + item.name; }).join("\n") }; }
+    if (type === "cta") { base.tone = "brand"; base.content = { eyebrow: "Vamos conectar?", title: "Consulte a cobertura no seu endereco.", text: "Fale com a equipe e encontre o plano ideal para sua rotina.", buttonLabel: "Consultar agora", buttonUrl: "#cobertura" }; }
+    return base;
+  }
+
   function analyticsData() {
     const events = FL.getEvents();
     const publicEvents = events.filter(function (event) { return event.path !== "/admin.html"; });
@@ -263,6 +321,27 @@
     return map[blockId] || [];
   }
 
+  function homeBlockField(label, key, block, options) {
+    const config = options || {};
+    const value = block.content && block.content[key] != null ? block.content[key] : "";
+    const help = config.help ? "<small>" + esc(config.help) + "</small>" : "";
+    if (config.type === "textarea") return '<label class="field"><span>' + esc(label) + '</span><textarea rows="' + (config.rows || 4) + '" data-home-block-field="' + esc(key) + '">' + esc(value) + "</textarea>" + help + "</label>";
+    if (config.type === "select") return '<label class="field"><span>' + esc(label) + '</span><select data-home-block-field="' + esc(key) + '">' + config.options.map(function (item) { return '<option value="' + esc(item.value) + '"' + (String(value) === String(item.value) ? " selected" : "") + '>' + esc(item.label) + "</option>"; }).join("") + "</select>" + help + "</label>";
+    return '<label class="field"><span>' + esc(label) + '</span><input value="' + esc(value) + '" data-home-block-field="' + esc(key) + '"' + (config.placeholder ? ' placeholder="' + esc(config.placeholder) + '"' : "") + ">" + help + "</label>";
+  }
+
+  function customBlockInspector(block) {
+    let fields = homeBlockField("Chamada curta", "eyebrow", block) + homeBlockField("Titulo", "title", block) + homeBlockField("Texto", "text", block, { type: "textarea", rows: 5 });
+    if (["custom-content", "custom-media", "custom-cta"].includes(block.type)) fields += '<div class="inspector-field-pair">' + homeBlockField("Texto do botao", "buttonLabel", block) + homeBlockField("Destino", "buttonUrl", block, { placeholder: "#planos ou whatsapp" }) + "</div>";
+    if (block.type === "custom-media") {
+      fields += homeBlockField("Imagem", "image", block) + '<label class="field"><span>Biblioteca de midia</span><select data-home-block-field="image"><option value="">Selecionar imagem</option>' + state.mediaLibrary.map(function (item) { return '<option value="' + esc(item.url) + '"' + (item.url === block.content.image ? " selected" : "") + '>' + esc(item.name) + "</option>"; }).join("") + '</select></label>' + homeBlockField("Texto alternativo", "imageAlt", block) + homeBlockField("Posicao da imagem", "imageSide", block, { type: "select", options: [{ value: "left", label: "Esquerda" }, { value: "right", label: "Direita" }] });
+    }
+    if (block.type === "custom-stats") fields += homeBlockField("Indicadores", "items", block, { type: "textarea", rows: 7, help: "Uma linha por item: valor | rotulo" });
+    if (block.type === "custom-features") fields += homeBlockField("Recursos", "items", block, { type: "textarea", rows: 9, help: "Uma linha por item: icone Lucide | titulo | descricao" });
+    if (block.type === "custom-gallery") fields += homeBlockField("Imagens", "items", block, { type: "textarea", rows: 8, help: "Uma linha por item: URL da imagem | legenda" }) + '<button class="button button--ghost button--block" data-goto="media">' + icon("images") + ' Abrir biblioteca de midia</button>';
+    return fields;
+  }
+
   function blockInspector(block) {
     const labels = {
       plansEyebrow: "Chamada curta", plansTitle: "Titulo", plansText: "Descricao",
@@ -273,6 +352,7 @@
       testimonialTitle: "Titulo", faqEyebrow: "Chamada curta", faqTitle: "Titulo",
       supportEyebrow: "Chamada curta", supportTitle: "Titulo", finalTitle: "Titulo", finalText: "Descricao",
     };
+    if (String(block.type).startsWith("custom-")) return customBlockInspector(block);
     if (block.id === "hero") {
       const active = state.banners.filter(function (banner) { return banner.active; }).length;
       return '<div class="inspector-callout">' + icon("gallery-horizontal-end") + '<div><strong>' + active + ' slides ativos</strong><p>O conteudo do banner principal e gerenciado no modulo de slides.</p><button class="text-button" data-goto="banners">Editar banners ' + icon("arrow-right") + "</button></div></div>";
@@ -286,27 +366,45 @@
     }).join("");
   }
 
+  function homeBlockIcon(type) {
+    const icons = { hero: "gallery-horizontal", plans: "badge-dollar-sign", coverage: "map", benefits: "badge-check", apps: "boxes", business: "building-2", testimonials: "messages-square", faq: "circle-help", support: "life-buoy", final: "mouse-pointer-click", proof: "shield-check" };
+    if (String(type).startsWith("custom-")) {
+      const customSection = HOME_SECTION_LIBRARY[String(type).replace("custom-", "")];
+      return customSection ? customSection.icon : "layout-panel-top";
+    }
+    return icons[type] || "layout-panel-top";
+  }
+
+  function blockSelect(label, attribute, value, options) {
+    return '<label class="field"><span>' + esc(label) + '</span><select ' + attribute + '>' + options.map(function (item) { return '<option value="' + esc(item.value) + '"' + (String(value) === String(item.value) ? " selected" : "") + '>' + esc(item.label) + "</option>"; }).join("") + "</select></label>";
+  }
+
+  function renderBuilderInspector(block) {
+    if (builderInspectorTab === "content") return '<div class="inspector-section"><span class="inspector-label">Conteudo</span>' + blockInspector(block) + "</div>";
+    if (builderInspectorTab === "design") {
+      return '<div class="inspector-section"><span class="inspector-label">Aparencia da secao</span>' + blockSelect("Tom do fundo", 'data-block-tone="' + esc(block.id) + '"', block.tone, [{ value: "light", label: "Claro" }, { value: "soft", label: "Suave" }, { value: "dark", label: "Escuro" }, { value: "brand", label: "Cor da marca" }]) + blockSelect("Espacamento vertical", 'data-block-setting="spacing"', block.spacing, [{ value: "compact", label: "Compacto" }, { value: "normal", label: "Normal" }, { value: "large", label: "Amplo" }]) + blockSelect("Largura do conteudo", 'data-block-setting="container"', block.container, [{ value: "narrow", label: "Estreita" }, { value: "normal", label: "Padrao" }, { value: "wide", label: "Larga" }, { value: "full", label: "Tela inteira" }]) + blockSelect("Alinhamento", 'data-block-setting="alignment"', block.alignment, [{ value: "left", label: "Esquerda" }, { value: "center", label: "Centro" }, { value: "right", label: "Direita" }]) + '<label class="field"><span>Imagem de fundo</span><select data-block-style="backgroundImage"><option value="">Sem imagem</option>' + state.mediaLibrary.map(function (item) { return '<option value="' + esc(item.url) + '"' + (item.url === block.backgroundImage ? " selected" : "") + '>' + esc(item.name) + "</option>"; }).join("") + '</select></label>' + blockSelect("Posicao do fundo", 'data-block-style="backgroundPosition"', block.backgroundPosition, [{ value: "center", label: "Centro" }, { value: "left", label: "Esquerda" }, { value: "right", label: "Direita" }, { value: "top", label: "Topo" }]) + '<div class="section-tone-preview" data-tone="' + esc(block.tone) + '"><span></span><div><strong>Previa da superficie</strong><small>Tipografia e cores seguem a identidade da marca.</small></div></div></div>';
+    }
+    return '<div class="inspector-section"><span class="inspector-label">Organizacao</span><label class="field"><span>Nome no construtor</span><input data-block-label value="' + esc(block.label) + '"></label><label class="field"><span>Ancora da secao</span><input data-block-anchor value="' + esc(block.anchor || "") + '" placeholder="ex: nossa-rede"><small>Use apenas letras, numeros e hifens.</small></label><label class="toggle-row"><span><strong>Visivel no site</strong><small>Controla a publicacao desta secao</small></span><input type="checkbox" data-block-visible="' + esc(block.id) + '"' + (block.visible ? " checked" : "") + (block.locked ? " disabled" : "") + '><i></i></label><label class="toggle-row"><span><strong>Ocultar no celular</strong><small>Remove a secao em telas menores</small></span><input type="checkbox" data-block-device="hideMobile"' + (block.hideMobile ? " checked" : "") + '><i></i></label><label class="toggle-row"><span><strong>Ocultar no desktop</strong><small>Exibe somente em telas menores</small></span><input type="checkbox" data-block-device="hideDesktop"' + (block.hideDesktop ? " checked" : "") + '><i></i></label></div><div class="inspector-section"><span class="inspector-label">Acoes</span><div class="inspector-actions"><button class="button button--ghost" data-action="move-block-up">' + icon("arrow-up") + ' Subir</button><button class="button button--ghost" data-action="move-block-down">' + icon("arrow-down") + ' Descer</button>' + (!block.locked ? '<button class="button button--ghost" data-action="duplicate-block">' + icon("copy") + ' Duplicar</button><button class="button button--danger" data-action="delete-block">' + icon("trash-2") + ' Excluir</button>' : '<div class="locked-section-note">' + icon("lock-keyhole") + '<span>Secao estrutural protegida</span></div>') + "</div></div>";
+  }
+
   function renderBuilder() {
     const block = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; }) || state.pageBlocks[0];
     selectedBlockId = block.id;
+    const zoom = Math.min(100, Math.max(65, Number(state.builderSettings.canvasZoom || 100)));
+    const previewTheme = state.builderSettings.previewTheme || "light";
     return [
-      panelHeader("Pagina inicial", "Organize as secoes, edite o conteudo e visualize cada dispositivo.", '<div class="heading-actions"><button class="button button--ghost" data-action="builder-preview">' + icon("play") + ' Abrir preview</button><button class="button button--primary" data-action="builder-save">' + icon("save") + " Salvar estrutura</button></div>"),
-      '<section class="builder-toolbar"><div class="builder-device-switch"><button class="' + (builderDevice === "desktop" ? "is-active" : "") + '" data-device="desktop" title="Desktop">' + icon("monitor") + '</button><button class="' + (builderDevice === "tablet" ? "is-active" : "") + '" data-device="tablet" title="Tablet">' + icon("tablet") + '</button><button class="' + (builderDevice === "mobile" ? "is-active" : "") + '" data-device="mobile" title="Celular">' + icon("smartphone") + '</button></div><div class="builder-status"><span><i class="status-dot"></i> Pagina inicial</span><small>Arraste os blocos para mudar a ordem</small></div><div><button class="button button--ghost" data-action="builder-refresh">' + icon("refresh-cw") + " Atualizar preview</button></div></section>",
+      panelHeader("Construtor da home", "Monte a pagina com secoes reutilizaveis, edite cada detalhe e visualize antes de publicar.", '<div class="heading-actions"><button class="button button--ghost" data-action="home-templates">' + icon("layout-template") + ' Modelos</button><button class="button button--ghost" data-action="builder-preview">' + icon("play") + ' Abrir preview</button><button class="button button--primary" data-action="builder-save">' + icon("save") + " Salvar estrutura</button></div>"),
+      '<section class="builder-toolbar builder-toolbar--advanced"><div class="builder-history"><button class="icon-button" data-action="builder-undo" title="Desfazer"' + (builderHistory.length ? "" : " disabled") + '>' + icon("undo-2") + '</button><button class="icon-button" data-action="builder-redo" title="Refazer"' + (builderFuture.length ? "" : " disabled") + '>' + icon("redo-2") + '</button></div><div class="builder-device-switch"><button class="' + (builderDevice === "desktop" ? "is-active" : "") + '" data-device="desktop" title="Desktop">' + icon("monitor") + '</button><button class="' + (builderDevice === "tablet" ? "is-active" : "") + '" data-device="tablet" title="Tablet">' + icon("tablet") + '</button><button class="' + (builderDevice === "mobile" ? "is-active" : "") + '" data-device="mobile" title="Celular">' + icon("smartphone") + '</button></div><div class="builder-status"><span><i class="status-dot"></i> ' + state.pageBlocks.length + ' secoes</span><small>Alteracoes salvas automaticamente</small></div><div class="builder-view-actions"><label>Zoom <select data-builder-zoom><option value="75"' + (zoom === 75 ? " selected" : "") + '>75%</option><option value="90"' + (zoom === 90 ? " selected" : "") + '>90%</option><option value="100"' + (zoom === 100 ? " selected" : "") + '>100%</option></select></label><button class="icon-button" data-action="builder-theme" title="Alternar tema do preview">' + icon(previewTheme === "dark" ? "sun" : "moon") + '</button><button class="icon-button" data-action="builder-refresh" title="Atualizar preview">' + icon("refresh-cw") + "</button></div></section>",
       '<div class="builder-mobile-tabs" aria-label="Ferramentas do construtor"><button class="' + (builderMobileTab === "layers" ? "is-active" : "") + '" data-builder-tab="layers">' + icon("layers-3") + '<span>Estrutura</span></button><button class="' + (builderMobileTab === "canvas" ? "is-active" : "") + '" data-builder-tab="canvas">' + icon("monitor-smartphone") + '<span>Preview</span></button><button class="' + (builderMobileTab === "inspector" ? "is-active" : "") + '" data-builder-tab="inspector">' + icon("sliders-horizontal") + '<span>Propriedades</span></button></div>',
-      '<section class="builder-workspace mobile-tab--' + builderMobileTab + '">',
-      '<aside class="builder-layers"><div class="builder-panel-title"><div><strong>Estrutura</strong><small>' + state.pageBlocks.filter(function (item) { return item.visible; }).length + ' secoes visiveis</small></div><button class="icon-button" data-action="add-section" title="Adicionar secao">' + icon("plus") + '</button></div><div class="layer-list" id="layer-list">',
-      state.pageBlocks.map(function (item) {
-        return '<article class="layer-item' + (item.id === selectedBlockId ? " is-selected" : "") + (item.visible ? "" : " is-hidden") + '" draggable="true" data-block-id="' + esc(item.id) + '"><button class="drag-handle" type="button" title="Arrastar">' + icon("grip-vertical") + '</button><button class="layer-select" type="button" data-select-block="' + esc(item.id) + '"><span>' + icon(item.type === "hero" ? "gallery-horizontal" : item.type === "plans" ? "badge-dollar-sign" : item.type === "coverage" ? "map" : "layout-panel-top") + '</span><div><strong>' + esc(item.label) + '</strong><small>' + esc(item.type) + '</small></div></button><button class="layer-visibility" type="button" data-toggle-block="' + esc(item.id) + '" title="' + (item.visible ? "Ocultar" : "Exibir") + '"' + (item.locked ? " disabled" : "") + '>' + icon(item.visible ? "eye" : "eye-off") + "</button></article>";
+      '<section class="builder-workspace builder-workspace--advanced mobile-tab--' + builderMobileTab + '">',
+      '<aside class="builder-layers"><div class="builder-panel-title"><div><strong>Estrutura</strong><small>' + state.pageBlocks.filter(function (item) { return item.visible; }).length + ' secoes visiveis</small></div><button class="icon-button" data-action="add-section" title="Adicionar secao">' + icon("plus") + '</button></div><button class="builder-add-section" data-action="add-section">' + icon("plus") + '<span><strong>Adicionar secao</strong><small>Texto, imagem, indicadores e mais</small></span></button><div class="layer-list" id="layer-list">',
+      state.pageBlocks.map(function (item, index) {
+        const custom = String(item.type).startsWith("custom-");
+        return '<article class="layer-item' + (item.id === selectedBlockId ? " is-selected" : "") + (item.visible ? "" : " is-hidden") + '" draggable="true" data-block-id="' + esc(item.id) + '"><button class="drag-handle" type="button" title="Arrastar">' + icon("grip-vertical") + '</button><button class="layer-select" type="button" data-select-block="' + esc(item.id) + '"><span>' + icon(homeBlockIcon(item.type)) + '</span><div><strong>' + esc(item.label) + '</strong><small>' + (custom ? "Bloco personalizado" : "Secao do sistema") + ' &middot; 0' + (index + 1) + '</small></div></button><button class="layer-visibility" type="button" data-toggle-block="' + esc(item.id) + '" title="' + (item.visible ? "Ocultar" : "Exibir") + '"' + (item.locked ? " disabled" : "") + '>' + icon(item.visible ? "eye" : "eye-off") + "</button></article>";
       }).join(""),
       '</div></aside>',
-      '<div class="builder-canvas"><div class="preview-frame preview-frame--' + builderDevice + '"><div class="preview-browser"><span></span><span></span><span></span><div>fibralider.net.br</div></div><iframe id="site-preview" src="./index.html?preview=1" title="Preview do site"></iframe></div></div>',
-      '<aside class="builder-inspector"><div class="builder-panel-title"><div><strong>Propriedades</strong><small>' + esc(block.label) + '</small></div><button class="icon-button" title="Mais opcoes">' + icon("ellipsis") + '</button></div><div class="inspector-body">',
-      '<div class="inspector-section"><span class="inspector-label">Secao</span>',
-      '<label class="toggle-row"><span><strong>Visivel no site</strong><small>Controla a publicacao deste bloco</small></span><input type="checkbox" data-block-visible="' + esc(block.id) + '"' + (block.visible ? " checked" : "") + (block.locked ? " disabled" : "") + '><i></i></label>',
-      '<label class="field"><span>Tom da secao</span><select data-block-tone="' + esc(block.id) + '"><option value="light"' + (block.tone === "light" ? " selected" : "") + '>Claro</option><option value="soft"' + (block.tone === "soft" ? " selected" : "") + '>Suave</option><option value="dark"' + (block.tone === "dark" ? " selected" : "") + '>Escuro</option><option value="brand"' + (block.tone === "brand" ? " selected" : "") + ">Marca</option></select></label></div>",
-      '<div class="inspector-section"><span class="inspector-label">Conteudo</span>' + blockInspector(block) + "</div>",
-      '<div class="inspector-section"><span class="inspector-label">Acoes</span><div class="inspector-actions"><button class="button button--ghost" data-action="move-block-up">' + icon("arrow-up") + ' Subir</button><button class="button button--ghost" data-action="move-block-down">' + icon("arrow-down") + " Descer</button></div></div>",
-      "</div></aside></section>",
+      '<div class="builder-canvas" style="--builder-zoom:' + (zoom / 100) + '"><div class="preview-frame preview-frame--' + builderDevice + '"><div class="preview-browser"><span></span><span></span><span></span><div>fibralider.net.br</div></div><iframe id="site-preview" src="./index.html?preview=1&theme=' + previewTheme + '" title="Preview do site"></iframe></div></div>',
+      '<aside class="builder-inspector"><div class="builder-panel-title"><div><strong>Propriedades</strong><small>' + esc(block.label) + '</small></div><span class="block-type-chip">' + icon(homeBlockIcon(block.type)) + esc(String(block.type).replace("custom-", "")) + '</span></div><div class="inspector-tabs"><button class="' + (builderInspectorTab === "content" ? "is-active" : "") + '" data-inspector-tab="content">Conteudo</button><button class="' + (builderInspectorTab === "design" ? "is-active" : "") + '" data-inspector-tab="design">Design</button><button class="' + (builderInspectorTab === "advanced" ? "is-active" : "") + '" data-inspector-tab="advanced">Avancado</button></div><div class="inspector-body">' + renderBuilderInspector(block) + "</div></aside></section>",
     ].join("");
   }
 
@@ -626,6 +724,52 @@
     return '<div class="modal-heading"><span class="eyebrow">Fibra Site OS</span><h2>' + esc(title) + '</h2><p>' + esc(description) + "</p></div>";
   }
 
+  function sectionLibraryModal() {
+    openModal(modalHeader("Adicionar secao", "Escolha uma estrutura pronta. Todo o conteudo, layout e estilo poderao ser alterados no inspetor.") + '<div class="section-library">' + Object.entries(HOME_SECTION_LIBRARY).map(function (entry) {
+      const item = entry[1];
+      return '<button data-add-home-section="' + esc(entry[0]) + '"><span>' + icon(item.icon) + '</span><div><strong>' + esc(item.label) + '</strong><p>' + esc(item.description) + '</p></div>' + icon("plus") + "</button>";
+    }).join("") + '</div><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button></div>', true);
+  }
+
+  function homeTemplatesModal() {
+    openModal(modalHeader("Modelos de pagina inicial", "Aplique uma jornada pronta sem apagar os blocos personalizados que voce ja criou.") + '<div class="home-template-grid">' + Object.entries(HOME_TEMPLATES).map(function (entry, index) {
+      const item = entry[1];
+      return '<article><div class="template-wireframe template-wireframe--' + (index + 1) + '"><i></i><i></i><i></i><i></i><i></i></div><span class="status-badge">' + item.order.length + ' secoes</span><h3>' + esc(item.label) + '</h3><p>' + esc(item.description) + '</p><button class="button button--ghost button--block" data-apply-home-template="' + esc(entry[0]) + '">' + icon("layout-template") + ' Aplicar modelo</button></article>';
+    }).join("") + '</div><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button></div>', true);
+  }
+
+  function addHomeSection(type) {
+    if (!HOME_SECTION_LIBRARY[type]) return;
+    recordBuilderHistory();
+    const block = homeSectionDefaults(type);
+    const finalIndex = state.pageBlocks.findIndex(function (item) { return item.id === "final"; });
+    if (finalIndex >= 0) state.pageBlocks.splice(finalIndex, 0, block); else state.pageBlocks.push(block);
+    selectedBlockId = block.id;
+    builderInspectorTab = "content";
+    saveDraft("Secao adicionada");
+    closeModal();
+    renderPanel();
+  }
+
+  function applyHomeTemplate(templateId) {
+    const template = HOME_TEMPLATES[templateId];
+    if (!template) return;
+    recordBuilderHistory();
+    const custom = state.pageBlocks.filter(function (item) { return String(item.type).startsWith("custom-"); });
+    const fixed = state.pageBlocks.filter(function (item) { return !String(item.type).startsWith("custom-"); });
+    const hidden = new Set(template.hidden || []);
+    fixed.forEach(function (item) { item.visible = !hidden.has(item.id); });
+    const ordered = template.order.map(function (id) { return fixed.find(function (item) { return item.id === id; }); }).filter(Boolean);
+    const remaining = fixed.filter(function (item) { return !template.order.includes(item.id); });
+    const finalIndex = ordered.findIndex(function (item) { return item.id === "final"; });
+    if (finalIndex >= 0) ordered.splice.apply(ordered, [finalIndex, 0].concat(custom)); else ordered.push.apply(ordered, custom);
+    state.pageBlocks = ordered.concat(remaining);
+    selectedBlockId = state.pageBlocks[0].id;
+    saveDraft("Modelo " + template.label + " aplicado");
+    closeModal();
+    renderPanel();
+  }
+
   function bannerModal(item) {
     const banner = item || { id: "", name: "", eyebrow: "", title: "", subtitle: "", image: "", mobileImage: "", primaryLabel: "Conhecer planos", primaryLink: "#planos", secondaryLabel: "Consultar cobertura", secondaryLink: "#cobertura", badge: "", position: "center", overlay: 65, active: true };
     openModal(modalHeader(item ? "Editar slide" : "Novo slide", "Use uma imagem forte, texto curto e uma chamada clara.") + '<form class="modal-form" data-form-kind="banner"><input type="hidden" name="id" value="' + esc(banner.id) + '"><div class="form-grid"><label class="field"><span>Nome interno</span><input name="name" value="' + esc(banner.name) + '" required></label><label class="field"><span>Selo</span><input name="badge" value="' + esc(banner.badge) + '"></label></div><label class="field"><span>Chamada curta</span><input name="eyebrow" value="' + esc(banner.eyebrow) + '" required></label><label class="field"><span>Titulo principal</span><input name="title" value="' + esc(banner.title) + '" required></label><label class="field"><span>Descricao</span><textarea name="subtitle" rows="3" required>' + esc(banner.subtitle) + '</textarea></label><div class="upload-zone"><input id="banner-image-file" type="file" accept="image/jpeg,image/png,image/webp"><span>' + icon("image-up") + '</span><div><strong>Imagem desktop</strong><p>1920 x 800 px, WebP ou JPG. A imagem sera otimizada automaticamente.</p></div></div><label class="field"><span>URL ou imagem atual</span><input name="image" value="' + esc(banner.image) + '" required></label><div class="form-grid"><label class="field"><span>Botao principal</span><input name="primaryLabel" value="' + esc(banner.primaryLabel) + '"></label><label class="field"><span>Destino</span><input name="primaryLink" value="' + esc(banner.primaryLink) + '"></label><label class="field"><span>Botao secundario</span><input name="secondaryLabel" value="' + esc(banner.secondaryLabel) + '"></label><label class="field"><span>Destino secundario</span><input name="secondaryLink" value="' + esc(banner.secondaryLink) + '"></label><label class="field"><span>Posicao da imagem</span><select name="position"><option value="left"' + (banner.position === "left" ? " selected" : "") + '>Esquerda</option><option value="center"' + (banner.position === "center" ? " selected" : "") + '>Centro</option><option value="right"' + (banner.position === "right" ? " selected" : "") + '>Direita</option></select></label><label class="field"><span>Camada escura (%)</span><input name="overlay" type="number" min="35" max="90" value="' + banner.overlay + '"></label></div><label class="check-field"><input name="active" type="checkbox"' + (banner.active ? " checked" : "") + '><span>Publicar este slide</span></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + " Salvar slide</button></div></form>", true);
@@ -888,6 +1032,10 @@
     }); });
     const resetCategory = $("[data-category-reset]", $("#admin-modal"));
     if (resetCategory) resetCategory.addEventListener("click", function () { categoryModal(); });
+    $$("[data-add-home-section]", $("#admin-modal")).forEach(function (button) { button.addEventListener("click", function () { addHomeSection(button.dataset.addHomeSection); }); });
+    $$("[data-apply-home-template]", $("#admin-modal")).forEach(function (button) { button.addEventListener("click", function () {
+      if (confirm("Aplicar este modelo de home? A ordem e a visibilidade das secoes do sistema serao atualizadas.")) applyHomeTemplate(button.dataset.applyHomeTemplate);
+    }); });
     const cepButton = $("#lookup-region-cep", $("#admin-modal"));
     const cepInput = $("#region-cep", $("#admin-modal"));
     if (cepButton && form) cepButton.addEventListener("click", function () { lookupRegionCep(form); });
@@ -915,15 +1063,23 @@
   function handleAction(action, id, element) {
     const find = function (list) { return list.find(function (item) { return item.id === id; }); };
     if (action === "publish") publish();
-    if (action === "preview-site" || action === "builder-preview") window.open("./index.html", "_blank", "noopener");
-    if (action === "builder-refresh") { const frame = $("#site-preview"); if (frame) frame.src = "./index.html?preview=" + Date.now(); }
-    if (action === "builder-save") { saveDraft("Estrutura salva"); const frame = $("#site-preview"); if (frame) frame.src = "./index.html?preview=" + Date.now(); }
-    if (action === "move-block-up" || action === "move-block-down") { moveInArray(state.pageBlocks, selectedBlockId, action.endsWith("up") ? -1 : 1); saveDraft(); renderPanel(); }
-    if (action === "add-section") {
-      const hidden = state.pageBlocks.filter(function (item) { return !item.visible; });
-      if (!hidden.length) toast("Todas as secoes disponiveis ja estao na pagina");
-      else { hidden[0].visible = true; selectedBlockId = hidden[0].id; saveDraft(); renderPanel(); }
+    if (action === "preview-site" || action === "builder-preview") window.open("./index.html?theme=" + state.builderSettings.previewTheme, "_blank", "noopener");
+    if (action === "builder-refresh") { const frame = $("#site-preview"); if (frame) frame.src = "./index.html?preview=" + Date.now() + "&theme=" + state.builderSettings.previewTheme; }
+    if (action === "builder-save") { saveDraft("Estrutura salva"); scheduleBuilderPreview(); }
+    if (action === "home-templates") homeTemplatesModal();
+    if (action === "add-section") sectionLibraryModal();
+    if (action === "move-block-up" || action === "move-block-down") { recordBuilderHistory(); moveInArray(state.pageBlocks, selectedBlockId, action.endsWith("up") ? -1 : 1); saveDraft(); renderPanel(); }
+    if (action === "duplicate-block") {
+      const source = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; });
+      if (source && !source.locked) { recordBuilderHistory(); const copy = FL.clone(source); copy.id = FL.uid("section"); copy.label += " - copia"; copy.anchor = ""; state.pageBlocks.splice(state.pageBlocks.indexOf(source) + 1, 0, copy); selectedBlockId = copy.id; saveDraft("Secao duplicada"); renderPanel(); }
     }
+    if (action === "delete-block") {
+      const source = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; });
+      if (source && !source.locked && confirm("Excluir esta secao da pagina inicial?")) { recordBuilderHistory(); const index = state.pageBlocks.indexOf(source); state.pageBlocks.splice(index, 1); selectedBlockId = state.pageBlocks[Math.max(0, index - 1)].id; saveDraft("Secao excluida"); renderPanel(); }
+    }
+    if (action === "builder-undo" && builderHistory.length) { const current = builderSnapshot(); const previous = builderHistory.pop(); builderFuture.push(current); restoreBuilderSnapshot(previous); toast("Alteracao desfeita"); renderPanel(); }
+    if (action === "builder-redo" && builderFuture.length) { const current = builderSnapshot(); const next = builderFuture.pop(); builderHistory.push(current); restoreBuilderSnapshot(next); toast("Alteracao refeita"); renderPanel(); }
+    if (action === "builder-theme") { state.builderSettings.previewTheme = state.builderSettings.previewTheme === "dark" ? "light" : "dark"; saveDraft(); renderPanel(); }
     if (action === "new-banner") bannerModal();
     if (action === "edit-banner") bannerModal(find(state.banners));
     if (action === "toggle-banner") { const item = find(state.banners); item.active = !item.active; saveDraft(); renderPanel(); }
@@ -1024,20 +1180,38 @@
     });
     $$("[data-bind]", $("#admin-panel")).forEach(function (element) {
       const eventName = element.type === "checkbox" || element.tagName === "SELECT" || element.type === "color" ? "change" : "input";
+      if (activePanel === "builder" && element.dataset.bind.indexOf("content.") === 0) element.addEventListener("focus", function () { if (!element.dataset.historyCaptured) { recordBuilderHistory(); element.dataset.historyCaptured = "true"; } });
       element.addEventListener(eventName, function () {
         const value = element.type === "checkbox" ? element.checked : element.type === "number" ? Number(element.value) : element.value;
         setPath(element.dataset.bind, value);
         if (element.type === "color") { const label = element.closest(".color-input").querySelector("b"); if (label) label.textContent = element.value; }
         saveDraft();
+        if (activePanel === "builder") scheduleBuilderPreview();
         if (element.dataset.bind.indexOf("coverageSettings.") === 0 && eventName === "change") renderPanel();
       });
     });
-    $$("[data-select-block]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { selectedBlockId = element.dataset.selectBlock; renderPanel(); }); });
-    $$("[data-toggle-block]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { const block = state.pageBlocks.find(function (item) { return item.id === element.dataset.toggleBlock; }); if (!block.locked) { block.visible = !block.visible; saveDraft(); renderPanel(); } }); });
+    $$("[data-select-block]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { selectedBlockId = element.dataset.selectBlock; builderInspectorTab = "content"; renderPanel(); }); });
+    $$("[data-toggle-block]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { const block = state.pageBlocks.find(function (item) { return item.id === element.dataset.toggleBlock; }); if (!block.locked) { recordBuilderHistory(); block.visible = !block.visible; saveDraft(); renderPanel(); } }); });
     const visible = $("[data-block-visible]", $("#admin-panel"));
-    if (visible) visible.addEventListener("change", function () { const block = state.pageBlocks.find(function (item) { return item.id === visible.dataset.blockVisible; }); block.visible = visible.checked; saveDraft(); renderPanel(); });
+    if (visible) visible.addEventListener("change", function () { const block = state.pageBlocks.find(function (item) { return item.id === visible.dataset.blockVisible; }); recordBuilderHistory(); block.visible = visible.checked; saveDraft(); renderPanel(); });
     const tone = $("[data-block-tone]", $("#admin-panel"));
-    if (tone) tone.addEventListener("change", function () { const block = state.pageBlocks.find(function (item) { return item.id === tone.dataset.blockTone; }); block.tone = tone.value; saveDraft(); });
+    if (tone) tone.addEventListener("change", function () { const block = state.pageBlocks.find(function (item) { return item.id === tone.dataset.blockTone; }); recordBuilderHistory(); block.tone = tone.value; saveDraft(); renderPanel(); });
+    $$("[data-inspector-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { builderInspectorTab = element.dataset.inspectorTab; renderPanel(); }); });
+    $$("[data-home-block-field]", $("#admin-panel")).forEach(function (element) {
+      let captured = false;
+      element.addEventListener("focus", function () { if (!captured) { recordBuilderHistory(); captured = true; } });
+      const eventName = element.tagName === "SELECT" ? "change" : "input";
+      element.addEventListener(eventName, function () { const block = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; }); if (block) { block.content = block.content || {}; block.content[element.dataset.homeBlockField] = element.value; saveDraft(); scheduleBuilderPreview(); } });
+    });
+    $$("[data-block-setting]", $("#admin-panel")).forEach(function (element) { element.addEventListener("change", function () { const block = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; }); if (block) { recordBuilderHistory(); block[element.dataset.blockSetting] = element.value; saveDraft(); renderPanel(); } }); });
+    $$("[data-block-style]", $("#admin-panel")).forEach(function (element) { element.addEventListener("change", function () { const block = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; }); if (block) { recordBuilderHistory(); block[element.dataset.blockStyle] = element.value; saveDraft(); renderPanel(); } }); });
+    $$("[data-block-device]", $("#admin-panel")).forEach(function (element) { element.addEventListener("change", function () { const block = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; }); if (block) { recordBuilderHistory(); block[element.dataset.blockDevice] = element.checked; saveDraft(); renderPanel(); } }); });
+    const blockLabel = $("[data-block-label]", $("#admin-panel"));
+    if (blockLabel) { let captured = false; blockLabel.addEventListener("focus", function () { if (!captured) { recordBuilderHistory(); captured = true; } }); blockLabel.addEventListener("input", function () { const block = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; }); block.label = blockLabel.value; saveDraft(); }); }
+    const blockAnchor = $("[data-block-anchor]", $("#admin-panel"));
+    if (blockAnchor) { let captured = false; blockAnchor.addEventListener("focus", function () { if (!captured) { recordBuilderHistory(); captured = true; } }); blockAnchor.addEventListener("input", function () { const block = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; }); block.anchor = slugify(blockAnchor.value); saveDraft(); scheduleBuilderPreview(); }); }
+    const builderZoom = $("[data-builder-zoom]", $("#admin-panel"));
+    if (builderZoom) builderZoom.addEventListener("change", function () { state.builderSettings.canvasZoom = Number(builderZoom.value); saveDraft(); renderPanel(); });
     $$("[data-device]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { builderDevice = element.dataset.device; renderPanel(); }); });
     $$("[data-builder-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { builderMobileTab = element.dataset.builderTab; renderPanel(); }); });
     bindBuilderDrag();
@@ -1085,6 +1259,7 @@
         event.preventDefault(); item.classList.remove("is-dragover");
         const targetId = item.dataset.blockId;
         if (!draggedId || draggedId === targetId) return;
+        recordBuilderHistory();
         const from = state.pageBlocks.findIndex(function (block) { return block.id === draggedId; });
         const to = state.pageBlocks.findIndex(function (block) { return block.id === targetId; });
         const moved = state.pageBlocks.splice(from, 1)[0];

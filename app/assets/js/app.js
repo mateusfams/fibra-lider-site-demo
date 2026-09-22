@@ -340,13 +340,80 @@
     setText("footer-company", state.brand.legalName + " · CNPJ " + state.brand.cnpj);
   }
 
+  function safeBlockUrl(value) {
+    const url = String(value || "#").trim();
+    if (url === "whatsapp") return FL.whatsappLink(state.brand.whatsapp, state.whatsapp.floatingMessage);
+    if (/^(https?:\/\/|mailto:|tel:|#|\.\/)/i.test(url)) return url;
+    return "#";
+  }
+
+  function blockParagraphs(value) {
+    return String(value || "").split(/\n+/).filter(Boolean).map(function (line) { return "<p>" + escapeHtml(line) + "</p>"; }).join("");
+  }
+
+  function structuredLines(value, size) {
+    return String(value || "").split("\n").map(function (line) {
+      const parts = line.split("|").map(function (part) { return part.trim(); });
+      while (parts.length < size) parts.push("");
+      return parts;
+    }).filter(function (parts) { return parts.some(Boolean); });
+  }
+
+  function renderCustomSection(block) {
+    const content = block.content || {};
+    const eyebrow = content.eyebrow ? '<span class="eyebrow">' + escapeHtml(content.eyebrow) + "</span>" : "";
+    const button = content.buttonLabel ? '<a class="button button--primary" href="' + escapeHtml(safeBlockUrl(content.buttonUrl)) + '"' + (String(content.buttonUrl).startsWith("http") || content.buttonUrl === "whatsapp" ? ' target="_blank" rel="noopener"' : "") + '>' + escapeHtml(content.buttonLabel) + " " + icon("arrow-right") + "</a>" : "";
+    let body = "";
+    if (block.type === "custom-content") {
+      body = '<div class="shell custom-content__inner">' + eyebrow + '<h2>' + escapeHtml(content.title) + "</h2>" + blockParagraphs(content.text) + button + "</div>";
+    }
+    if (block.type === "custom-media") {
+      body = '<div class="shell custom-media__inner' + (content.imageSide === "right" ? " is-reversed" : "") + '"><figure><img src="' + escapeHtml(content.image || state.banners[0].image) + '" alt="' + escapeHtml(content.imageAlt || content.title) + '" loading="lazy"></figure><div>' + eyebrow + '<h2>' + escapeHtml(content.title) + "</h2>" + blockParagraphs(content.text) + button + "</div></div>";
+    }
+    if (block.type === "custom-stats") {
+      const items = structuredLines(content.items, 2);
+      body = '<div class="shell"><div class="custom-section-heading">' + eyebrow + '<h2>' + escapeHtml(content.title) + '</h2><p>' + escapeHtml(content.text) + '</p></div><div class="custom-stats__grid">' + items.map(function (item) { return '<article><strong>' + escapeHtml(item[0]) + '</strong><span>' + escapeHtml(item[1]) + "</span></article>"; }).join("") + "</div></div>";
+    }
+    if (block.type === "custom-features") {
+      const items = structuredLines(content.items, 3);
+      body = '<div class="shell"><div class="custom-section-heading">' + eyebrow + '<h2>' + escapeHtml(content.title) + '</h2><p>' + escapeHtml(content.text) + '</p></div><div class="custom-features__grid">' + items.map(function (item) { return '<article><span>' + icon(item[0] || "sparkles") + '</span><h3>' + escapeHtml(item[1]) + '</h3><p>' + escapeHtml(item[2]) + "</p></article>"; }).join("") + "</div></div>";
+    }
+    if (block.type === "custom-gallery") {
+      const items = structuredLines(content.items, 2);
+      body = '<div class="shell"><div class="custom-section-heading">' + eyebrow + '<h2>' + escapeHtml(content.title) + '</h2><p>' + escapeHtml(content.text) + '</p></div><div class="custom-gallery__grid">' + items.map(function (item) { return '<figure><img src="' + escapeHtml(item[0]) + '" alt="' + escapeHtml(item[1]) + '" loading="lazy"><figcaption>' + escapeHtml(item[1]) + "</figcaption></figure>"; }).join("") + "</div></div>";
+    }
+    if (block.type === "custom-cta") {
+      body = '<div class="shell custom-cta__inner"><div>' + eyebrow + '<h2>' + escapeHtml(content.title) + '</h2><p>' + escapeHtml(content.text) + "</p></div>" + button + "</div>";
+    }
+    return '<section class="section page-section custom-builder-section custom-builder-section--' + escapeHtml(block.type.replace("custom-", "")) + '" data-section="' + escapeHtml(block.id) + '">' + body + "</section>";
+  }
+
+  function renderCustomSections() {
+    $$(".custom-builder-section", $("#conteudo")).forEach(function (section) { section.remove(); });
+    state.pageBlocks.filter(function (block) { return String(block.type).startsWith("custom-"); }).forEach(function (block) {
+      $("#conteudo").insertAdjacentHTML("beforeend", renderCustomSection(block));
+    });
+  }
+
   function applyPageBlocks() {
     const main = $("#conteudo");
+    renderCustomSections();
     state.pageBlocks.forEach(function (block) {
       const section = $('[data-section="' + block.id + '"]');
       if (!section) return;
       section.hidden = block.visible === false;
       section.dataset.tone = block.tone || "light";
+      section.dataset.spacing = block.spacing || "normal";
+      section.dataset.container = block.container || "normal";
+      section.dataset.align = block.alignment || "left";
+      section.dataset.hideMobile = String(Boolean(block.hideMobile));
+      section.dataset.hideDesktop = String(Boolean(block.hideDesktop));
+      const background = String(block.backgroundImage || "");
+      const safeBackground = /^(https?:\/\/|data:image\/|\.\/)/i.test(background) ? background : "";
+      section.classList.toggle("has-builder-background", Boolean(safeBackground));
+      section.style.backgroundImage = safeBackground ? 'url("' + safeBackground.replace(/["\n\r]/g, "") + '")' : "";
+      section.style.backgroundPosition = block.backgroundPosition || "center";
+      if (String(block.type).startsWith("custom-")) section.id = block.anchor || block.id;
       main.appendChild(section);
     });
   }

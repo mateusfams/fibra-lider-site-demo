@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "fibra-lider-studio-state-v8";
-  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v7"];
+  const STORAGE_KEY = "fibra-lider-studio-state-v9";
+  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v8", "fibra-lider-studio-state-v7"];
   const EVENTS_KEY = "fibra-lider-studio-events-v2";
   const SESSION_KEY = "fibra-lider-studio-session-v2";
 
@@ -12,7 +12,7 @@
 
   const defaultState = {
     meta: {
-      version: "1.2.0-mvp",
+      version: "1.3.0-mvp",
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
       status: "published",
@@ -205,6 +205,12 @@
       maxWidth: 1920,
       maxFileMb: 8,
     },
+    builderSettings: {
+      autosave: true,
+      canvasZoom: 100,
+      showSectionLabels: true,
+      previewTheme: "light",
+    },
     mediaLibrary: [
       { id: "media-hero-family", name: "Familia conectada", url: "./assets/img/hero-family-fiber.jpg", type: "image/jpeg", width: 1774, height: 887, bytes: 224939, originalBytes: 224939, usage: "Banner", createdAt: "2026-09-21" },
       { id: "media-streaming", name: "Streaming em familia", url: "./assets/img/banner-streaming-family.jpg", type: "image/jpeg", width: 1672, height: 941, bytes: 227341, originalBytes: 227341, usage: "Banner", createdAt: "2026-09-21" },
@@ -314,7 +320,7 @@
       stored = clone(defaultState);
     }
     const next = { ...clone(defaultState), ...stored };
-    ["meta", "brand", "theme", "slider", "content", "whatsapp", "seo", "integrations", "footer", "dashboardTargets", "coverageSettings", "mediaSettings"].forEach(function (key) {
+    ["meta", "brand", "theme", "slider", "content", "whatsapp", "seo", "integrations", "footer", "dashboardTargets", "coverageSettings", "mediaSettings", "builderSettings"].forEach(function (key) {
       next[key] = { ...clone(defaultState[key]), ...(stored[key] || {}) };
     });
     ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "pageBlocks", "pages", "mediaLibrary"].forEach(function (key) {
@@ -322,6 +328,9 @@
     });
     next.regions = next.regions.map(function (region, index) {
       return { type: "city", cep: "", stateCode: "SP", address: region.name + " - SP", radiusKm: next.coverageSettings.defaultRadiusKm, color: index === 0 ? next.theme.mapAccent : region.color || next.theme.primary, ...region };
+    });
+    next.pageBlocks = next.pageBlocks.map(function (block) {
+      return { spacing: "normal", container: "normal", alignment: "left", anchor: "", backgroundImage: "", backgroundPosition: "center", hideMobile: false, hideDesktop: false, content: {}, ...block, content: { ...(block.content || {}) } };
     });
     next.meta.version = defaultState.meta.version;
     return next;
