@@ -260,6 +260,32 @@
       </article>
     </div>
 
+    <div class="modal lead-modal" id="lead-modal" hidden>
+      <div class="modal-backdrop" data-close-lead-modal></div>
+      <article class="lead-dialog" role="dialog" aria-modal="true" aria-labelledby="lead-title">
+        <button class="icon-button modal-close" type="button" data-close-lead-modal aria-label="Fechar"><i data-lucide="x"></i></button>
+        <div class="lead-dialog__summary">
+          <span class="lead-dialog__icon"><i data-lucide="wifi"></i></span>
+          <span class="eyebrow">Seu plano selecionado</span>
+          <h2 id="lead-plan-name"></h2>
+          <strong id="lead-plan-price"></strong>
+          <span class="lead-offer-badge" id="lead-offer-badge" hidden></span>
+          <ul id="lead-plan-features"></ul>
+        </div>
+        <form class="lead-dialog__form" id="lead-form">
+          <input id="lead-plan-id" name="planId" type="hidden">
+          <span class="eyebrow">Atendimento comercial</span>
+          <h2 id="lead-title">Vamos confirmar os seus dados.</h2>
+          <p>Preencha as informacoes abaixo para continuar com o plano escolhido.</p>
+          <label class="field"><span>Seu nome</span><input id="lead-name" name="name" autocomplete="name" maxlength="80" placeholder="Como podemos chamar voce?" required></label>
+          <label class="field"><span>WhatsApp</span><span class="input-with-icon"><i data-lucide="message-circle"></i><input id="lead-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="(19) 99999-9999" required></span><small>Usaremos este numero somente para dar continuidade ao seu interesse.</small></label>
+          <label class="lead-consent"><input id="lead-consent" name="consent" type="checkbox" required><span id="lead-consent-text"></span></label>
+          <button class="button button--primary button--block" type="submit">Continuar no WhatsApp <i data-lucide="arrow-up-right"></i></button>
+          <small class="lead-privacy"><i data-lucide="shield-check"></i> Seus dados nao sao publicados no site.</small>
+        </form>
+      </article>
+    </div>
+
     <div class="toast" id="site-toast" role="status" aria-live="polite" hidden></div>
 
     <aside class="cookie-banner" id="cookie-banner" hidden>

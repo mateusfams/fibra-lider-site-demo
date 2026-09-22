@@ -12,7 +12,7 @@
     plans: ["Planos e combos", "Conteudo"],
     catalog: ["Apps e beneficios", "Conteudo"],
     coverage: ["Cobertura regional", "Conteudo"],
-    support: ["Atendimento", "Conteudo"],
+    support: ["Leads e WhatsApp", "Conteudo"],
     campaigns: ["Campanhas e cupons", "Marketing"],
     seo: ["SEO local", "Marketing"],
     pixels: ["Pixels e analytics", "Marketing"],
@@ -26,7 +26,9 @@
   let selectedBlockId = "hero";
   let builderDevice = "desktop";
   let builderInspectorTab = "content";
+  let builderStudioTab = "layout";
   let activeCampaignTab = "popups";
+  let leadWorkspaceTab = "leads";
   let planFilter = "all";
   let pageEditId = null;
   let selectedPageBlockId = null;
@@ -99,6 +101,12 @@
     if (message) toast(message);
   }
 
+  function saveRuntime(message) {
+    state = FL.saveRuntimeState(state);
+    setSaveStatus(state.meta.status === "published" ? "saved" : "draft");
+    if (message) toast(message);
+  }
+
   function publish() {
     state = FL.saveState(state, true);
     setSaveStatus("saved");
@@ -158,6 +166,14 @@
     if (value < 1024) return value + " B";
     if (value < 1024 * 1024) return (value / 1024).toFixed(value > 102400 ? 0 : 1).replace(".", ",") + " KB";
     return (value / (1024 * 1024)).toFixed(1).replace(".", ",") + " MB";
+  }
+
+  function formatPhone(value) {
+    let digits = String(value || "").replace(/\D/g, "");
+    if (digits.length === 12 || digits.length === 13) digits = digits.slice(2);
+    if (digits.length === 11) return "(" + digits.slice(0, 2) + ") " + digits.slice(2, 7) + "-" + digits.slice(7);
+    if (digits.length === 10) return "(" + digits.slice(0, 2) + ") " + digits.slice(2, 6) + "-" + digits.slice(6);
+    return value || "Sem WhatsApp";
   }
 
   function stateSize() {
@@ -222,8 +238,9 @@
     const planClicks = count("plan_click");
     const whatsapp = count("whatsapp_click");
     const coverage = count("coverage_search");
-    const conversion = views ? ((whatsapp / views) * 100) : 0;
-    return { events: publicEvents, views, planClicks, whatsapp, coverage, conversion };
+    const leads = state.leads.length;
+    const conversion = views ? ((leads / views) * 100) : 0;
+    return { events: publicEvents, views, planClicks, whatsapp, leads, coverage, conversion };
   }
 
   function groupByPayload(events, key) {
@@ -261,15 +278,15 @@
     const mappedRegions = state.regions.filter(function (item) { return item.active && Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng)); }).length;
     return [
       panelHeader("Visao geral", "Acompanhe a jornada de aquisicao e os pontos que mais geram interesse.", '<div class="heading-actions"><select class="compact-select"><option>Ultimos 28 dias</option><option>Ultimos 7 dias</option></select><button class="button button--ghost" data-action="export-report">' + icon("download") + " Exportar</button></div>"),
-      '<section class="dashboard-welcome"><div><span><i class="status-dot"></i> Site ' + status.toLowerCase() + '</span><h3>Bom trabalho, equipe Fibra Lider.</h3><p>As campanhas estao gerando interesse principalmente nos planos de 600 Mega.</p><button class="text-button" data-goto="campaigns">Ver campanhas ' + icon("arrow-right") + '</button></div><div class="welcome-score"><small>Meta mensal de leads</small><strong>' + data.whatsapp + '<span> / ' + state.dashboardTargets.monthlyLeads + '</span></strong><div><i style="width:' + Math.min(100, (data.whatsapp / state.dashboardTargets.monthlyLeads) * 100) + '%"></i></div><p>' + Math.round((data.whatsapp / state.dashboardTargets.monthlyLeads) * 100) + '% da meta</p></div></section>',
+      '<section class="dashboard-welcome"><div><span><i class="status-dot"></i> Site ' + status.toLowerCase() + '</span><h3>Bom trabalho, equipe Fibra Lider.</h3><p>As campanhas estao gerando interesse principalmente nos planos de 600 Mega.</p><button class="text-button" data-goto="support">Abrir fila comercial ' + icon("arrow-right") + '</button></div><div class="welcome-score"><small>Meta mensal de leads</small><strong>' + data.leads + '<span> / ' + state.dashboardTargets.monthlyLeads + '</span></strong><div><i style="width:' + Math.min(100, (data.leads / state.dashboardTargets.monthlyLeads) * 100) + '%"></i></div><p>' + Math.round((data.leads / state.dashboardTargets.monthlyLeads) * 100) + '% da meta</p></div></section>',
       '<section class="metrics-grid">',
       metricCard("Visitantes", String(data.views), "+12,8%", "32% vieram do Google", "users", "blue"),
       metricCard("Interesse em planos", String(data.planClicks), "+18,4%", "600 Mega lidera cliques", "mouse-pointer-click", "violet"),
-      metricCard("Leads no WhatsApp", String(data.whatsapp), "+9,2%", data.conversion.toFixed(1).replace(".", ",") + "% de conversao", "message-circle", "green"),
+      metricCard("Leads capturados", String(data.leads), "+9,2%", data.conversion.toFixed(1).replace(".", ",") + "% de conversao", "contact-round", "green"),
       metricCard("Consultas de cobertura", String(data.coverage), "+6,7%", "Sumare concentra a procura", "map-pin-check", "orange"),
       "</section>",
       '<section class="signal-grid">',
-      '<article><span class="signal-icon signal-icon--green">' + icon("badge-check") + '</span><div><small>Conversao comercial</small><strong>' + data.conversion.toFixed(1).replace(".", ",") + '%</strong><p>visitas que chegaram ao WhatsApp</p></div></article>',
+      '<article><span class="signal-icon signal-icon--green">' + icon("badge-check") + '</span><div><small>Conversao comercial</small><strong>' + data.conversion.toFixed(1).replace(".", ",") + '%</strong><p>visitas que enviaram o formulario</p></div></article>',
       '<article><span class="signal-icon signal-icon--blue">' + icon("smartphone") + '</span><div><small>Audiencia mobile</small><strong>' + mobileShare + '%</strong><p>interacoes em telas menores</p></div></article>',
       '<article><span class="signal-icon signal-icon--violet">' + icon("megaphone") + '</span><div><small>Campanhas ativas</small><strong>' + state.popupCampaigns.filter(function (item) { return item.active; }).length + '</strong><p>' + state.coupons.filter(function (item) { return item.active; }).length + ' cupom ativo no site</p></div></article>',
       '<article><span class="signal-icon signal-icon--orange">' + icon("files") + '</span><div><small>Conteudo publicado</small><strong>' + state.pages.filter(function (item) { return item.status === "published"; }).length + '</strong><p>paginas internas disponiveis</p></div></article>',
@@ -289,7 +306,7 @@
       }).join("") + '</div><button class="text-button" data-goto="analytics">Abrir relatorio completo ' + icon("arrow-right") + "</button></article></section>",
       '<section class="dashboard-grid dashboard-grid--bottom"><article class="admin-card">',
       cardTitle("Funil comercial", "Da visita ao contato no WhatsApp", ""),
-      '<div class="funnel"><div><span>Visitantes</span><strong>' + data.views + '</strong><i style="--w:100%"></i></div><div><span>Planos visualizados</span><strong>' + data.planClicks + '</strong><i style="--w:72%"></i></div><div><span>Consulta de cobertura</span><strong>' + data.coverage + '</strong><i style="--w:48%"></i></div><div><span>Leads no WhatsApp</span><strong>' + data.whatsapp + '</strong><i style="--w:35%"></i></div></div>',
+      '<div class="funnel"><div><span>Visitantes</span><strong>' + data.views + '</strong><i style="--w:100%"></i></div><div><span>Planos visualizados</span><strong>' + data.planClicks + '</strong><i style="--w:72%"></i></div><div><span>Consulta de cobertura</span><strong>' + data.coverage + '</strong><i style="--w:48%"></i></div><div><span>Leads capturados</span><strong>' + data.leads + '</strong><i style="--w:35%"></i></div></div>',
       '</article><article class="admin-card">',
       cardTitle("Planos com maior interesse", "Cliques e contatos por oferta", ""),
       '<div class="ranking-list">' + topPlans.map(function (entry, index) {
@@ -387,13 +404,12 @@
     return '<div class="inspector-section"><span class="inspector-label">Organizacao</span><label class="field"><span>Nome no construtor</span><input data-block-label value="' + esc(block.label) + '"></label><label class="field"><span>Ancora da secao</span><input data-block-anchor value="' + esc(block.anchor || "") + '" placeholder="ex: nossa-rede"><small>Use apenas letras, numeros e hifens.</small></label><label class="toggle-row"><span><strong>Visivel no site</strong><small>Controla a publicacao desta secao</small></span><input type="checkbox" data-block-visible="' + esc(block.id) + '"' + (block.visible ? " checked" : "") + (block.locked ? " disabled" : "") + '><i></i></label><label class="toggle-row"><span><strong>Ocultar no celular</strong><small>Remove a secao em telas menores</small></span><input type="checkbox" data-block-device="hideMobile"' + (block.hideMobile ? " checked" : "") + '><i></i></label><label class="toggle-row"><span><strong>Ocultar no desktop</strong><small>Exibe somente em telas menores</small></span><input type="checkbox" data-block-device="hideDesktop"' + (block.hideDesktop ? " checked" : "") + '><i></i></label></div><div class="inspector-section"><span class="inspector-label">Acoes</span><div class="inspector-actions"><button class="button button--ghost" data-action="move-block-up">' + icon("arrow-up") + ' Subir</button><button class="button button--ghost" data-action="move-block-down">' + icon("arrow-down") + ' Descer</button>' + (!block.locked ? '<button class="button button--ghost" data-action="duplicate-block">' + icon("copy") + ' Duplicar</button><button class="button button--danger" data-action="delete-block">' + icon("trash-2") + ' Excluir</button>' : '<div class="locked-section-note">' + icon("lock-keyhole") + '<span>Secao estrutural protegida</span></div>') + "</div></div>";
   }
 
-  function renderBuilder() {
+  function renderBuilderLayout() {
     const block = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; }) || state.pageBlocks[0];
     selectedBlockId = block.id;
     const zoom = Math.min(100, Math.max(65, Number(state.builderSettings.canvasZoom || 100)));
     const previewTheme = state.builderSettings.previewTheme || "light";
     return [
-      panelHeader("Construtor da home", "Monte a pagina com secoes reutilizaveis, edite cada detalhe e visualize antes de publicar.", '<div class="heading-actions"><button class="button button--ghost" data-action="home-templates">' + icon("layout-template") + ' Modelos</button><button class="button button--ghost" data-action="builder-preview">' + icon("play") + ' Abrir preview</button><button class="button button--primary" data-action="builder-save">' + icon("save") + " Salvar estrutura</button></div>"),
       '<section class="builder-toolbar builder-toolbar--advanced"><div class="builder-history"><button class="icon-button" data-action="builder-undo" title="Desfazer"' + (builderHistory.length ? "" : " disabled") + '>' + icon("undo-2") + '</button><button class="icon-button" data-action="builder-redo" title="Refazer"' + (builderFuture.length ? "" : " disabled") + '>' + icon("redo-2") + '</button></div><div class="builder-device-switch"><button class="' + (builderDevice === "desktop" ? "is-active" : "") + '" data-device="desktop" title="Desktop">' + icon("monitor") + '</button><button class="' + (builderDevice === "tablet" ? "is-active" : "") + '" data-device="tablet" title="Tablet">' + icon("tablet") + '</button><button class="' + (builderDevice === "mobile" ? "is-active" : "") + '" data-device="mobile" title="Celular">' + icon("smartphone") + '</button></div><div class="builder-status"><span><i class="status-dot"></i> ' + state.pageBlocks.length + ' secoes</span><small>Alteracoes salvas automaticamente</small></div><div class="builder-view-actions"><label>Zoom <select data-builder-zoom><option value="75"' + (zoom === 75 ? " selected" : "") + '>75%</option><option value="90"' + (zoom === 90 ? " selected" : "") + '>90%</option><option value="100"' + (zoom === 100 ? " selected" : "") + '>100%</option></select></label><button class="icon-button" data-action="builder-theme" title="Alternar tema do preview">' + icon(previewTheme === "dark" ? "sun" : "moon") + '</button><button class="icon-button" data-action="builder-refresh" title="Atualizar preview">' + icon("refresh-cw") + "</button></div></section>",
       '<div class="builder-mobile-tabs" aria-label="Ferramentas do construtor"><button class="' + (builderMobileTab === "layers" ? "is-active" : "") + '" data-builder-tab="layers">' + icon("layers-3") + '<span>Estrutura</span></button><button class="' + (builderMobileTab === "canvas" ? "is-active" : "") + '" data-builder-tab="canvas">' + icon("monitor-smartphone") + '<span>Preview</span></button><button class="' + (builderMobileTab === "inspector" ? "is-active" : "") + '" data-builder-tab="inspector">' + icon("sliders-horizontal") + '<span>Propriedades</span></button></div>',
       '<section class="builder-workspace builder-workspace--advanced mobile-tab--' + builderMobileTab + '">',
@@ -406,6 +422,50 @@
       '<div class="builder-canvas" style="--builder-zoom:' + (zoom / 100) + '"><div class="preview-frame preview-frame--' + builderDevice + '"><div class="preview-browser"><span></span><span></span><span></span><div>fibralider.net.br</div></div><iframe id="site-preview" src="./index.html?preview=1&theme=' + previewTheme + '" title="Preview do site"></iframe></div></div>',
       '<aside class="builder-inspector"><div class="builder-panel-title"><div><strong>Propriedades</strong><small>' + esc(block.label) + '</small></div><span class="block-type-chip">' + icon(homeBlockIcon(block.type)) + esc(String(block.type).replace("custom-", "")) + '</span></div><div class="inspector-tabs"><button class="' + (builderInspectorTab === "content" ? "is-active" : "") + '" data-inspector-tab="content">Conteudo</button><button class="' + (builderInspectorTab === "design" ? "is-active" : "") + '" data-inspector-tab="design">Design</button><button class="' + (builderInspectorTab === "advanced" ? "is-active" : "") + '" data-inspector-tab="advanced">Avancado</button></div><div class="inspector-body">' + renderBuilderInspector(block) + "</div></aside></section>",
     ].join("");
+  }
+
+  function studioTabs() {
+    const tabs = [
+      ["layout", "panels-top-left", "Pagina", state.pageBlocks.length + " secoes"],
+      ["slides", "gallery-horizontal-end", "Banners", state.banners.filter(function (item) { return item.active; }).length + " ativos"],
+      ["header", "panel-top", "Cabecalho", state.navigation.filter(function (item) { return item.visible; }).length + " links"],
+      ["footer", "panel-bottom", "Rodape", state.footer.columns.length + " colunas"],
+      ["brand", "palette", "Marca", "cores e componentes"],
+    ];
+    return '<nav class="studio-tabs" aria-label="Areas do construtor">' + tabs.map(function (item) {
+      return '<button class="' + (builderStudioTab === item[0] ? "is-active" : "") + '" data-studio-tab="' + item[0] + '"><span>' + icon(item[1]) + '</span><div><strong>' + item[2] + '</strong><small>' + item[3] + '</small></div></button>';
+    }).join("") + "</nav>";
+  }
+
+  function studioPreview(title, section) {
+    return '<aside class="studio-live-preview"><div class="studio-live-preview__head"><div><strong>' + esc(title) + '</strong><small>Preview sincronizado</small></div><button class="icon-button" data-action="builder-refresh" title="Atualizar preview">' + icon("refresh-cw") + '</button></div><div class="studio-live-preview__device"><iframe id="site-preview" src="./index.html?preview=1&theme=' + esc(state.builderSettings.previewTheme || "light") + (section ? "&section=" + encodeURIComponent(section) : "") + '" title="Preview do site"></iframe></div></aside>';
+  }
+
+  function renderStudioSlides() {
+    return '<section class="studio-editor-grid"><div class="studio-editor-stack"><article class="admin-card studio-summary-card">' + cardTitle("Carrossel principal", "Crie e ordene as mensagens da primeira dobra.", '<button class="button button--primary" data-action="new-banner">' + icon("plus") + ' Novo slide</button>') + '<div class="studio-spec-row"><span>' + icon("monitor") + '<b>1920 x 800</b><small>desktop</small></span><span>' + icon("smartphone") + '<b>1080 x 1350</b><small>mobile</small></span><span>' + icon("image-down") + '<b>WebP ou JPG</b><small>ate 5 MB</small></span></div><div class="settings-inline">' + toggle("Rotacao automatica", "slider.autoplay", "Troca os slides sem interacao") + toggle("Pausar no hover", "slider.pauseOnHover", "Mantem a leitura confortavel") + field("Intervalo", "slider.interval", { type: "number", help: "Milissegundos" }) + '</div></article><div class="studio-slide-list">' + state.banners.map(function (banner, index) {
+      return '<article class="studio-slide-card"><div class="studio-slide-card__image"><img src="' + esc(banner.image) + '" alt=""><span>0' + (index + 1) + '</span></div><div><span class="status-badge ' + (banner.active ? "status-badge--success" : "") + '">' + (banner.active ? "Publicado" : "Pausado") + '</span><h3>' + esc(banner.name) + '</h3><p>' + esc(banner.title) + '</p><small>' + esc(banner.primaryLabel) + ' &middot; camada ' + banner.overlay + '%</small></div><div class="row-actions"><button class="icon-button" data-action="toggle-banner" data-id="' + esc(banner.id) + '" title="' + (banner.active ? "Pausar" : "Ativar") + '">' + icon(banner.active ? "pause" : "play") + '</button><button class="icon-button" data-action="edit-banner" data-id="' + esc(banner.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button" data-action="duplicate-banner" data-id="' + esc(banner.id) + '" title="Duplicar">' + icon("copy") + '</button><button class="icon-button icon-button--danger" data-action="delete-banner" data-id="' + esc(banner.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></article>';
+    }).join("") + '</div></div>' + studioPreview("Banner e primeira dobra", "hero") + "</section>";
+  }
+
+  function renderStudioHeader() {
+    return '<section class="studio-editor-grid"><div class="studio-editor-stack"><article class="admin-card">' + cardTitle("Menu principal", "Edite os links exibidos no cabecalho.", '<button class="button button--ghost" data-action="add-nav-link">' + icon("plus") + ' Adicionar link</button>') + '<div class="editable-list">' + state.navigation.map(function (item, index) {
+      return '<div class="editable-row"><span class="drag-handle">' + icon("grip-vertical") + '</span><div class="editable-row__fields"><input value="' + esc(item.label) + '" data-nav-label="' + esc(item.id) + '" aria-label="Nome do link"><input value="' + esc(item.href) + '" data-nav-href="' + esc(item.id) + '" aria-label="Destino do link"></div><button class="icon-button" data-action="move-nav-up" data-id="' + esc(item.id) + '" title="Subir"' + (index === 0 ? " disabled" : "") + '>' + icon("arrow-up") + '</button><button class="icon-button" data-action="toggle-nav" data-id="' + esc(item.id) + '" title="Visibilidade">' + icon(item.visible ? "eye" : "eye-off") + "</button></div>";
+    }).join("") + '</div></article><article class="admin-card">' + cardTitle("Marca e acoes", "Elementos permanentes do topo do site.", "") + '<div class="form-grid">' + field("Logo em fundo claro", "brand.logoDark", {}) + field("Telefone", "brand.phone", {}) + field("Area do cliente", "brand.clientAreaUrl", { type: "url" }) + '</div>' + toggle("Permitir troca de tema", "theme.visitorThemeToggle", "Mostra o seletor claro e escuro") + '</article></div>' + studioPreview("Cabecalho do site", "hero") + "</section>";
+  }
+
+  function renderStudioFooter() {
+    return '<section class="studio-editor-grid"><div class="studio-editor-stack"><article class="admin-card">' + cardTitle("Mensagem institucional", "Conteudo e dados exibidos ao final de todas as paginas.", "") + field("Descricao", "footer.description", { type: "textarea", rows: 3 }) + field("Copyright", "footer.copyright", {}) + '<div class="form-grid">' + field("Telefone", "brand.phone", {}) + field("E-mail", "brand.email", { type: "email" }) + field("Endereco", "brand.address", {}) + field("Area do cliente", "brand.clientAreaUrl", { type: "url" }) + '</div></article><article class="admin-card">' + cardTitle("Colunas de navegacao", "Os links acompanham as jornadas principais do site.", '<span class="status-badge">' + state.footer.columns.length + ' colunas</span>') + '<div class="footer-column-editor">' + state.footer.columns.map(function (column, columnIndex) { return '<div><label class="field"><span>Titulo da coluna</span><input data-footer-column-title="' + columnIndex + '" value="' + esc(column.title) + '"></label>' + column.links.map(function (link, linkIndex) { return '<div class="footer-link-fields"><input data-footer-link-label="' + columnIndex + ':' + linkIndex + '" value="' + esc(link.label) + '" aria-label="Nome do link"><input data-footer-link-href="' + columnIndex + ':' + linkIndex + '" value="' + esc(link.href) + '" aria-label="Destino do link"></div>'; }).join("") + '</div>'; }).join("") + '</div></article></div>' + studioPreview("Rodape completo", "final") + "</section>";
+  }
+
+  function renderStudioBrand() {
+    const colors = [["Cor principal", "theme.primary"], ["Azul profundo", "theme.primaryDark"], ["Cor de destaque", "theme.accent"], ["Texto", "theme.ink"], ["Fundo", "theme.surface"], ["Superficie", "theme.panel"]];
+    return '<section class="studio-brand-layout"><div class="studio-editor-stack"><article class="admin-card theme-presets">' + cardTitle("Sistemas de cor", "Comece por uma direcao visual e personalize os tokens.", '<span class="status-badge">4 estilos</span>') + '<div class="theme-preset-grid">' + Object.entries(THEME_PRESETS).map(function (entry) { const preset = entry[1]; return '<button data-action="apply-theme-preset" data-preset="' + entry[0] + '"><span><i style="background:' + preset.primary + '"></i><i style="background:' + preset.primaryDark + '"></i><i style="background:' + preset.accent + '"></i></span><strong>' + esc(preset.label) + '</strong><small>' + esc(preset.description) + '</small>' + icon("arrow-up-right") + '</button>'; }).join("") + '</div></article><article class="admin-card">' + cardTitle("Paleta da marca", "Tokens aplicados em toda a experiencia.", "") + '<div class="color-grid">' + colors.map(function (item) { return field(item[0], item[1], { type: "color" }); }).join("") + '</div>' + field("Cor do mapa", "theme.mapAccent", { type: "color" }) + '</article><article class="admin-card">' + cardTitle("Componentes", "Defina tipografia, densidade e superficies.", "") + '<div class="form-grid">' + field("Tipografia", "theme.font", { type: "select", options: [{ value: "Inter", label: "Inter" }, { value: "Manrope", label: "Manrope" }, { value: "Arial", label: "Arial" }] }) + field("Densidade", "theme.density", { type: "select", options: [{ value: "compact", label: "Compacta" }, { value: "comfortable", label: "Confortavel" }, { value: "airy", label: "Espacosa" }] }) + field("Botoes", "theme.buttonStyle", { type: "select", options: [{ value: "square", label: "Retos" }, { value: "soft", label: "Suaves" }, { value: "pill", label: "Capsula" }] }) + field("Cards", "theme.cardStyle", { type: "select", options: [{ value: "bordered", label: "Com contorno" }, { value: "elevated", label: "Elevados" }, { value: "flat", label: "Planos" }] }) + field("Sombras", "theme.shadow", { type: "select", options: [{ value: "none", label: "Sem sombra" }, { value: "soft", label: "Suave" }, { value: "strong", label: "Marcante" }] }) + field("Arredondamento", "theme.radius", { type: "number" }) + field("Tema padrao", "theme.defaultMode", { type: "select", options: [{ value: "light", label: "Claro" }, { value: "dark", label: "Escuro" }, { value: "system", label: "Sistema" }] }) + '</div>' + toggle("Animar secoes", "theme.sectionReveal", "Movimento sutil durante a rolagem") + '</article><article class="admin-card">' + cardTitle("Arquivos da marca", "Versoes corretas para fundos claros e escuros.", '<button class="text-button" data-goto="media">Abrir midia ' + icon("arrow-right") + '</button>') + field("Logo em fundo claro", "brand.logoDark", {}) + field("Logo em fundo escuro", "brand.logo", {}) + field("Icone do site", "brand.icon", {}) + '</article></div>' + studioPreview("Identidade aplicada", "hero") + "</section>";
+  }
+
+  function renderBuilder() {
+    const views = { layout: renderBuilderLayout, slides: renderStudioSlides, header: renderStudioHeader, footer: renderStudioFooter, brand: renderStudioBrand };
+    const actions = builderStudioTab === "layout" ? '<button class="button button--ghost" data-action="home-templates">' + icon("layout-template") + ' Modelos</button>' : "";
+    return panelHeader("Site Studio", "Edite toda a experiencia do template base em um unico lugar.", '<div class="heading-actions">' + actions + '<button class="button button--ghost" data-action="builder-preview">' + icon("play") + ' Abrir preview</button><button class="button button--primary" data-action="builder-save">' + icon("save") + ' Salvar alteracoes</button></div>') + '<div class="studio-command-bar"><div><span class="live-chip"><i></i> Edicao visual</span><strong>Home principal</strong><small>Rascunho salvo automaticamente</small></div><div><span>' + icon("shield-check") + ' componentes seguros</span><span>' + icon("smartphone") + ' responsivo</span><span>' + icon("history") + ' historico local</span></div></div>' + studioTabs() + (views[builderStudioTab] || renderBuilderLayout)();
   }
 
   function pageBlockIcon(type) {
@@ -542,13 +602,96 @@
     return '<div class="admin-map-shell map-style--' + esc(state.coverageSettings.mapStyle) + '"><div class="admin-map" id="admin-regional-map"></div><div class="map-scale"><span>Menor procura</span><i style="--map-accent:' + esc(state.theme.mapAccent) + '"></i><span>Maior procura</span></div><a class="map-provider-link" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(state.brand.address) + '" target="_blank" rel="noopener">' + icon("route") + ' Abrir no Google Maps</a></div>';
   }
 
+  function kmlElements(root, name) {
+    return Array.from(root.getElementsByTagNameNS ? root.getElementsByTagNameNS("*", name) : root.getElementsByTagName(name));
+  }
+
+  function kmlDirectText(root, name) {
+    const node = Array.from(root.children || []).find(function (child) { return child.localName === name || child.nodeName === name; });
+    return node ? String(node.textContent || "").trim().slice(0, 160) : "";
+  }
+
+  function parseKmlCoordinates(value, budget) {
+    const points = String(value || "").trim().split(/\s+/).map(function (entry) {
+      const parts = entry.split(",");
+      const lng = Number(parts[0]); const lat = Number(parts[1]);
+      return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? [lat, lng] : null;
+    }).filter(Boolean);
+    if (!points.length) return [];
+    const remaining = Math.max(0, budget.max - budget.used);
+    if (!remaining) return [];
+    const step = Math.max(1, Math.ceil(points.length / remaining));
+    const sampled = points.filter(function (_, index) { return index % step === 0; }).slice(0, remaining);
+    if (points.length > 1 && sampled.length > 1 && sampled[sampled.length - 1] !== points[points.length - 1]) sampled[sampled.length - 1] = points[points.length - 1];
+    budget.used += sampled.length;
+    return sampled;
+  }
+
+  function parseKmlDocument(kmlText) {
+    kmlText = String(kmlText || "").replace(/^\uFEFF/, "").replace(/^\u00ef\u00bb\u00bf/, "").trim();
+    if (kmlText.length > 8 * 1024 * 1024) throw new Error("O KML descompactado ultrapassa 8 MB.");
+    if (/<!DOCTYPE|<!ENTITY/i.test(kmlText)) throw new Error("O arquivo contem declaracoes XML nao permitidas.");
+    const documentNode = new DOMParser().parseFromString(kmlText, "application/xml");
+    if (kmlElements(documentNode, "parsererror").length) throw new Error("O KML possui XML invalido.");
+    const budget = { used: 0, max: 20000 };
+    const features = [];
+    kmlElements(documentNode, "Placemark").slice(0, 100).forEach(function (placemark, placemarkIndex) {
+      const name = kmlDirectText(placemark, "name") || "Area " + (placemarkIndex + 1);
+      kmlElements(placemark, "Polygon").forEach(function (polygon) {
+        const outer = kmlElements(polygon, "outerBoundaryIs")[0] || polygon;
+        const coordinates = kmlElements(outer, "coordinates")[0];
+        const points = parseKmlCoordinates(coordinates ? coordinates.textContent : "", budget);
+        if (points.length >= 3) features.push({ type: "polygon", name, coordinates: points });
+      });
+      kmlElements(placemark, "LineString").forEach(function (line) {
+        const coordinates = kmlElements(line, "coordinates")[0];
+        const points = parseKmlCoordinates(coordinates ? coordinates.textContent : "", budget);
+        if (points.length >= 2) features.push({ type: "line", name, coordinates: points });
+      });
+      kmlElements(placemark, "Point").forEach(function (point) {
+        const coordinates = kmlElements(point, "coordinates")[0];
+        const points = parseKmlCoordinates(coordinates ? coordinates.textContent : "", budget);
+        if (points[0]) features.push({ type: "point", name, coordinates: points[0] });
+      });
+    });
+    if (!features.length) throw new Error("Nenhum poligono, linha ou ponto foi encontrado no KML.");
+    return { features: features.slice(0, 160), coordinateCount: budget.used };
+  }
+
+  async function importCoverageFile(file) {
+    if (!file) return;
+    const extension = String(file.name.split(".").pop() || "").toLowerCase();
+    const limit = Math.max(1, Number(state.coverageSettings.maxImportMb || 5)) * 1024 * 1024;
+    if (!["kml", "kmz"].includes(extension)) { toast("Envie um arquivo KML ou KMZ do Google Earth.", "error"); return; }
+    if (file.size > limit) { toast("O arquivo ultrapassa o limite de " + state.coverageSettings.maxImportMb + " MB.", "error"); return; }
+    try {
+      let kmlText;
+      if (extension === "kmz") {
+        if (!window.JSZip) throw new Error("O leitor KMZ nao foi carregado.");
+        const zip = await window.JSZip.loadAsync(await file.arrayBuffer(), { checkCRC32: true });
+        const entries = Object.values(zip.files).filter(function (entry) { return !entry.dir && /\.kml$/i.test(entry.name); });
+        if (!entries.length) throw new Error("O KMZ nao contem um arquivo KML.");
+        const root = entries.find(function (entry) { return /(^|\/)doc\.kml$/i.test(entry.name); }) || entries[0];
+        if (root._data && Number(root._data.uncompressedSize || 0) > 8 * 1024 * 1024) throw new Error("O KML descompactado ultrapassa 8 MB.");
+        kmlText = await root.async("string");
+      } else {
+        kmlText = await file.text();
+      }
+      const parsed = parseKmlDocument(kmlText);
+      state.coverageFiles.unshift({ id: FL.uid("coverage"), name: file.name.replace(/\.(kml|kmz)$/i, ""), fileName: file.name, format: extension.toUpperCase(), bytes: file.size, importedAt: new Date().toISOString(), color: state.theme.mapAccent, active: true, coordinateCount: parsed.coordinateCount, features: parsed.features });
+      saveDraft(parsed.features.length + " areas importadas do Google Earth");
+      renderPanel();
+    } catch (error) { toast(error.message || "Nao foi possivel importar a cobertura.", "error"); }
+  }
+
   function initAdminMap() {
     const element = $("#admin-regional-map");
     if (adminMap) { adminMap.remove(); adminMap = null; }
     if (!element || !window.L) return;
     if (element._leaflet_id) delete element._leaflet_id;
     const regions = state.regions.filter(function (region) { return Number.isFinite(Number(region.lat)) && Number.isFinite(Number(region.lng)); });
-    if (!regions.length) { element.innerHTML = '<div class="empty-state"><h3>Cadastre coordenadas</h3><p>Adicione latitude e longitude para exibir as regioes no mapa.</p></div>'; return; }
+    const importedFiles = state.coverageFiles.filter(function (file) { return file.active; });
+    if (!regions.length && !importedFiles.length) { element.innerHTML = '<div class="empty-state"><h3>Cadastre ou importe uma cobertura</h3><p>Use cidade, CEP, KML ou KMZ para exibir a operacao no mapa.</p></div>'; return; }
     adminMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true }).setView([Number(state.coverageSettings.centerLat), Number(state.coverageSettings.centerLng)], 11);
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -564,19 +707,36 @@
       window.L.circleMarker(point, { radius: 7, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(adminMap)
         .bindTooltip(esc(region.name), { permanent: state.coverageSettings.showLabels, direction: "top", offset: [0, -8], className: "region-map-label" });
     });
+    importedFiles.forEach(function (file) {
+      const color = file.color || state.theme.mapAccent;
+      file.features.forEach(function (feature) {
+        if (feature.type === "polygon") {
+          window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.24), weight: 2 }).addTo(adminMap).bindTooltip('<strong>' + esc(feature.name) + '</strong><span>Area importada de ' + esc(file.fileName) + '</span>', { className: "coverage-tooltip" });
+          bounds.push.apply(bounds, feature.coordinates);
+        } else if (feature.type === "line") {
+          window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(adminMap).bindTooltip(esc(feature.name));
+          bounds.push.apply(bounds, feature.coordinates);
+        } else if (feature.type === "point") {
+          window.L.circleMarker(feature.coordinates, { radius: 6, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(adminMap).bindTooltip(esc(feature.name));
+          bounds.push(feature.coordinates);
+        }
+      });
+    });
     adminMap.fitBounds(bounds, { padding: [34, 34], maxZoom: 11 });
     setTimeout(function () { if (adminMap) adminMap.invalidateSize(); }, 80);
   }
 
   function renderCoverage() {
     const active = state.regions.filter(function (region) { return region.active; }).length;
+    const importedFeatures = state.coverageFiles.reduce(function (sum, file) { return sum + (file.active ? file.features.length : 0); }, 0);
     const averageInterest = state.regions.length ? Math.round(state.regions.reduce(function (sum, region) { return sum + Number(region.interest || 0); }, 0) / state.regions.length) : 0;
     const totalLeads = state.regions.reduce(function (sum, region) { return sum + Number(region.leads || 0); }, 0);
     return [
-      panelHeader("Cobertura regional", "Defina cidades, CEPs e raios de atendimento com validacao de endereco e rota.", '<button class="button button--primary" data-action="add-region">' + icon("plus") + " Nova area</button>"),
-      '<section class="quick-stats coverage-stats"><article><span>' + icon("map-pinned") + '</span><div><strong>' + active + '</strong><small>areas publicadas</small></div></article><article><span>' + icon("locate-fixed") + '</span><div><strong>' + state.regions.filter(function (region) { return region.cep; }).length + '</strong><small>areas com CEP validado</small></div></article><article><span>' + icon("activity") + '</span><div><strong>' + averageInterest + '%</strong><small>interesse medio</small></div></article><article><span>' + icon("message-circle") + '</span><div><strong>' + totalLeads + '</strong><small>leads por regiao</small></div></article></section>',
+      panelHeader("Cobertura regional", "Combine cidades, CEPs e os poligonos operacionais exportados pelo Google Earth.", '<div class="heading-actions"><label class="button button--ghost file-action">' + icon("file-up") + ' Importar KML/KMZ<input id="coverage-file-input" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"></label><button class="button button--primary" data-action="add-region">' + icon("plus") + " Nova area</button></div>"),
+      '<section class="quick-stats coverage-stats"><article><span>' + icon("map-pinned") + '</span><div><strong>' + active + '</strong><small>areas manuais publicadas</small></div></article><article><span>' + icon("shapes") + '</span><div><strong>' + importedFeatures + '</strong><small>geometrias importadas</small></div></article><article><span>' + icon("activity") + '</span><div><strong>' + averageInterest + '%</strong><small>interesse medio</small></div></article><article><span>' + icon("message-circle") + '</span><div><strong>' + totalLeads + '</strong><small>leads por regiao</small></div></article></section>',
       '<section class="admin-card coverage-controls">' + cardTitle("Aparencia e consulta", "Personalize o mapa para a marca e o fluxo de viabilidade.", '<span class="status-badge status-badge--success">ViaCEP + rotas Google</span>') + '<div class="settings-inline coverage-settings">' + field("Estilo do mapa", "coverageSettings.mapStyle", { type: "select", options: [{ value: "brand", label: "Cores da marca" }, { value: "street", label: "Mapa limpo" }, { value: "dark", label: "Contraste escuro" }] }) + field("Raio padrao", "coverageSettings.defaultRadiusKm", { type: "number", help: "Quilometros" }) + toggle("Consulta por CEP", "coverageSettings.cepLookup", "Preenche cidade e bairro automaticamente") + toggle("Mostrar nomes", "coverageSettings.showLabels", "Exibe rotulos fixos no mapa") + toggle("Intensidade de interesse", "coverageSettings.showInterest", "A opacidade representa a procura") + '</div></section>',
-      '<div class="coverage-integration-notice"><span>' + icon("shield-check") + '</span><div><strong>Integracao sem chave exposta</strong><p>Enderecos sao consultados pelo ViaCEP, pontos sao posicionados no mapa e rotas abrem no Google Maps em qualquer dispositivo.</p></div><a href="https://www.google.com/maps/dir/?api=1" target="_blank" rel="noopener">Testar Google Maps ' + icon("external-link") + '</a></div>',
+      '<div class="coverage-integration-notice"><span>' + icon("shield-check") + '</span><div><strong>Importacao local e controlada</strong><p>KML e KMZ sao lidos no navegador, limitados a 5 MB e convertidos somente em pontos, linhas e poligonos seguros. O arquivo original nao e enviado para terceiros.</p></div><a href="https://earth.google.com" target="_blank" rel="noopener">Abrir Google Earth ' + icon("external-link") + '</a></div>',
+      '<section class="admin-card coverage-file-manager">' + cardTitle("Arquivos do Google Earth", "Camadas operacionais que complementam os raios e cidades cadastrados.", '<span class="status-badge ' + (state.coverageFiles.length ? "status-badge--success" : "") + '">' + state.coverageFiles.length + ' arquivo(s)</span>') + (state.coverageFiles.length ? '<div class="coverage-file-list">' + state.coverageFiles.map(function (file) { return '<article><span>' + icon("map") + '</span><div><strong>' + esc(file.name) + '</strong><p>' + esc(file.fileName) + '</p><small>' + file.features.length + ' geometrias &middot; ' + file.coordinateCount + ' coordenadas &middot; ' + formatBytes(file.bytes) + '</small></div><label class="color-mini" title="Cor da camada"><input type="color" data-coverage-file-color="' + esc(file.id) + '" value="' + esc(file.color || state.theme.mapAccent) + '"></label><button class="icon-button" data-action="toggle-coverage-file" data-id="' + esc(file.id) + '" title="' + (file.active ? "Ocultar" : "Publicar") + '">' + icon(file.active ? "eye" : "eye-off") + '</button><button class="icon-button icon-button--danger" data-action="delete-coverage-file" data-id="' + esc(file.id) + '" title="Remover">' + icon("trash-2") + '</button></article>'; }).join("") + '</div>' : '<div class="empty-state empty-state--compact">' + icon("file-up") + '<h3>Importe o KMZ da operacao</h3><p>Poligonos de bairros, cidades e rotas aparecerao aqui e no mapa publico.</p></div>') + '</section>',
       '<section class="coverage-admin-layout coverage-admin-layout--pro"><article class="admin-card map-admin-card">' + cardTitle("Mapa de cobertura e interesse", "Raios configurados por area com as cores da marca.", '<span class="live-chip"><i></i> Atualizado agora</span>') + regionHeatMap() + '</article><article class="admin-card region-manager">' + cardTitle("Areas atendidas", "Status, CEP, raio e procura comercial.", "") + '<div class="region-search search-field">' + icon("search") + '<input id="region-search" type="search" placeholder="Buscar cidade, CEP ou status"></div><div class="region-list">' + state.regions.map(function (region) {
         return '<div class="region-admin-row" data-region-search="' + esc((region.name + " " + (region.cep || "") + " " + region.status).toLowerCase()) + '"><span class="region-heat" style="--level:' + region.interest + ';--region-color:' + esc(region.color || state.theme.mapAccent) + '"></span><div><span><strong>' + esc(region.name) + '</strong><em>' + esc(region.type === "cep" ? "CEP" : region.type === "region" ? "Regiao" : "Cidade") + '</em></span><small>' + esc(region.cep || "Sem CEP") + ' &middot; ' + esc(region.radiusKm) + ' km &middot; ' + esc(region.status) + '</small></div><div class="region-numbers"><strong>' + region.leads + '</strong><small>leads</small></div><div class="row-actions"><button class="icon-button" data-action="open-region-route" data-id="' + esc(region.id) + '" title="Abrir rota">' + icon("route") + '</button><button class="icon-button" data-action="toggle-region" data-id="' + esc(region.id) + '" title="' + (region.active ? "Ocultar" : "Publicar") + '">' + icon(region.active ? "eye" : "eye-off") + '</button><button class="icon-button" data-action="edit-region" data-id="' + esc(region.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-region" data-id="' + esc(region.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div>';
       }).join("") + "</div></article></section>",
@@ -584,12 +744,32 @@
   }
 
   function renderSupport() {
-    return [
-      panelHeader("Atendimento", "Configure canais publicos e padronize as mensagens enviadas pelo site.", '<button class="button button--primary" data-action="save-content">' + icon("save") + " Salvar atendimento</button>"),
-      '<section class="two-column-layout"><div class="stack"><article class="admin-card">' + cardTitle("WhatsApp comercial", "Numero e mensagens usadas em cada jornada.", "") + '<div class="form-grid">' + field("Numero principal", "brand.whatsapp", { help: "DDI + DDD + numero" }) + field("Numero secundario", "brand.whatsappSecondary", {}) + '</div>' + field("Mensagem do botao flutuante", "whatsapp.floatingMessage", { type: "textarea", rows: 3 }) + field("Mensagem de cobertura", "whatsapp.coverageTemplate", { type: "textarea", rows: 4, help: "Variaveis: {cep}, {city} e {neighborhood}" }) + field("Mensagem de plano", "whatsapp.planTemplate", { type: "textarea", rows: 7, help: "Variaveis: {plan}, {speed}, {price}, {category}" }) + '</article></div><article class="admin-card">' + cardTitle("Atalhos da central", "Cards exibidos na area de atendimento.", "") + '<div class="support-admin-list">' + state.supportCards.map(function (item) {
-        return '<div><span>' + icon(item.icon) + '</span><div><strong>' + esc(item.title) + '</strong><p>' + esc(item.text) + '</p><small>' + esc(item.label) + '</small></div><button class="icon-button" data-action="edit-support" data-id="' + esc(item.id) + '">' + icon("pencil") + '</button><button class="icon-button" data-action="toggle-support" data-id="' + esc(item.id) + '">' + icon(item.active ? "eye" : "eye-off") + "</button></div>";
-      }).join("") + "</div></article></section>",
-    ].join("");
+    const newLeads = state.leads.filter(function (lead) { return lead.status === "new"; }).length;
+    const contacted = state.leads.filter(function (lead) { return lead.status === "contacted"; }).length;
+    const content = leadWorkspaceTab === "settings" ? renderLeadSettings() : leadWorkspaceTab === "campaigns" ? renderWhatsappCampaigns() : renderLeadPipeline();
+    return panelHeader("Leads e WhatsApp", "Transforme interesse em conversas organizadas, sem disparos automaticos.", '<div class="heading-actions"><button class="button button--ghost" data-action="export-leads">' + icon("download") + ' Exportar leads</button><button class="button button--primary" data-action="new-whatsapp-campaign">' + icon("plus") + ' Nova campanha manual</button></div>') + '<section class="quick-stats lead-stats"><article><span>' + icon("contact-round") + '</span><div><strong>' + state.leads.length + '</strong><small>leads capturados</small></div></article><article><span>' + icon("sparkles") + '</span><div><strong>' + newLeads + '</strong><small>aguardando contato</small></div></article><article><span>' + icon("message-circle") + '</span><div><strong>' + contacted + '</strong><small>contatos iniciados</small></div></article><article><span>' + icon("send") + '</span><div><strong>' + state.whatsappCampaigns.filter(function (item) { return item.status === "active"; }).length + '</strong><small>campanhas manuais</small></div></article></section><div class="segmented-control lead-tabs"><button class="' + (leadWorkspaceTab === "leads" ? "is-active" : "") + '" data-lead-tab="leads">Leads</button><button class="' + (leadWorkspaceTab === "campaigns" ? "is-active" : "") + '" data-lead-tab="campaigns">Campanhas manuais</button><button class="' + (leadWorkspaceTab === "settings" ? "is-active" : "") + '" data-lead-tab="settings">Mensagens e captura</button></div>' + content;
+  }
+
+  function leadPlan(lead) {
+    return state.plans.find(function (plan) { return plan.id === lead.planId; });
+  }
+
+  function renderLeadPipeline() {
+    return '<section class="admin-card lead-pipeline">' + cardTitle("Fila comercial", "Contatos capturados no site, ordenados pelos mais recentes.", '<span class="status-badge status-badge--success">Atualizacao local</span>') + '<div class="lead-table"><div class="lead-table__head"><span>Contato</span><span>Interesse</span><span>Origem</span><span>Status</span><span>Acao</span></div>' + state.leads.map(function (lead) {
+      const plan = leadPlan(lead); const coupon = state.coupons.find(function (item) { return item.id === lead.couponId; });
+      return '<article><div class="lead-contact"><span>' + esc((lead.name || "L").slice(0, 2).toUpperCase()) + '</span><div><strong>' + esc(lead.name) + '</strong><small>' + esc(formatPhone(lead.whatsapp)) + '</small></div></div><div><strong>' + esc(plan ? plan.speed + " - " + plan.title : "Plano removido") + '</strong><small>' + esc(coupon ? FL.couponLabel(coupon) : "Sem promocao") + '</small></div><div><strong>' + esc(lead.source || "Site") + '</strong><small>' + dateLabel(lead.createdAt) + '</small></div><div><select data-lead-status="' + esc(lead.id) + '"><option value="new"' + (lead.status === "new" ? " selected" : "") + '>Novo</option><option value="contacted"' + (lead.status === "contacted" ? " selected" : "") + '>Em contato</option><option value="qualified"' + (lead.status === "qualified" ? " selected" : "") + '>Qualificado</option><option value="closed"' + (lead.status === "closed" ? " selected" : "") + '>Convertido</option><option value="lost"' + (lead.status === "lost" ? " selected" : "") + '>Sem retorno</option></select></div><div class="row-actions"><button class="button button--ghost button--compact" data-action="contact-lead" data-id="' + esc(lead.id) + '">' + icon("message-circle") + ' Conversar</button><button class="icon-button icon-button--danger" data-action="delete-lead" data-id="' + esc(lead.id) + '" title="Excluir lead">' + icon("trash-2") + '</button></div></article>';
+    }).join("") + (state.leads.length ? "" : '<div class="empty-state">' + icon("contact-round") + '<h3>Nenhum lead capturado</h3><p>Os contatos enviados pela escolha de planos aparecerao aqui.</p></div>') + '</div></section>';
+  }
+
+  function renderWhatsappCampaigns() {
+    return '<section class="manual-campaign-grid">' + state.whatsappCampaigns.map(function (campaign) {
+      const eligible = state.leads.filter(function (lead) { return !campaign.planIds.length || campaign.planIds.includes(lead.planId); });
+      return '<article class="admin-card manual-campaign-card"><div class="manual-campaign-card__head"><span>' + icon("message-square-text") + '</span><div><span class="status-badge ' + (campaign.status === "active" ? "status-badge--success" : "") + '">' + (campaign.status === "active" ? "Ativa" : "Rascunho") + '</span><h3>' + esc(campaign.name) + '</h3></div><button class="icon-button" data-action="edit-whatsapp-campaign" data-id="' + esc(campaign.id) + '" title="Editar">' + icon("pencil") + '</button></div><p>' + esc(campaign.message) + '</p><div class="campaign-audience"><span>' + icon("users") + '<strong>' + eligible.length + '</strong> leads compativeis</span><span>' + icon("send") + '<strong>' + campaign.contactsSent + '</strong> contatos abertos</span></div><div class="manual-lead-queue">' + eligible.slice(0, 4).map(function (lead) { const plan = leadPlan(lead); return '<div><span>' + esc((lead.name || "L").slice(0, 2).toUpperCase()) + '</span><div><strong>' + esc(lead.name) + '</strong><small>' + esc(plan ? plan.speed : "Sem plano") + '</small></div><button class="icon-button" data-action="contact-lead" data-id="' + esc(lead.id) + '" data-campaign-id="' + esc(campaign.id) + '" title="Abrir conversa">' + icon("send") + '</button></div>'; }).join("") + '</div></article>';
+    }).join("") + (state.whatsappCampaigns.length ? "" : '<div class="empty-state">' + icon("message-square-text") + '<h3>Nenhuma campanha manual</h3><p>Crie uma mensagem e selecione os planos que definem o publico.</p></div>') + '</section><div class="security-notice">' + icon("shield-check") + '<div><strong>Envio individual e consciente</strong><p>O sistema apenas prepara a mensagem. Cada conversa e aberta manualmente pelo atendente, sem disparo em massa ou automacao nao autorizada.</p></div></div>';
+  }
+
+  function renderLeadSettings() {
+    return '<section class="two-column-layout"><div class="stack"><article class="admin-card">' + cardTitle("Captura de interesse", "Defina o que acontece antes de abrir o WhatsApp.", "") + toggle("Capturar lead antes do WhatsApp", "leadSettings.captureEnabled", "Solicita nome e numero no clique do plano") + toggle("WhatsApp obrigatorio", "leadSettings.requireWhatsapp", "Evita registros sem canal de retorno") + field("Texto de consentimento", "leadSettings.consentText", { type: "textarea", rows: 3 }) + field("Retencao planejada", "leadSettings.retentionDays", { type: "number", help: "Dias; no SaaS sera aplicada por rotina automatica" }) + '</article><article class="admin-card">' + cardTitle("Mensagens do WhatsApp", "Variaveis sao preenchidas com o interesse capturado.", "") + field("Mensagem do plano", "whatsapp.planTemplate", { type: "textarea", rows: 9, help: "Variaveis: {name}, {leadWhatsapp}, {plan}, {speed}, {price}, {category}, {offer}" }) + field("Mensagem de cobertura", "whatsapp.coverageTemplate", { type: "textarea", rows: 5, help: "Variaveis: {cep}, {city}, {neighborhood}" }) + field("Botao flutuante", "whatsapp.floatingMessage", { type: "textarea", rows: 3 }) + '</article></div><article class="admin-card">' + cardTitle("Canais publicos", "Numeros e atalhos usados no site.", "") + '<div class="form-grid">' + field("WhatsApp principal", "brand.whatsapp", { help: "DDI + DDD + numero" }) + field("WhatsApp secundario", "brand.whatsappSecondary", {}) + '</div><div class="support-admin-list">' + state.supportCards.map(function (item) { return '<div><span>' + icon(item.icon) + '</span><div><strong>' + esc(item.title) + '</strong><p>' + esc(item.text) + '</p><small>' + esc(item.label) + '</small></div><button class="icon-button" data-action="edit-support" data-id="' + esc(item.id) + '">' + icon("pencil") + '</button><button class="icon-button" data-action="toggle-support" data-id="' + esc(item.id) + '">' + icon(item.active ? "eye" : "eye-off") + '</button></div>'; }).join("") + '</div></article></section>';
   }
 
   function renderCampaigns() {
@@ -612,7 +792,7 @@
   function renderCouponList() {
     return '<section class="coupon-grid">' + state.coupons.map(function (item) {
       const percent = Math.min(100, (Number(item.used || 0) / Math.max(1, Number(item.usageLimit || 1))) * 100);
-      return '<article class="coupon-card"><div class="coupon-card__top"><span class="status-badge ' + (item.active ? "status-badge--success" : "") + '">' + (item.active ? "Ativo" : "Inativo") + '</span><div class="row-actions"><button class="icon-button" data-action="edit-coupon" data-id="' + esc(item.id) + '">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-coupon" data-id="' + esc(item.id) + '">' + icon("trash-2") + '</button></div></div><small>' + esc(item.title) + '</small><button class="coupon-big-code" data-action="copy-code" data-code="' + esc(item.code) + '">' + esc(item.code) + icon("copy") + '</button><strong>' + esc(item.discount) + '</strong><p>' + esc(item.description) + '</p><div class="coupon-progress"><span><b>' + item.used + '</b> de ' + item.usageLimit + ' usos</span><div><i style="width:' + percent + '%"></i></div></div><footer><span>' + icon("calendar") + " Valido ate " + esc(item.expiresAt) + '</span><button data-action="toggle-coupon" data-id="' + esc(item.id) + '">' + (item.active ? "Pausar" : "Ativar") + "</button></footer></article>";
+      return '<article class="coupon-card"><div class="coupon-card__top"><span class="status-badge ' + (item.active ? "status-badge--success" : "") + '">' + (item.active ? "Ativo" : "Inativo") + '</span><div class="row-actions"><button class="icon-button" data-action="edit-coupon" data-id="' + esc(item.id) + '">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-coupon" data-id="' + esc(item.id) + '">' + icon("trash-2") + '</button></div></div><small>' + esc(item.title) + '</small><button class="coupon-big-code" data-action="copy-code" data-code="' + esc(item.code) + '">' + esc(item.code) + icon("copy") + '</button><strong>' + esc(FL.couponLabel(item)) + '</strong><p>' + esc(item.description) + '</p><div class="coupon-progress"><span><b>' + item.used + '</b> de ' + item.usageLimit + ' usos</span><div><i style="width:' + percent + '%"></i></div></div><footer><span>' + icon("calendar") + " Valido ate " + esc(item.expiresAt || "sem prazo") + '</span><button data-action="toggle-coupon" data-id="' + esc(item.id) + '">' + (item.active ? "Pausar" : "Ativar") + "</button></footer></article>";
     }).join("") + "</section>";
   }
 
@@ -638,7 +818,7 @@
       integrationCard("Meta Pixel", "Conversoes para Facebook e Instagram.", "facebook", "integrations.metaPixelEnabled", "integrations.metaPixelId", "123456789012345"),
       integrationCard("Google Ads", "Conversoes das campanhas de pesquisa.", "badge-dollar-sign", "integrations.googleAdsEnabled", "integrations.googleAdsId", "AW-XXXXXXXXX"),
       integrationCard("Google Tag Manager", "Container opcional para tags adicionais.", "tags", "integrations.gtmEnabled", "integrations.gtmId", "GTM-XXXXXXX"),
-      '</section><section class="admin-card event-catalog">' + cardTitle("Eventos preparados", "Acoes comerciais enviadas para as integracoes ativas.", "") + '<div><span>' + icon("eye") + '<b>page_view</b><small>Visualizacao da home</small></span><span>' + icon("mouse-pointer-click") + '<b>plan_click</b><small>Interesse em um plano</small></span><span>' + icon("message-circle") + '<b>whatsapp_click</b><small>Inicio de conversa</small></span><span>' + icon("map-pin") + '<b>coverage_search</b><small>Consulta regional</small></span><span>' + icon("ticket-percent") + '<b>coupon_copy</b><small>Copia de cupom</small></span></div></section>',
+      '</section><section class="admin-card event-catalog">' + cardTitle("Eventos preparados", "Acoes comerciais enviadas para as integracoes ativas.", "") + '<div><span>' + icon("eye") + '<b>page_view</b><small>Visualizacao da home</small></span><span>' + icon("mouse-pointer-click") + '<b>plan_click</b><small>Interesse em um plano</small></span><span>' + icon("contact-round") + '<b>lead_capture</b><small>Formulario comercial enviado</small></span><span>' + icon("message-circle") + '<b>whatsapp_click</b><small>Inicio de conversa</small></span><span>' + icon("map-pin") + '<b>coverage_search</b><small>Consulta regional</small></span><span>' + icon("ticket-percent") + '<b>coupon_copy</b><small>Copia de cupom</small></span></div></section>',
     ].join("");
   }
 
@@ -648,7 +828,7 @@
     const regions = Object.entries(groupByPayload(data.events, "region")).sort(function (a, b) { return b[1] - a[1]; });
     return [
       panelHeader("Desempenho", "Entenda canais, dispositivos, conversoes e oportunidades comerciais.", '<div class="heading-actions"><select class="compact-select"><option>28 dias</option><option>7 dias</option><option>Hoje</option></select><button class="button button--ghost" data-action="export-report">' + icon("download") + " Exportar CSV</button></div>"),
-      '<section class="metrics-grid">' + metricCard("Visitantes", data.views, "+12,8%", "comparado ao periodo anterior", "users", "blue") + metricCard("CTR dos planos", (data.views ? (data.planClicks / data.views) * 100 : 0).toFixed(1).replace(".", ",") + "%", "+3,1%", "cliques sobre visitas", "mouse-pointer-click", "violet") + metricCard("Conversao WhatsApp", data.conversion.toFixed(1).replace(".", ",") + "%", "+1,4%", "contatos sobre visitas", "message-circle", "green") + metricCard("Cobertura consultada", data.coverage, "+6,7%", "buscas no periodo", "map-pin-check", "orange") + '</section>',
+      '<section class="metrics-grid">' + metricCard("Visitantes", data.views, "+12,8%", "comparado ao periodo anterior", "users", "blue") + metricCard("CTR dos planos", (data.views ? (data.planClicks / data.views) * 100 : 0).toFixed(1).replace(".", ",") + "%", "+3,1%", "cliques sobre visitas", "mouse-pointer-click", "violet") + metricCard("Conversao em lead", data.conversion.toFixed(1).replace(".", ",") + "%", "+1,4%", "formularios sobre visitas", "contact-round", "green") + metricCard("Cobertura consultada", data.coverage, "+6,7%", "buscas no periodo", "map-pin-check", "orange") + '</section>',
       '<section class="analytics-layout"><article class="admin-card">' + cardTitle("Canais de aquisicao", "Participacao por origem de trafego.", "") + '<div class="donut-layout"><div class="donut-chart" style="--a:37%;--b:64%;--c:82%"><strong>' + data.views + '<small>visitas</small></strong></div><div class="donut-legend">' + sources.slice(0, 5).map(function (entry, index) { return '<div><i class="dot-' + (index + 1) + '"></i><span>' + esc(entry[0]) + '</span><strong>' + entry[1] + "</strong></div>"; }).join("") + '</div></div></article><article class="admin-card">' + cardTitle("Demanda por regiao", "Interacoes identificadas por cidade.", "") + '<div class="horizontal-bars">' + regions.map(function (entry, index) { const max = regions[0] ? regions[0][1] : 1; return '<div><span>' + esc(entry[0]) + '</span><div><i style="width:' + (entry[1] / max) * 100 + '%"></i></div><strong>' + entry[1] + "</strong></div>"; }).join("") + '</div></article><article class="admin-card device-card">' + cardTitle("Dispositivos", "Distribuicao estimada por viewport.", "") + '<div class="device-bars"><div><span>' + icon("smartphone") + ' Celular</span><strong>68%</strong><i><b style="width:68%"></b></i></div><div><span>' + icon("monitor") + ' Desktop</span><strong>27%</strong><i><b style="width:27%"></b></i></div><div><span>' + icon("tablet") + ' Tablet</span><strong>5%</strong><i><b style="width:5%"></b></i></div></div></article></section>',
     ].join("");
   }
@@ -690,6 +870,8 @@
   }
 
   function setPanel(panel) {
+    const studioAliases = { banners: "slides", navigation: "header", appearance: "brand" };
+    if (studioAliases[panel]) { builderStudioTab = studioAliases[panel]; panel = "builder"; }
     if (!PANEL_META[panel]) panel = "dashboard";
     activePanel = panel;
     history.replaceState(null, "", "#" + panel);
@@ -809,8 +991,13 @@
   }
 
   function couponModal(item) {
-    const coupon = item || { id: "", code: "", title: "", discount: "", description: "", startsAt: new Date().toISOString().slice(0, 10), expiresAt: "", usageLimit: 100, used: 0, active: true };
-    openModal(modalHeader(item ? "Editar cupom" : "Novo cupom", "Defina o codigo, beneficio e periodo de validade.") + '<form class="modal-form" data-form-kind="coupon"><input type="hidden" name="id" value="' + esc(coupon.id) + '"><div class="form-grid"><label class="field"><span>Codigo</span><input name="code" value="' + esc(coupon.code) + '" required></label><label class="field"><span>Beneficio</span><input name="discount" value="' + esc(coupon.discount) + '" placeholder="10% na adesao" required></label><label class="field"><span>Nome interno</span><input name="title" value="' + esc(coupon.title) + '" required></label><label class="field"><span>Limite de usos</span><input name="usageLimit" type="number" min="1" value="' + coupon.usageLimit + '"></label><label class="field"><span>Inicio</span><input name="startsAt" type="date" value="' + esc(coupon.startsAt) + '"></label><label class="field"><span>Termino</span><input name="expiresAt" type="date" value="' + esc(coupon.expiresAt) + '"></label></div><label class="field"><span>Descricao</span><textarea name="description" rows="3">' + esc(coupon.description) + '</textarea></label><label class="check-field"><input name="active" type="checkbox"' + (coupon.active ? " checked" : "") + '><span>Cupom ativo</span></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + " Salvar cupom</button></div></form>");
+    const coupon = item || { id: "", code: "", title: "", description: "", discountType: "percentage", discountValue: 10, durationType: "first_month", durationMonths: 1, autoApply: true, planIds: [], startsAt: new Date().toISOString().slice(0, 10), expiresAt: "", usageLimit: 100, used: 0, active: true };
+    openModal(modalHeader(item ? "Editar desconto" : "Novo desconto", "Configure valor, duracao e planos. A oferta sera calculada automaticamente no site.") + '<form class="modal-form" data-form-kind="coupon"><input type="hidden" name="id" value="' + esc(coupon.id) + '"><div class="form-grid"><label class="field"><span>Codigo</span><input name="code" value="' + esc(coupon.code) + '" maxlength="24" required></label><label class="field"><span>Nome interno</span><input name="title" value="' + esc(coupon.title) + '" required></label><label class="field"><span>Tipo de desconto</span><select name="discountType"><option value="percentage"' + (coupon.discountType === "percentage" ? " selected" : "") + '>Percentual (%)</option><option value="fixed"' + (coupon.discountType === "fixed" ? " selected" : "") + '>Valor fixo (R$)</option></select></label><label class="field"><span>Valor do desconto</span><input name="discountValue" type="number" min="0.01" max="100" step="0.01" value="' + esc(coupon.discountValue) + '" required></label><label class="field"><span>Duracao</span><select name="durationType"><option value="first_month"' + (coupon.durationType === "first_month" ? " selected" : "") + '>Somente no primeiro mes</option><option value="months"' + (coupon.durationType === "months" ? " selected" : "") + '>Primeiros meses</option><option value="lifetime"' + (coupon.durationType === "lifetime" ? " selected" : "") + '>Vitalicio enquanto o plano estiver ativo</option></select></label><label class="field"><span>Quantidade de meses</span><input name="durationMonths" type="number" min="1" max="36" value="' + esc(coupon.durationMonths || 1) + '"><small>Usado apenas na opcao primeiros meses.</small></label><label class="field"><span>Inicio</span><input name="startsAt" type="date" value="' + esc(coupon.startsAt) + '"></label><label class="field"><span>Termino</span><input name="expiresAt" type="date" value="' + esc(coupon.expiresAt) + '"></label><label class="field"><span>Limite de usos</span><input name="usageLimit" type="number" min="1" value="' + coupon.usageLimit + '"></label></div><label class="field"><span>Descricao comercial</span><textarea name="description" rows="3">' + esc(coupon.description) + '</textarea></label><fieldset class="plan-selector"><legend>Planos participantes</legend><p>Sem selecao, o desconto vale para todos os planos.</p><div>' + state.plans.map(function (plan) { return '<label><input type="checkbox" name="planIds" value="' + esc(plan.id) + '"' + (coupon.planIds.includes(plan.id) ? " checked" : "") + '><span><strong>' + esc(plan.speed) + '</strong><small>' + esc(plan.title) + '</small></span></label>'; }).join("") + '</div></fieldset><div class="form-grid"><label class="check-field"><input name="autoApply" type="checkbox"' + (coupon.autoApply ? " checked" : "") + '><span>Aplicar automaticamente no card do plano</span></label><label class="check-field"><input name="active" type="checkbox"' + (coupon.active ? " checked" : "") + '><span>Desconto ativo</span></label></div><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + " Salvar desconto</button></div></form>", true);
+  }
+
+  function whatsappCampaignModal(item) {
+    const campaign = item || { id: "", name: "", message: "Ola {name}! Aqui e da Fibra Lider. Vimos seu interesse no plano {plan}. Posso ajudar com a oferta {offer}?", planIds: [], status: "draft", contactsSent: 0 };
+    openModal(modalHeader(item ? "Editar campanha manual" : "Nova campanha manual", "Escolha a audiencia por interesse e prepare uma mensagem individual para o atendimento.") + '<form class="modal-form" data-form-kind="whatsapp-campaign"><input type="hidden" name="id" value="' + esc(campaign.id) + '"><label class="field"><span>Nome interno</span><input name="name" value="' + esc(campaign.name) + '" placeholder="Interesse em 600 Mega" required></label><label class="field"><span>Mensagem</span><textarea name="message" rows="7" required>' + esc(campaign.message) + '</textarea><small>Variaveis: {name}, {plan}, {speed}, {price}, {offer}.</small></label><fieldset class="plan-selector"><legend>Interesses incluidos</legend><p>Sem selecao, a campanha fica disponivel para todos os leads.</p><div>' + state.plans.map(function (plan) { return '<label><input type="checkbox" name="planIds" value="' + esc(plan.id) + '"' + (campaign.planIds.includes(plan.id) ? " checked" : "") + '><span><strong>' + esc(plan.speed) + '</strong><small>' + esc(plan.title) + '</small></span></label>'; }).join("") + '</div></fieldset><label class="check-field"><input name="active" type="checkbox"' + (campaign.status === "active" ? " checked" : "") + '><span>Campanha pronta para atendimento</span></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + ' Salvar campanha</button></div></form>', true);
   }
 
   function popupModal(item) {
@@ -943,7 +1130,8 @@
   }
 
   async function handleModalSubmit(form) {
-    const data = Object.fromEntries(new FormData(form).entries());
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
     const kind = form.dataset.formKind;
     if (kind === "banner") {
       const existing = state.banners.find(function (item) { return item.id === data.id; });
@@ -995,8 +1183,16 @@
     }
     if (kind === "coupon") {
       const existing = state.coupons.find(function (item) { return item.id === data.id; });
-      const item = { id: data.id || FL.uid("coupon"), code: data.code.toUpperCase(), title: data.title, discount: data.discount, description: data.description, startsAt: data.startsAt, expiresAt: data.expiresAt, usageLimit: Number(data.usageLimit), used: existing ? existing.used : 0, planIds: existing ? existing.planIds : [], active: form.elements.active.checked };
+      const item = { id: data.id || FL.uid("coupon"), code: data.code.toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 24), title: data.title, discountType: data.discountType, discountValue: Number(data.discountValue), durationType: data.durationType, durationMonths: data.durationType === "months" ? Number(data.durationMonths || 1) : data.durationType === "first_month" ? 1 : 0, autoApply: form.elements.autoApply.checked, description: data.description, startsAt: data.startsAt, expiresAt: data.expiresAt, usageLimit: Number(data.usageLimit), used: existing ? existing.used : 0, planIds: formData.getAll("planIds"), active: form.elements.active.checked };
+      if (!item.code || state.coupons.some(function (coupon) { return coupon.code === item.code && coupon.id !== item.id; })) { toast("Informe um codigo unico para o desconto", "error"); return; }
+      if (item.expiresAt && item.startsAt && item.expiresAt < item.startsAt) { toast("A data final deve ser posterior ao inicio", "error"); return; }
+      item.discount = FL.couponLabel(item);
       if (existing) Object.assign(existing, item); else state.coupons.push(item);
+    }
+    if (kind === "whatsapp-campaign") {
+      const existing = state.whatsappCampaigns.find(function (item) { return item.id === data.id; });
+      const item = { id: data.id || FL.uid("wa-campaign"), name: data.name, message: data.message, planIds: formData.getAll("planIds"), status: form.elements.active.checked ? "active" : "draft", contactsSent: existing ? existing.contactsSent : 0, createdAt: existing ? existing.createdAt : new Date().toISOString().slice(0, 10) };
+      if (existing) Object.assign(existing, item); else state.whatsappCampaigns.push(item);
     }
     if (kind === "popup") {
       const existing = state.popupCampaigns.find(function (item) { return item.id === data.id; });
@@ -1126,8 +1322,26 @@
     if (action === "toggle-region") { const item = find(state.regions); item.active = !item.active; saveDraft(); renderPanel(); }
     if (action === "delete-region" && state.regions.length > 1 && confirm("Excluir esta area de cobertura?")) { state.regions = state.regions.filter(function (item) { return item.id !== id; }); saveDraft("Area removida"); renderPanel(); }
     if (action === "open-region-route") { const item = find(state.regions); if (item) window.open(googleMapsUrl(item, true), "_blank", "noopener"); }
+    if (action === "toggle-coverage-file") { const item = find(state.coverageFiles); if (item) { item.active = !item.active; saveDraft(); renderPanel(); } }
+    if (action === "delete-coverage-file" && confirm("Remover esta camada de cobertura?")) { state.coverageFiles = state.coverageFiles.filter(function (item) { return item.id !== id; }); saveDraft("Camada removida"); renderPanel(); }
     if (action === "edit-support") simpleItemModal("support", find(state.supportCards));
     if (action === "toggle-support") { const item = find(state.supportCards); item.active = !item.active; saveDraft(); renderPanel(); }
+    if (action === "new-whatsapp-campaign") whatsappCampaignModal();
+    if (action === "edit-whatsapp-campaign") whatsappCampaignModal(find(state.whatsappCampaigns));
+    if (action === "contact-lead") {
+      const lead = find(state.leads); const plan = lead && leadPlan(lead); const coupon = lead && state.coupons.find(function (item) { return item.id === lead.couponId; }); const campaign = element.dataset.campaignId && state.whatsappCampaigns.find(function (item) { return item.id === element.dataset.campaignId; });
+      if (lead && plan && lead.whatsapp) {
+        const values = { name: lead.name, plan: plan.title, speed: plan.speed, price: FL.formatCurrency(coupon ? FL.couponPrice(plan, coupon) : plan.price), offer: FL.couponLabel(coupon) };
+        const message = campaign ? FL.interpolate(campaign.message, values) : FL.planMessage(state, plan, { name: lead.name, whatsapp: lead.whatsapp, coupon });
+        lead.status = "contacted"; lead.lastContactAt = new Date().toISOString();
+        if (campaign) campaign.contactsSent = Number(campaign.contactsSent || 0) + 1;
+        saveRuntime("Conversa preparada no WhatsApp");
+        window.open(FL.whatsappLink(lead.whatsapp, message), "_blank", "noopener");
+        renderPanel();
+      }
+    }
+    if (action === "delete-lead" && confirm("Excluir este lead da demonstracao?")) { state.leads = state.leads.filter(function (item) { return item.id !== id; }); saveRuntime("Lead excluido"); renderPanel(); }
+    if (action === "export-leads") exportLeads();
     if (action === "new-coupon") couponModal();
     if (action === "edit-coupon") couponModal(find(state.coupons));
     if (action === "toggle-coupon") { const item = find(state.coupons); item.active = !item.active; saveDraft(); renderPanel(); }
@@ -1175,6 +1389,7 @@
 
   function bindPanelControls() {
     $$("[data-goto]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { setPanel(element.dataset.goto); }); });
+    $$("[data-studio-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { builderStudioTab = element.dataset.studioTab; renderPanel(); }); });
     $$("[data-action]", $("#admin-panel")).forEach(function (element) {
       element.addEventListener("click", function () { handleAction(element.dataset.action, element.dataset.id, element); });
     });
@@ -1229,9 +1444,16 @@
     if (search) search.addEventListener("input", function () { $$(".plan-admin-card").forEach(function (card) { card.hidden = !card.dataset.search.includes(search.value.toLowerCase()); }); });
     const regionSearch = $("#region-search");
     if (regionSearch) regionSearch.addEventListener("input", function () { $$("[data-region-search]").forEach(function (row) { row.hidden = !row.dataset.regionSearch.includes(regionSearch.value.toLowerCase()); }); });
+    const coverageFileInput = $("#coverage-file-input");
+    if (coverageFileInput) coverageFileInput.addEventListener("change", function () { importCoverageFile(coverageFileInput.files[0]); });
+    $$("[data-coverage-file-color]", $("#admin-panel")).forEach(function (element) { element.addEventListener("change", function () { const file = state.coverageFiles.find(function (item) { return item.id === element.dataset.coverageFileColor; }); if (file) { file.color = element.value; saveDraft(); renderPanel(); } }); });
     $$("[data-campaign-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { activeCampaignTab = element.dataset.campaignTab; renderPanel(); }); });
-    $$("[data-nav-label]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const item = state.navigation.find(function (nav) { return nav.id === element.dataset.navLabel; }); item.label = element.value; saveDraft(); }); });
-    $$("[data-nav-href]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const item = state.navigation.find(function (nav) { return nav.id === element.dataset.navHref; }); item.href = element.value; saveDraft(); }); });
+    $$("[data-lead-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { leadWorkspaceTab = element.dataset.leadTab; renderPanel(); }); });
+    $$("[data-lead-status]", $("#admin-panel")).forEach(function (element) { element.addEventListener("change", function () { const lead = state.leads.find(function (item) { return item.id === element.dataset.leadStatus; }); if (lead) { lead.status = element.value; saveRuntime("Status do lead atualizado"); } }); });
+    $$("[data-nav-label]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const item = state.navigation.find(function (nav) { return nav.id === element.dataset.navLabel; }); item.label = element.value; saveDraft(); scheduleBuilderPreview(); }); });
+    $$("[data-nav-href]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const item = state.navigation.find(function (nav) { return nav.id === element.dataset.navHref; }); item.href = element.value; saveDraft(); scheduleBuilderPreview(); }); });
+    $$("[data-footer-column-title]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const column = state.footer.columns[Number(element.dataset.footerColumnTitle)]; if (column) { column.title = element.value; saveDraft(); scheduleBuilderPreview(); } }); });
+    $$("[data-footer-link-label], [data-footer-link-href]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const key = element.dataset.footerLinkLabel || element.dataset.footerLinkHref; const parts = key.split(":").map(Number); const link = state.footer.columns[parts[0]] && state.footer.columns[parts[0]].links[parts[1]]; if (link) { if (element.dataset.footerLinkLabel) link.label = element.value; else link.href = element.value; saveDraft(); scheduleBuilderPreview(); } }); });
     const importInput = $("#import-state-file");
     if (importInput) importInput.addEventListener("change", importState);
     const mediaInput = $("#media-upload-input");
@@ -1305,6 +1527,15 @@
     downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), "fibra-lider-eventos.csv");
   }
 
+  function exportLeads() {
+    const rows = [["data", "nome", "whatsapp", "plano", "cupom", "origem", "regiao", "status"]].concat(state.leads.map(function (lead) {
+      const plan = leadPlan(lead); const coupon = state.coupons.find(function (item) { return item.id === lead.couponId; });
+      return [lead.createdAt, lead.name, lead.whatsapp, plan ? plan.speed + " - " + plan.title : "", coupon ? coupon.code : "", lead.source || "", lead.region || "", lead.status];
+    }));
+    const csv = rows.map(function (row) { return row.map(function (value) { return '"' + String(value || "").replace(/"/g, '""') + '"'; }).join(","); }).join("\n");
+    downloadBlob(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }), "fibra-lider-leads.csv");
+  }
+
   function downloadBlob(blob, name) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -1320,7 +1551,9 @@
       try {
         const parsed = JSON.parse(reader.result);
         if (!parsed.brand || !parsed.plans || !parsed.pageBlocks) throw new Error("Estrutura invalida");
-        state = parsed; saveDraft("Configuracao importada"); renderPanel();
+        FL.saveState(parsed, false);
+        state = FL.getState();
+        saveDraft("Configuracao importada"); renderPanel();
       } catch (error) { toast("Arquivo de configuracao invalido", "error"); }
     };
     reader.readAsText(file);
@@ -1339,6 +1572,8 @@
     state = FL.getState();
     FL.seedEventsIfEmpty();
     activePanel = location.hash.replace("#", "") || "dashboard";
+    const studioAliases = { banners: "slides", navigation: "header", appearance: "brand" };
+    if (studioAliases[activePanel]) { builderStudioTab = studioAliases[activePanel]; activePanel = "builder"; }
     if (!PANEL_META[activePanel]) activePanel = "dashboard";
     applyAdminTheme();
     setSaveStatus(state.meta.status === "published" ? "saved" : "draft");

@@ -7,6 +7,7 @@
   let activeSlide = 0;
   let sliderTimer = null;
   let publicMap = null;
+  let selectedPlanId = null;
   const isBuilderPreview = new URLSearchParams(location.search).has("preview");
 
   const $ = function (selector, root) { return (root || document).querySelector(selector); };
@@ -180,21 +181,90 @@
     const filtered = state.plans.filter(function (item) { return item.active && item.categoryId === activeCategory; });
     const visible = showAllPlans ? filtered : filtered.slice(0, 3);
     $("#plans-grid").innerHTML = visible.map(function (item) {
-      const price = FL.formatCurrency(item.price).replace("R$", "").trim().split(",");
+      const coupon = FL.activeCouponForPlan(state, item, true);
+      const promotionalPrice = coupon ? FL.couponPrice(item, coupon) : item.price;
+      const price = FL.formatCurrency(promotionalPrice).replace("R$", "").trim().split(",");
       return [
         '<article class="plan-card' + (item.featured ? " plan-card--featured" : "") + '">',
         '<div class="plan-card__top"><div><span>' + escapeHtml(item.title) + "</span><strong>" + escapeHtml(item.speed) + "</strong></div>",
         item.badge ? '<em>' + escapeHtml(item.badge) + "</em>" : "", "</div>",
+        coupon ? '<div class="plan-promotion"><span>' + icon("badge-percent") + escapeHtml(FL.couponLabel(coupon)) + '</span><small>Cupom ' + escapeHtml(coupon.code) + ' aplicado</small></div>' : "",
+        coupon ? '<span class="plan-old-price">De ' + escapeHtml(FL.formatCurrency(item.price)) + ' por</span>' : "",
         '<div class="plan-price"><small>R$</small><b>' + price[0] + '</b><span>,' + (price[1] || "00") + "<small>/" + escapeHtml(item.period) + "</small></span></div>",
+        coupon && coupon.durationType !== "lifetime" ? '<small class="plan-price-after">Depois, ' + escapeHtml(FL.formatCurrency(item.price)) + '/' + escapeHtml(item.period) + '</small>' : "",
         '<p class="plan-note">' + escapeHtml(item.note) + "</p>",
         '<ul>' + item.features.map(function (feature) { return "<li>" + icon("check") + escapeHtml(feature) + "</li>"; }).join("") + "</ul>",
-        '<a class="button ' + (item.featured ? "button--primary" : "button--outline") + ' button--block plan-cta" data-plan-id="' + escapeHtml(item.id) + '" href="' + escapeHtml(FL.whatsappLink(state.brand.whatsapp, FL.planMessage(state, item))) + '" target="_blank" rel="noopener">Contratar este plano ' + icon("arrow-up-right") + "</a>",
+        '<button class="button ' + (item.featured ? "button--primary" : "button--outline") + ' button--block plan-cta" type="button" data-plan-id="' + escapeHtml(item.id) + '">Quero este plano ' + icon("arrow-up-right") + "</button>",
         "</article>",
       ].join("");
     }).join("");
     $("#show-all-plans").hidden = filtered.length <= 3;
     $("#show-all-plans").innerHTML = (showAllPlans ? "Mostrar menos" : "Ver todos os planos") + " " + icon(showAllPlans ? "arrow-up" : "arrow-right");
     refreshIcons();
+  }
+
+  function formatLeadPhone(value) {
+    const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 6) return "(" + digits.slice(0, 2) + ") " + digits.slice(2);
+    if (digits.length <= 10) return "(" + digits.slice(0, 2) + ") " + digits.slice(2, 6) + "-" + digits.slice(6);
+    return "(" + digits.slice(0, 2) + ") " + digits.slice(2, 7) + "-" + digits.slice(7);
+  }
+
+  function normalizedLeadPhone(value) {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (digits.length < 10 || digits.length > 13) return "";
+    return digits.length <= 11 ? "55" + digits : digits;
+  }
+
+  function openLeadModal(planId) {
+    const plan = state.plans.find(function (item) { return item.id === planId; });
+    if (!plan) return;
+    if (!state.leadSettings.captureEnabled) {
+      window.open(FL.whatsappLink(state.brand.whatsapp, FL.planMessage(state, plan)), "_blank", "noopener");
+      return;
+    }
+    selectedPlanId = plan.id;
+    const coupon = FL.activeCouponForPlan(state, plan, true);
+    $("#lead-plan-id").value = plan.id;
+    setText("lead-plan-name", plan.speed + " - " + plan.title);
+    setText("lead-plan-price", FL.formatCurrency(coupon ? FL.couponPrice(plan, coupon) : plan.price) + "/" + plan.period);
+    const offer = $("#lead-offer-badge");
+    offer.hidden = !coupon;
+    offer.textContent = coupon ? FL.couponLabel(coupon) : "";
+    $("#lead-plan-features").innerHTML = plan.features.slice(0, 4).map(function (feature) { return "<li>" + icon("check") + escapeHtml(feature) + "</li>"; }).join("");
+    setText("lead-consent-text", state.leadSettings.consentText);
+    $("#lead-whatsapp").required = Boolean(state.leadSettings.requireWhatsapp);
+    $("#lead-modal").hidden = false;
+    document.body.classList.add("modal-open");
+    setTimeout(function () { $("#lead-name").focus(); }, 50);
+    FL.trackEvent("lead_form_view", { planId: plan.id, couponId: coupon ? coupon.id : "" });
+    refreshIcons();
+  }
+
+  function closeLeadModal() {
+    $("#lead-modal").hidden = true;
+    document.body.classList.remove("modal-open");
+    selectedPlanId = null;
+  }
+
+  function submitLead(event) {
+    event.preventDefault();
+    const plan = state.plans.find(function (item) { return item.id === selectedPlanId; });
+    const name = $("#lead-name").value.trim().replace(/\s+/g, " ").slice(0, 80);
+    const rawPhone = $("#lead-whatsapp").value;
+    const phone = normalizedLeadPhone(rawPhone);
+    if (!plan || name.length < 2 || (state.leadSettings.requireWhatsapp && !phone) || (rawPhone.trim() && !phone)) { toast("Confira seu nome e informe um WhatsApp valido."); return; }
+    const coupon = FL.activeCouponForPlan(state, plan, true);
+    const lead = { id: FL.uid("lead"), name, whatsapp: phone, planId: plan.id, couponId: coupon ? coupon.id : "", source: "Plano no site", region: "", status: "new", createdAt: new Date().toISOString(), lastContactAt: "" };
+    state.leads.unshift(lead);
+    state = FL.saveRuntimeState(state);
+    FL.trackEvent("lead_capture", { leadId: lead.id, planId: plan.id, couponId: lead.couponId, source: lead.source });
+    FL.trackEvent("whatsapp_click", { leadId: lead.id, planId: plan.id, source: "lead_form" });
+    const destination = FL.whatsappLink(state.brand.whatsapp, FL.planMessage(state, plan, { name, whatsapp: phone ? formatLeadPhone(phone.slice(2)) : "nao informado", coupon }));
+    closeLeadModal();
+    $("#lead-form").reset();
+    window.open(destination, "_blank", "noopener");
   }
 
   function renderBenefits() {
@@ -246,9 +316,10 @@
     const fallback = $("#public-map-fallback");
     if (!element) return;
     const regions = state.regions.filter(function (region) { return region.active && Number.isFinite(Number(region.lat)) && Number.isFinite(Number(region.lng)); });
+    const importedFiles = state.coverageFiles.filter(function (file) { return file.active; });
     if (publicMap) { publicMap.remove(); publicMap = null; }
     if (element._leaflet_id) delete element._leaflet_id;
-    if (!window.L || !regions.length) {
+    if (!window.L || (!regions.length && !importedFiles.length)) {
       element.hidden = true;
       fallback.hidden = false;
       fallback.innerHTML = regions.map(function (region) { return '<button type="button" data-region="' + escapeHtml(region.name) + '"><strong>' + escapeHtml(region.name) + '</strong><span>' + escapeHtml(region.status) + "</span></button>"; }).join("");
@@ -278,6 +349,22 @@
       const marker = window.L.circleMarker(point, { radius: 7, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(publicMap);
       marker.bindTooltip(escapeHtml(region.name), { permanent: state.coverageSettings.showLabels, direction: "top", offset: [0, -8], className: "region-map-label" });
       marker.on("click", function () { selectCoverageRegion(region.name); });
+    });
+    importedFiles.forEach(function (file) {
+      const color = file.color || state.theme.mapAccent || state.theme.primary;
+      file.features.forEach(function (feature) {
+        if (feature.type === "polygon") {
+          const polygon = window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.24), weight: 2 }).addTo(publicMap);
+          polygon.bindTooltip('<strong>' + escapeHtml(feature.name) + '</strong><span>Area atendida pela ' + escapeHtml(state.brand.name) + '</span>', { direction: "top", className: "coverage-tooltip" });
+          bounds.push.apply(bounds, feature.coordinates);
+        } else if (feature.type === "line") {
+          window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(publicMap).bindTooltip(escapeHtml(feature.name));
+          bounds.push.apply(bounds, feature.coordinates);
+        } else if (feature.type === "point") {
+          window.L.circleMarker(feature.coordinates, { radius: 6, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(publicMap).bindTooltip(escapeHtml(feature.name));
+          bounds.push(feature.coordinates);
+        }
+      });
     });
     publicMap.fitBounds(bounds, { padding: [32, 32], maxZoom: 11 });
     setTimeout(function () { if (publicMap) publicMap.invalidateSize(); }, 80);
@@ -613,8 +700,8 @@
     });
     $("#show-all-plans").addEventListener("click", function () { showAllPlans = !showAllPlans; renderPlans(); });
     $("#plans-grid").addEventListener("click", function (event) {
-      const link = event.target.closest("[data-plan-id]");
-      if (link) FL.trackEvent("whatsapp_click", { planId: link.dataset.planId, source: "plan_card" });
+      const button = event.target.closest("[data-plan-id]");
+      if (button) { FL.trackEvent("plan_click", { planId: button.dataset.planId, source: "plan_card" }); openLeadModal(button.dataset.planId); }
     });
     $("#coverage-form").addEventListener("submit", handleCoverage);
     let cepTimer;
@@ -633,6 +720,9 @@
       if (open) { item.classList.add("is-open"); button.setAttribute("aria-expanded", "true"); }
     });
     $$("[data-close-modal]").forEach(function (element) { element.addEventListener("click", closeCampaign); });
+    $$("[data-close-lead-modal]").forEach(function (element) { element.addEventListener("click", closeLeadModal); });
+    $("#lead-form").addEventListener("submit", submitLead);
+    $("#lead-whatsapp").addEventListener("input", function () { this.value = formatLeadPhone(this.value); });
     $("#campaign-coupon").addEventListener("click", function () {
       const code = this.querySelector("span").textContent;
       if (navigator.clipboard) navigator.clipboard.writeText(code);
@@ -641,7 +731,7 @@
     });
     $("#cookie-essential").addEventListener("click", function () { setConsent("essential"); });
     $("#cookie-accept").addEventListener("click", function () { setConsent("all"); });
-    document.addEventListener("keydown", function (event) { if (event.key === "Escape") closeCampaign(); });
+    document.addEventListener("keydown", function (event) { if (event.key === "Escape") { closeCampaign(); closeLeadModal(); } });
     $("#floating-whatsapp").addEventListener("click", function () { FL.trackEvent("whatsapp_click", { source: "floating" }); });
   }
 
