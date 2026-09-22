@@ -141,6 +141,11 @@
             <p id="coverage-description"></p>
             <form class="coverage-form" id="coverage-form">
               <label>
+                <span>CEP</span>
+                <span class="coverage-cep-field"><input id="coverage-cep" name="cep" type="text" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000"><i data-lucide="map-pin"></i></span>
+                <small id="coverage-cep-status">Preenchemos cidade e bairro para voce.</small>
+              </label>
+              <label>
                 <span>Cidade</span>
                 <select id="coverage-city" name="city" required></select>
               </label>

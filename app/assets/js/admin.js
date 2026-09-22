@@ -6,6 +6,7 @@
     builder: ["Construtor do site", "Site"],
     pages: ["Paginas", "Site"],
     banners: ["Banners e slides", "Site"],
+    media: ["Central de midia", "Site"],
     navigation: ["Menu e rodape", "Site"],
     appearance: ["Identidade visual", "Site"],
     plans: ["Planos e combos", "Conteudo"],
@@ -29,7 +30,17 @@
   let pageEditId = null;
   let selectedPageBlockId = null;
   let pageBuilderDevice = "desktop";
+  let builderMobileTab = "canvas";
+  let pageBuilderMobileTab = "canvas";
+  let themePreviewMode = "light";
   let adminMap = null;
+
+  const THEME_PRESETS = {
+    fibra: { label: "Fibra Lider", description: "Azul confiavel e verde comercial", primary: "#0874e7", primaryDark: "#063f83", accent: "#29d884", ink: "#0a1628", surface: "#f4f7fb", panel: "#ffffff", mapAccent: "#0874e7" },
+    oceano: { label: "Oceano", description: "Azul intenso com ciano luminoso", primary: "#006ce5", primaryDark: "#08366b", accent: "#16c5d8", ink: "#0a1726", surface: "#f2f7fa", panel: "#ffffff", mapAccent: "#16a8c0" },
+    horizonte: { label: "Horizonte", description: "Verde digital com azul profundo", primary: "#087f5b", primaryDark: "#06473b", accent: "#2f80ed", ink: "#10201c", surface: "#f2f8f5", panel: "#ffffff", mapAccent: "#087f5b" },
+    grafite: { label: "Grafite", description: "Contraste editorial e acento coral", primary: "#222c3a", primaryDark: "#111923", accent: "#ef6459", ink: "#111827", surface: "#f4f5f7", panel: "#ffffff", mapAccent: "#ef6459" },
+  };
 
   const $ = function (selector, root) { return (root || document).querySelector(selector); };
   const $$ = function (selector, root) { return Array.from((root || document).querySelectorAll(selector)); };
@@ -122,6 +133,29 @@
     return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(date));
   }
 
+  function formatBytes(bytes) {
+    const value = Number(bytes || 0);
+    if (value < 1024) return value + " B";
+    if (value < 1024 * 1024) return (value / 1024).toFixed(value > 102400 ? 0 : 1).replace(".", ",") + " KB";
+    return (value / (1024 * 1024)).toFixed(1).replace(".", ",") + " MB";
+  }
+
+  function stateSize() {
+    try { return new Blob([JSON.stringify(state)]).size; }
+    catch (error) { return 0; }
+  }
+
+  function mediaSavings() {
+    return state.mediaLibrary.reduce(function (total, item) { return total + Math.max(0, Number(item.originalBytes || item.bytes || 0) - Number(item.bytes || 0)); }, 0);
+  }
+
+  function googleMapsUrl(region, directions) {
+    const destination = Number.isFinite(Number(region.lat)) && Number.isFinite(Number(region.lng)) ? Number(region.lat) + "," + Number(region.lng) : region.address || region.name;
+    return directions
+      ? "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(destination) + "&travelmode=driving"
+      : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(destination);
+  }
+
   function analyticsData() {
     const events = FL.getEvents();
     const publicEvents = events.filter(function (event) { return event.path !== "/admin.html"; });
@@ -163,6 +197,10 @@
     });
     const maxDay = Math.max.apply(null, days.map(function (day) { return day.total; }).concat([1]));
     const status = state.meta.status === "published" ? "Publicado" : "Rascunho";
+    const healthChecks = [state.banners.some(function (item) { return item.active; }), state.plans.some(function (item) { return item.active; }), state.regions.some(function (item) { return item.active && item.cep; }), Boolean(state.seo.title && state.seo.description), Boolean(state.brand.whatsapp), state.pages.some(function (item) { return item.status === "published"; }), state.integrations.consentBanner];
+    const healthScore = Math.round((healthChecks.filter(Boolean).length / healthChecks.length) * 100);
+    const mediaWeight = state.mediaLibrary.reduce(function (sum, item) { return sum + Number(item.bytes || 0); }, 0);
+    const mappedRegions = state.regions.filter(function (item) { return item.active && Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng)); }).length;
     return [
       panelHeader("Visao geral", "Acompanhe a jornada de aquisicao e os pontos que mais geram interesse.", '<div class="heading-actions"><select class="compact-select"><option>Ultimos 28 dias</option><option>Ultimos 7 dias</option></select><button class="button button--ghost" data-action="export-report">' + icon("download") + " Exportar</button></div>"),
       '<section class="dashboard-welcome"><div><span><i class="status-dot"></i> Site ' + status.toLowerCase() + '</span><h3>Bom trabalho, equipe Fibra Lider.</h3><p>As campanhas estao gerando interesse principalmente nos planos de 600 Mega.</p><button class="text-button" data-goto="campaigns">Ver campanhas ' + icon("arrow-right") + '</button></div><div class="welcome-score"><small>Meta mensal de leads</small><strong>' + data.whatsapp + '<span> / ' + state.dashboardTargets.monthlyLeads + '</span></strong><div><i style="width:' + Math.min(100, (data.whatsapp / state.dashboardTargets.monthlyLeads) * 100) + '%"></i></div><p>' + Math.round((data.whatsapp / state.dashboardTargets.monthlyLeads) * 100) + '% da meta</p></div></section>',
@@ -178,6 +216,8 @@
       '<article><span class="signal-icon signal-icon--violet">' + icon("megaphone") + '</span><div><small>Campanhas ativas</small><strong>' + state.popupCampaigns.filter(function (item) { return item.active; }).length + '</strong><p>' + state.coupons.filter(function (item) { return item.active; }).length + ' cupom ativo no site</p></div></article>',
       '<article><span class="signal-icon signal-icon--orange">' + icon("files") + '</span><div><small>Conteudo publicado</small><strong>' + state.pages.filter(function (item) { return item.status === "published"; }).length + '</strong><p>paginas internas disponiveis</p></div></article>',
       '</section>',
+      '<section class="quality-grid"><article class="quality-card"><div class="quality-ring" style="--score:' + healthScore + '"><strong>' + healthScore + '<small>%</small></strong></div><div><span>Saude do site</span><h3>' + (healthScore >= 85 ? "Pronto para campanhas" : "Ha ajustes recomendados") + '</h3><p>SEO, conteudo, cobertura e canais comerciais.</p><button class="text-button" data-goto="seo">Ver diagnostico ' + icon("arrow-right") + '</button></div></article><article class="quality-card"><span class="quality-icon">' + icon("image-down") + '</span><div><span>Performance de midia</span><h3>' + formatBytes(mediaWeight) + ' publicados</h3><p>' + formatBytes(mediaSavings()) + ' economizados com compressao.</p><button class="text-button" data-goto="media">Otimizar imagens ' + icon("arrow-right") + '</button></div></article><article class="quality-card"><span class="quality-icon">' + icon("map-pinned") + '</span><div><span>Inteligencia de cobertura</span><h3>' + mappedRegions + ' areas mapeadas</h3><p>' + state.regions.filter(function (item) { return item.cep; }).length + ' CEPs validados para consulta.</p><button class="text-button" data-goto="coverage">Gerenciar cobertura ' + icon("arrow-right") + '</button></div></article><article class="quality-card"><span class="quality-icon">' + icon("panels-top-left") + '</span><div><span>Experiencia da marca</span><h3>' + state.pageBlocks.filter(function (item) { return item.visible; }).length + ' secoes na home</h3><p>' + state.pages.length + ' paginas e ' + state.banners.filter(function (item) { return item.active; }).length + ' banners ativos.</p><button class="text-button" data-goto="builder">Editar experiencia ' + icon("arrow-right") + '</button></div></article></section>',
+      '<section class="dashboard-action-center"><div><span>' + icon("sparkles") + '</span><div><strong>Proximas acoes recomendadas</strong><p>Melhore a conversao sem sair do fluxo de trabalho.</p></div></div><div><button data-goto="coverage">' + icon("map-pin-plus") + '<span><strong>Validar novos CEPs</strong><small>Expanda a area comercial</small></span></button><button data-goto="campaigns">' + icon("badge-percent") + '<span><strong>Criar oferta regional</strong><small>Use os locais mais procurados</small></span></button><button data-goto="appearance">' + icon("palette") + '<span><strong>Revisar a identidade</strong><small>Confira claro e escuro</small></span></button></div></section>',
       '<section class="dashboard-grid dashboard-grid--main"><article class="admin-card chart-card">',
       cardTitle("Interacoes no site", "Volume diario nos ultimos 14 dias", '<button class="icon-button" title="Mais opcoes">' + icon("ellipsis") + "</button>"),
       '<div class="chart-summary"><strong>' + data.events.length + '</strong><span>Total de interacoes <em>+14,6%</em></span></div>',
@@ -252,7 +292,8 @@
     return [
       panelHeader("Pagina inicial", "Organize as secoes, edite o conteudo e visualize cada dispositivo.", '<div class="heading-actions"><button class="button button--ghost" data-action="builder-preview">' + icon("play") + ' Abrir preview</button><button class="button button--primary" data-action="builder-save">' + icon("save") + " Salvar estrutura</button></div>"),
       '<section class="builder-toolbar"><div class="builder-device-switch"><button class="' + (builderDevice === "desktop" ? "is-active" : "") + '" data-device="desktop" title="Desktop">' + icon("monitor") + '</button><button class="' + (builderDevice === "tablet" ? "is-active" : "") + '" data-device="tablet" title="Tablet">' + icon("tablet") + '</button><button class="' + (builderDevice === "mobile" ? "is-active" : "") + '" data-device="mobile" title="Celular">' + icon("smartphone") + '</button></div><div class="builder-status"><span><i class="status-dot"></i> Pagina inicial</span><small>Arraste os blocos para mudar a ordem</small></div><div><button class="button button--ghost" data-action="builder-refresh">' + icon("refresh-cw") + " Atualizar preview</button></div></section>",
-      '<section class="builder-workspace">',
+      '<div class="builder-mobile-tabs" aria-label="Ferramentas do construtor"><button class="' + (builderMobileTab === "layers" ? "is-active" : "") + '" data-builder-tab="layers">' + icon("layers-3") + '<span>Estrutura</span></button><button class="' + (builderMobileTab === "canvas" ? "is-active" : "") + '" data-builder-tab="canvas">' + icon("monitor-smartphone") + '<span>Preview</span></button><button class="' + (builderMobileTab === "inspector" ? "is-active" : "") + '" data-builder-tab="inspector">' + icon("sliders-horizontal") + '<span>Propriedades</span></button></div>',
+      '<section class="builder-workspace mobile-tab--' + builderMobileTab + '">',
       '<aside class="builder-layers"><div class="builder-panel-title"><div><strong>Estrutura</strong><small>' + state.pageBlocks.filter(function (item) { return item.visible; }).length + ' secoes visiveis</small></div><button class="icon-button" data-action="add-section" title="Adicionar secao">' + icon("plus") + '</button></div><div class="layer-list" id="layer-list">',
       state.pageBlocks.map(function (item) {
         return '<article class="layer-item' + (item.id === selectedBlockId ? " is-selected" : "") + (item.visible ? "" : " is-hidden") + '" draggable="true" data-block-id="' + esc(item.id) + '"><button class="drag-handle" type="button" title="Arrastar">' + icon("grip-vertical") + '</button><button class="layer-select" type="button" data-select-block="' + esc(item.id) + '"><span>' + icon(item.type === "hero" ? "gallery-horizontal" : item.type === "plans" ? "badge-dollar-sign" : item.type === "coverage" ? "map" : "layout-panel-top") + '</span><div><strong>' + esc(item.label) + '</strong><small>' + esc(item.type) + '</small></div></button><button class="layer-visibility" type="button" data-toggle-block="' + esc(item.id) + '" title="' + (item.visible ? "Ocultar" : "Exibir") + '"' + (item.locked ? " disabled" : "") + '>' + icon(item.visible ? "eye" : "eye-off") + "</button></article>";
@@ -270,7 +311,7 @@
   }
 
   function pageBlockIcon(type) {
-    const icons = { hero: "panel-top", text: "text", callout: "message-square-quote", document: "file-text", image: "image", cta: "mouse-pointer-click", faq: "circle-help" };
+    const icons = { hero: "panel-top", text: "text", callout: "message-square-quote", document: "file-text", image: "image", cta: "mouse-pointer-click", faq: "circle-help", stats: "chart-no-axes-column-increasing" };
     return icons[type] || "layout-panel-top";
   }
 
@@ -284,9 +325,10 @@
     let fields = "";
     if (block.type === "hero") fields += pageBlockField("Chamada curta", "eyebrow", block.eyebrow);
     fields += pageBlockField("Titulo", "title", block.title);
-    fields += pageBlockField("Texto", "text", block.text, true);
+    fields += pageBlockField(block.type === "stats" ? "Indicadores (valor | rotulo por linha)" : block.type === "faq" ? "Perguntas (pergunta | resposta por linha)" : "Texto", "text", block.text, true);
     if (["document", "cta", "image"].includes(block.type)) fields += pageBlockField(block.type === "image" ? "Texto alternativo" : "Texto do botao", "label", block.label);
     if (["document", "cta", "image"].includes(block.type)) fields += pageBlockField(block.type === "image" ? "URL da imagem" : "Destino", "url", block.url);
+    if (block.type === "image") fields += '<label class="field"><span>Escolher da biblioteca</span><select data-page-media><option value="">Selecione uma imagem</option>' + state.mediaLibrary.map(function (item) { return '<option value="' + esc(item.url) + '"' + (item.url === block.url ? " selected" : "") + '>' + esc(item.name) + ' (' + item.width + ' x ' + item.height + ')</option>'; }).join("") + '</select><small>Novos arquivos podem ser enviados na Central de midia.</small></label>';
     return fields;
   }
 
@@ -312,12 +354,13 @@
     return [
       panelHeader(page.title, "Construtor de pagina interna /" + page.slug, '<div class="heading-actions"><button class="button button--ghost" data-action="back-pages">' + icon("arrow-left") + ' Voltar</button><button class="button button--ghost" data-action="page-settings" data-id="' + esc(page.id) + '">' + icon("settings-2") + ' Configurar</button><button class="button button--primary" data-action="open-page" data-id="' + esc(page.id) + '">' + icon("external-link") + " Visualizar</button></div>"),
       '<section class="builder-toolbar"><div class="builder-device-switch"><button class="' + (pageBuilderDevice === "desktop" ? "is-active" : "") + '" data-page-device="desktop" title="Desktop">' + icon("monitor") + '</button><button class="' + (pageBuilderDevice === "tablet" ? "is-active" : "") + '" data-page-device="tablet" title="Tablet">' + icon("tablet") + '</button><button class="' + (pageBuilderDevice === "mobile" ? "is-active" : "") + '" data-page-device="mobile" title="Celular">' + icon("smartphone") + '</button></div><div class="builder-status"><span><i class="status-dot"></i> ' + (page.status === "published" ? "Pagina publicada" : "Rascunho") + '</span><small>Arraste os blocos para reorganizar</small></div><button class="button button--ghost" data-action="refresh-page-preview">' + icon("refresh-cw") + " Atualizar preview</button></section>",
-      '<section class="builder-workspace page-builder-workspace">',
+      '<div class="builder-mobile-tabs" aria-label="Ferramentas do construtor"><button class="' + (pageBuilderMobileTab === "layers" ? "is-active" : "") + '" data-page-builder-tab="layers">' + icon("layers-3") + '<span>Blocos</span></button><button class="' + (pageBuilderMobileTab === "canvas" ? "is-active" : "") + '" data-page-builder-tab="canvas">' + icon("monitor-smartphone") + '<span>Preview</span></button><button class="' + (pageBuilderMobileTab === "inspector" ? "is-active" : "") + '" data-page-builder-tab="inspector">' + icon("sliders-horizontal") + '<span>Editar</span></button></div>',
+      '<section class="builder-workspace page-builder-workspace mobile-tab--' + pageBuilderMobileTab + '">',
       '<aside class="builder-layers"><div class="builder-panel-title"><div><strong>Blocos</strong><small>' + page.blocks.length + ' itens na pagina</small></div></div><div class="layer-list" id="page-layer-list">' + page.blocks.map(function (item) {
         return '<article class="layer-item page-block-item' + (item.id === selectedPageBlockId ? " is-selected" : "") + (item.visible === false ? " is-hidden" : "") + '" draggable="true" data-page-block-id="' + esc(item.id) + '"><button class="drag-handle" type="button" title="Arrastar">' + icon("grip-vertical") + '</button><button class="layer-select" type="button" data-select-page-block="' + esc(item.id) + '"><span>' + icon(pageBlockIcon(item.type)) + '</span><div><strong>' + esc(item.title || "Bloco sem titulo") + '</strong><small>' + esc(item.type) + '</small></div></button><button class="layer-visibility" type="button" data-toggle-page-block="' + esc(item.id) + '" title="Visibilidade">' + icon(item.visible === false ? "eye-off" : "eye") + "</button></article>";
-      }).join("") + '</div><div class="page-block-palette"><span>Adicionar bloco</span><div><button data-action="add-page-block" data-block-type="text" title="Texto">' + icon("text") + '</button><button data-action="add-page-block" data-block-type="callout" title="Destaque">' + icon("message-square-quote") + '</button><button data-action="add-page-block" data-block-type="document" title="Documento">' + icon("file-text") + '</button><button data-action="add-page-block" data-block-type="image" title="Imagem">' + icon("image") + '</button><button data-action="add-page-block" data-block-type="cta" title="Chamada">' + icon("mouse-pointer-click") + "</button></div></div></aside>",
+      }).join("") + '</div><div class="page-block-palette"><span>Adicionar bloco</span><div><button data-action="add-page-block" data-block-type="text" title="Texto">' + icon("text") + '</button><button data-action="add-page-block" data-block-type="callout" title="Destaque">' + icon("message-square-quote") + '</button><button data-action="add-page-block" data-block-type="document" title="Documento">' + icon("file-text") + '</button><button data-action="add-page-block" data-block-type="image" title="Imagem">' + icon("image") + '</button><button data-action="add-page-block" data-block-type="stats" title="Indicadores">' + icon("chart-no-axes-column-increasing") + '</button><button data-action="add-page-block" data-block-type="faq" title="Perguntas">' + icon("circle-help") + '</button><button data-action="add-page-block" data-block-type="cta" title="Chamada">' + icon("mouse-pointer-click") + "</button></div></div></aside>",
       '<div class="builder-canvas"><div class="preview-frame preview-frame--' + pageBuilderDevice + '"><div class="preview-browser"><span></span><span></span><span></span><div>fibralider.net.br/' + esc(page.slug) + '</div></div><iframe id="page-preview" src="./pagina.html?slug=' + encodeURIComponent(page.slug) + '&preview=1" title="Preview da pagina"></iframe></div></div>',
-      '<aside class="builder-inspector"><div class="builder-panel-title"><div><strong>Propriedades</strong><small>' + esc(block ? block.type : "Pagina vazia") + '</small></div></div><div class="inspector-body"><div class="inspector-section"><span class="inspector-label">Conteudo do bloco</span>' + pageBlockInspector(block) + '</div>' + (block ? '<div class="inspector-section"><span class="inspector-label">Acoes</span><div class="inspector-actions"><button class="button button--ghost" data-action="move-page-block-up">' + icon("arrow-up") + ' Subir</button><button class="button button--ghost" data-action="move-page-block-down">' + icon("arrow-down") + ' Descer</button><button class="button button--danger" data-action="delete-page-block">' + icon("trash-2") + " Excluir</button></div></div>" : "") + "</div></aside></section>",
+      '<aside class="builder-inspector"><div class="builder-panel-title"><div><strong>Propriedades</strong><small>' + esc(block ? block.type : "Pagina vazia") + '</small></div></div><div class="inspector-body"><div class="inspector-section"><span class="inspector-label">Conteudo do bloco</span>' + pageBlockInspector(block) + '</div>' + (block ? '<div class="inspector-section"><span class="inspector-label">Acoes</span><div class="inspector-actions"><button class="button button--ghost" data-action="move-page-block-up">' + icon("arrow-up") + ' Subir</button><button class="button button--ghost" data-action="move-page-block-down">' + icon("arrow-down") + ' Descer</button><button class="button button--ghost" data-action="duplicate-page-block">' + icon("copy") + ' Duplicar</button><button class="button button--danger" data-action="delete-page-block">' + icon("trash-2") + " Excluir</button></div></div>" : "") + "</div></aside></section>",
     ].join("");
   }
 
@@ -332,6 +375,22 @@
       '<div class="banner-list">' + state.banners.map(function (banner, index) {
         return '<article class="banner-row"><div class="banner-thumb"><img src="' + esc(banner.image) + '" alt=""><span>0' + (index + 1) + '</span></div><div class="banner-info"><div><span class="status-badge ' + (banner.active ? "status-badge--success" : "") + '">' + (banner.active ? "Ativo" : "Pausado") + '</span><small>' + esc(banner.badge) + '</small></div><h3>' + esc(banner.name) + '</h3><p>' + esc(banner.title) + '</p></div><div class="banner-meta"><span><i data-lucide="mouse-pointer-click"></i>' + esc(banner.primaryLabel) + '</span><span><i data-lucide="layers-2"></i>Camada ' + banner.overlay + '%</span></div><div class="row-actions"><button class="icon-button" data-action="toggle-banner" data-id="' + esc(banner.id) + '" title="' + (banner.active ? "Pausar" : "Ativar") + '">' + icon(banner.active ? "pause" : "play") + '</button><button class="icon-button" data-action="edit-banner" data-id="' + esc(banner.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button" data-action="duplicate-banner" data-id="' + esc(banner.id) + '" title="Duplicar">' + icon("copy") + '</button><button class="icon-button icon-button--danger" data-action="delete-banner" data-id="' + esc(banner.id) + '" title="Excluir">' + icon("trash-2") + "</button></div></article>";
       }).join("") + "</div></section>",
+    ].join("");
+  }
+
+  function renderMedia() {
+    const totalBytes = state.mediaLibrary.reduce(function (sum, item) { return sum + Number(item.bytes || 0); }, 0);
+    const optimized = state.mediaLibrary.filter(function (item) { return Number(item.originalBytes || 0) > Number(item.bytes || 0); }).length;
+    return [
+      panelHeader("Central de midia", "Otimize, converta e reutilize imagens sem comprometer a velocidade do site.", '<label class="button button--primary media-upload-button">' + icon("upload") + ' Enviar imagens<input id="media-upload-input" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>'),
+      '<section class="quick-stats media-stats"><article><span>' + icon("images") + '</span><div><strong>' + state.mediaLibrary.length + '</strong><small>arquivos na biblioteca</small></div></article><article><span>' + icon("hard-drive") + '</span><div><strong>' + formatBytes(totalBytes) + '</strong><small>peso total das imagens</small></div></article><article><span>' + icon("package-check") + '</span><div><strong>' + optimized + '</strong><small>arquivos otimizados</small></div></article><article><span>' + icon("gauge") + '</span><div><strong>' + formatBytes(mediaSavings()) + '</strong><small>trafego economizado</small></div></article></section>',
+      '<section class="admin-card media-optimizer">',
+      cardTitle("Otimizador automatico", "As configuracoes abaixo tambem valem para banners, paginas e logos.", '<span class="status-badge status-badge--success">Ativo</span>'),
+      '<div class="media-optimizer__layout"><label class="media-dropzone" id="media-dropzone"><input id="media-drop-input" type="file" accept="image/jpeg,image/png,image/webp" multiple><span>' + icon("image-down") + '</span><strong>Arraste imagens para converter</strong><p>JPEG, PNG ou WebP. O arquivo e redimensionado antes de entrar no site.</p><em>Selecionar arquivos</em></label><div class="media-options"><div class="form-grid">' + field("Formato final", "mediaSettings.format", { type: "select", options: [{ value: "image/webp", label: "WebP (recomendado)" }, { value: "image/jpeg", label: "JPEG" }, { value: "image/png", label: "PNG" }] }) + field("Largura maxima", "mediaSettings.maxWidth", { type: "number", help: "Pixels; imagens menores nao sao ampliadas" }) + field("Qualidade", "mediaSettings.quality", { type: "number", help: "Entre 45 e 95" }) + field("Arquivo original", "mediaSettings.maxFileMb", { type: "number", help: "Limite em MB por upload" }) + '</div><div class="optimizer-note">' + icon("zap") + '<div><strong>Preset recomendado para provedores</strong><p>WebP em 82%, ate 1920 px. Equilibra nitidez de banners e carregamento no 4G.</p></div></div></div></div></section>',
+      '<section class="media-library"><div class="list-header"><div><strong>Biblioteca</strong><span>Clique em uma imagem para copiar seu endereco</span></div><span>' + formatBytes(stateSize()) + ' usados no armazenamento local</span></div><div class="media-grid">' + state.mediaLibrary.map(function (item) {
+        const saving = Number(item.originalBytes || 0) > Number(item.bytes || 0) ? Math.round((1 - Number(item.bytes) / Number(item.originalBytes)) * 100) : 0;
+        return '<article class="media-card"><button class="media-card__preview" data-action="copy-media" data-id="' + esc(item.id) + '" title="Copiar endereco"><img src="' + esc(item.url) + '" alt=""></button><div class="media-card__body"><div><strong>' + esc(item.name) + '</strong><span class="status-badge ' + (saving ? "status-badge--success" : "") + '">' + (saving ? "-" + saving + "%" : esc(item.usage || "Original")) + '</span></div><p>' + item.width + ' x ' + item.height + ' px &middot; ' + formatBytes(item.bytes) + '</p><small>' + esc((item.type || "imagem").replace("image/", "").toUpperCase()) + ' &middot; ' + esc(item.usage || "Biblioteca") + '</small></div><div class="media-card__actions"><button class="icon-button" data-action="copy-media" data-id="' + esc(item.id) + '" title="Copiar endereco">' + icon("copy") + '</button><button class="icon-button" data-action="download-media" data-id="' + esc(item.id) + '" title="Baixar">' + icon("download") + '</button><button class="icon-button icon-button--danger" data-action="delete-media" data-id="' + esc(item.id) + '" title="Remover">' + icon("trash-2") + '</button></div></article>';
+      }).join("") + '</div></section>',
     ].join("");
   }
 
@@ -350,9 +409,10 @@
   function renderAppearance() {
     const colors = [["Cor principal", "theme.primary"], ["Azul profundo", "theme.primaryDark"], ["Cor de destaque", "theme.accent"], ["Texto", "theme.ink"], ["Fundo", "theme.surface"], ["Superficie", "theme.panel"]];
     return [
-      panelHeader("Identidade visual", "Controle as cores, a densidade e os modos de visualizacao do site.", '<button class="button button--primary" data-action="save-content">' + icon("save") + " Aplicar identidade</button>"),
-      '<section class="appearance-layout"><div class="stack"><article class="admin-card">' + cardTitle("Paleta da marca", "A interface usa estes tokens em todos os componentes.", "") + '<div class="color-grid">' + colors.map(function (item) { return field(item[0], item[1], { type: "color" }); }).join("") + '</div></article><article class="admin-card">' + cardTitle("Experiencia", "Preferencias globais de interface.", "") + '<div class="form-grid">' + field("Tema padrao", "theme.defaultMode", { type: "select", options: [{ value: "light", label: "Claro" }, { value: "dark", label: "Escuro" }, { value: "system", label: "Sistema" }] }) + field("Arredondamento", "theme.radius", { type: "number", help: "Entre 8 e 20 pixels" }) + field("Movimento", "theme.motion", { type: "select", options: [{ value: "comfortable", label: "Confortavel" }, { value: "reduced", label: "Reduzido" }] }) + '</div>' + toggle("Permitir troca de tema", "theme.visitorThemeToggle", "Mostra o seletor claro/escuro no site") + '</article></div>',
-      '<aside class="theme-preview"><div class="theme-preview__top"><span>Preview da identidade</span><div><i></i><i></i><i></i></div></div><div class="theme-preview__hero" style="--preview-primary:' + esc(state.theme.primary) + ';--preview-accent:' + esc(state.theme.accent) + '"><img src="' + esc(state.banners[0].image) + '" alt=""><div><small>FIBRA OPTICA EM SUMARE</small><h3>Internet que acompanha sua rotina.</h3><button>Conhecer planos</button></div></div><div class="theme-preview__cards"><article><span></span><strong>600 MEGA</strong><p>R$ 99,90 / mes</p></article><article><span></span><strong>800 MEGA</strong><p>R$ 129,90 / mes</p></article></div></aside></section>',
+      panelHeader("Identidade visual", "Crie um sistema visual consistente para todas as paginas e dispositivos.", '<div class="heading-actions"><button class="button button--ghost" data-goto="builder">' + icon("panels-top-left") + ' Abrir construtor</button><button class="button button--primary" data-action="save-content">' + icon("save") + " Aplicar identidade</button></div>"),
+      '<section class="admin-card theme-presets">' + cardTitle("Cores prontas", "Aplique uma base profissional e personalize os detalhes depois.", '<span class="status-badge">4 estilos</span>') + '<div class="theme-preset-grid">' + Object.entries(THEME_PRESETS).map(function (entry) { const preset = entry[1]; return '<button data-action="apply-theme-preset" data-preset="' + entry[0] + '"><span><i style="background:' + preset.primary + '"></i><i style="background:' + preset.primaryDark + '"></i><i style="background:' + preset.accent + '"></i></span><strong>' + esc(preset.label) + '</strong><small>' + esc(preset.description) + '</small>' + icon("arrow-up-right") + '</button>'; }).join("") + '</div></section>',
+      '<section class="appearance-layout appearance-layout--studio"><div class="stack"><article class="admin-card">' + cardTitle("Paleta da marca", "Tokens aplicados em botoes, cards, mapas e estados de foco.", "") + '<div class="color-grid">' + colors.map(function (item) { return field(item[0], item[1], { type: "color" }); }).join("") + '</div>' + field("Cor do mapa", "theme.mapAccent", { type: "color", help: "Usada na cobertura e nos indicadores regionais" }) + '</article><article class="admin-card">' + cardTitle("Componentes", "Ajuste o ritmo visual sem editar CSS.", "") + '<div class="form-grid">' + field("Tipografia", "theme.font", { type: "select", options: [{ value: "Inter", label: "Inter" }, { value: "Manrope", label: "Manrope" }, { value: "Arial", label: "Arial" }] }) + field("Densidade", "theme.density", { type: "select", options: [{ value: "compact", label: "Compacta" }, { value: "comfortable", label: "Confortavel" }, { value: "airy", label: "Espacosa" }] }) + field("Botoes", "theme.buttonStyle", { type: "select", options: [{ value: "square", label: "Retos" }, { value: "soft", label: "Suaves" }, { value: "pill", label: "Capsula" }] }) + field("Cards", "theme.cardStyle", { type: "select", options: [{ value: "bordered", label: "Com contorno" }, { value: "elevated", label: "Elevados" }, { value: "flat", label: "Planos" }] }) + field("Sombras", "theme.shadow", { type: "select", options: [{ value: "none", label: "Sem sombra" }, { value: "soft", label: "Suave" }, { value: "strong", label: "Marcante" }] }) + field("Arredondamento", "theme.radius", { type: "number", help: "Entre 4 e 20 pixels" }) + field("Tema padrao", "theme.defaultMode", { type: "select", options: [{ value: "light", label: "Claro" }, { value: "dark", label: "Escuro" }, { value: "system", label: "Sistema" }] }) + field("Movimento", "theme.motion", { type: "select", options: [{ value: "comfortable", label: "Confortavel" }, { value: "reduced", label: "Reduzido" }] }) + '</div>' + toggle("Animar secoes ao rolar", "theme.sectionReveal", "Revela o conteudo de forma sutil") + toggle("Permitir troca de tema", "theme.visitorThemeToggle", "Mostra o seletor claro/escuro no site") + '</article><article class="admin-card">' + cardTitle("Arquivos da marca", "Use versoes legiveis para fundos claros e escuros.", '<button class="text-button" data-goto="media">Abrir midia ' + icon("arrow-right") + '</button>') + field("Logo para fundo claro", "brand.logoDark", {}) + field("Logo para fundo escuro", "brand.logo", {}) + field("Icone do site", "brand.icon", {}) + '</article></div>',
+      '<aside class="theme-live-preview"><div class="theme-live-preview__toolbar"><div><strong>Preview ao vivo</strong><small>Home completa</small></div><div class="segmented-control"><button class="' + (themePreviewMode === "light" ? "is-active" : "") + '" data-action="theme-preview-mode" data-mode="light">' + icon("sun") + '</button><button class="' + (themePreviewMode === "dark" ? "is-active" : "") + '" data-action="theme-preview-mode" data-mode="dark">' + icon("moon") + '</button></div></div><div class="theme-live-preview__frame"><iframe id="theme-live-frame" src="./index.html?preview=1&theme=' + themePreviewMode + '" title="Preview da identidade"></iframe></div><div class="theme-live-preview__footer"><span>' + icon("monitor-smartphone") + ' Atualize os campos para aplicar os tokens</span><button class="text-button" data-action="refresh-theme-preview">Atualizar ' + icon("refresh-cw") + '</button></div></aside></section>',
     ].join("");
   }
 
@@ -381,7 +441,7 @@
   }
 
   function regionHeatMap() {
-    return '<div class="admin-map-shell"><div class="admin-map" id="admin-regional-map"></div><div class="map-scale"><span>Baixo interesse</span><i></i><span>Alto interesse</span></div></div>';
+    return '<div class="admin-map-shell map-style--' + esc(state.coverageSettings.mapStyle) + '"><div class="admin-map" id="admin-regional-map"></div><div class="map-scale"><span>Menor procura</span><i style="--map-accent:' + esc(state.theme.mapAccent) + '"></i><span>Maior procura</span></div><a class="map-provider-link" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(state.brand.address) + '" target="_blank" rel="noopener">' + icon("route") + ' Abrir no Google Maps</a></div>';
   }
 
   function initAdminMap() {
@@ -391,7 +451,7 @@
     if (element._leaflet_id) delete element._leaflet_id;
     const regions = state.regions.filter(function (region) { return Number.isFinite(Number(region.lat)) && Number.isFinite(Number(region.lng)); });
     if (!regions.length) { element.innerHTML = '<div class="empty-state"><h3>Cadastre coordenadas</h3><p>Adicione latitude e longitude para exibir as regioes no mapa.</p></div>'; return; }
-    adminMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true }).setView([-22.835, -47.19], 11);
+    adminMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true }).setView([Number(state.coverageSettings.centerLat), Number(state.coverageSettings.centerLng)], 11);
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -399,22 +459,28 @@
     const bounds = [];
     regions.forEach(function (region) {
       const point = [Number(region.lat), Number(region.lng)];
-      const color = region.interest >= 75 ? "#0fba72" : region.interest >= 50 ? "#0874e7" : "#f59e0b";
+      const color = region.color || state.theme.mapAccent;
       bounds.push(point);
-      window.L.circle(point, { radius: 1300 + Number(region.interest) * 24, color, fillColor: color, fillOpacity: 0.36, weight: 2 }).addTo(adminMap)
-        .bindTooltip('<strong>' + esc(region.name) + '</strong><span>' + esc(region.status) + '</span><small>' + region.interest + '% de interesse &middot; ' + region.leads + ' leads</small>', { direction: "top", className: "coverage-tooltip" });
+      window.L.circle(point, { radius: Math.max(500, Number(region.radiusKm || state.coverageSettings.defaultRadiusKm) * 1000), color, fillColor: color, fillOpacity: state.coverageSettings.showInterest ? 0.16 + (Number(region.interest || 0) / 500) : 0.22, weight: 2 }).addTo(adminMap)
+        .bindTooltip('<strong>' + esc(region.name) + '</strong><span>' + esc(region.status) + '</span><small>' + region.interest + '% de interesse &middot; ' + region.leads + ' leads &middot; raio ' + esc(region.radiusKm) + ' km</small>', { direction: "top", className: "coverage-tooltip" });
       window.L.circleMarker(point, { radius: 7, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(adminMap)
-        .bindTooltip(esc(region.name), { permanent: true, direction: "top", offset: [0, -8], className: "region-map-label" });
+        .bindTooltip(esc(region.name), { permanent: state.coverageSettings.showLabels, direction: "top", offset: [0, -8], className: "region-map-label" });
     });
     adminMap.fitBounds(bounds, { padding: [34, 34], maxZoom: 11 });
     setTimeout(function () { if (adminMap) adminMap.invalidateSize(); }, 80);
   }
 
   function renderCoverage() {
+    const active = state.regions.filter(function (region) { return region.active; }).length;
+    const averageInterest = state.regions.length ? Math.round(state.regions.reduce(function (sum, region) { return sum + Number(region.interest || 0); }, 0) / state.regions.length) : 0;
+    const totalLeads = state.regions.reduce(function (sum, region) { return sum + Number(region.leads || 0); }, 0);
     return [
-      panelHeader("Cobertura regional", "Acompanhe demanda e defina como cada cidade aparece na consulta.", '<button class="button button--primary" data-action="add-region">' + icon("plus") + " Nova regiao</button>"),
-      '<section class="coverage-admin-layout"><article class="admin-card map-admin-card">' + cardTitle("Mapa de cobertura e interesse", "Intensidade baseada em consultas e leads do site.", '<span class="live-chip"><i></i> Atualizado agora</span>') + regionHeatMap() + '</article><article class="admin-card">' + cardTitle("Regioes atendidas", "Status publico e indice de procura.", "") + '<div class="region-list">' + state.regions.map(function (region) {
-        return '<div class="region-admin-row"><span class="region-heat" style="--level:' + region.interest + '"></span><div><strong>' + esc(region.name) + '</strong><small>' + esc(region.status) + '</small></div><div class="region-numbers"><strong>' + region.leads + '</strong><small>leads</small></div><button class="icon-button" data-action="edit-region" data-id="' + esc(region.id) + '">' + icon("pencil") + "</button></div>";
+      panelHeader("Cobertura regional", "Defina cidades, CEPs e raios de atendimento com validacao de endereco e rota.", '<button class="button button--primary" data-action="add-region">' + icon("plus") + " Nova area</button>"),
+      '<section class="quick-stats coverage-stats"><article><span>' + icon("map-pinned") + '</span><div><strong>' + active + '</strong><small>areas publicadas</small></div></article><article><span>' + icon("locate-fixed") + '</span><div><strong>' + state.regions.filter(function (region) { return region.cep; }).length + '</strong><small>areas com CEP validado</small></div></article><article><span>' + icon("activity") + '</span><div><strong>' + averageInterest + '%</strong><small>interesse medio</small></div></article><article><span>' + icon("message-circle") + '</span><div><strong>' + totalLeads + '</strong><small>leads por regiao</small></div></article></section>',
+      '<section class="admin-card coverage-controls">' + cardTitle("Aparencia e consulta", "Personalize o mapa para a marca e o fluxo de viabilidade.", '<span class="status-badge status-badge--success">ViaCEP + rotas Google</span>') + '<div class="settings-inline coverage-settings">' + field("Estilo do mapa", "coverageSettings.mapStyle", { type: "select", options: [{ value: "brand", label: "Cores da marca" }, { value: "street", label: "Mapa limpo" }, { value: "dark", label: "Contraste escuro" }] }) + field("Raio padrao", "coverageSettings.defaultRadiusKm", { type: "number", help: "Quilometros" }) + toggle("Consulta por CEP", "coverageSettings.cepLookup", "Preenche cidade e bairro automaticamente") + toggle("Mostrar nomes", "coverageSettings.showLabels", "Exibe rotulos fixos no mapa") + toggle("Intensidade de interesse", "coverageSettings.showInterest", "A opacidade representa a procura") + '</div></section>',
+      '<div class="coverage-integration-notice"><span>' + icon("shield-check") + '</span><div><strong>Integracao sem chave exposta</strong><p>Enderecos sao consultados pelo ViaCEP, pontos sao posicionados no mapa e rotas abrem no Google Maps em qualquer dispositivo.</p></div><a href="https://www.google.com/maps/dir/?api=1" target="_blank" rel="noopener">Testar Google Maps ' + icon("external-link") + '</a></div>',
+      '<section class="coverage-admin-layout coverage-admin-layout--pro"><article class="admin-card map-admin-card">' + cardTitle("Mapa de cobertura e interesse", "Raios configurados por area com as cores da marca.", '<span class="live-chip"><i></i> Atualizado agora</span>') + regionHeatMap() + '</article><article class="admin-card region-manager">' + cardTitle("Areas atendidas", "Status, CEP, raio e procura comercial.", "") + '<div class="region-search search-field">' + icon("search") + '<input id="region-search" type="search" placeholder="Buscar cidade, CEP ou status"></div><div class="region-list">' + state.regions.map(function (region) {
+        return '<div class="region-admin-row" data-region-search="' + esc((region.name + " " + (region.cep || "") + " " + region.status).toLowerCase()) + '"><span class="region-heat" style="--level:' + region.interest + ';--region-color:' + esc(region.color || state.theme.mapAccent) + '"></span><div><span><strong>' + esc(region.name) + '</strong><em>' + esc(region.type === "cep" ? "CEP" : region.type === "region" ? "Regiao" : "Cidade") + '</em></span><small>' + esc(region.cep || "Sem CEP") + ' &middot; ' + esc(region.radiusKm) + ' km &middot; ' + esc(region.status) + '</small></div><div class="region-numbers"><strong>' + region.leads + '</strong><small>leads</small></div><div class="row-actions"><button class="icon-button" data-action="open-region-route" data-id="' + esc(region.id) + '" title="Abrir rota">' + icon("route") + '</button><button class="icon-button" data-action="toggle-region" data-id="' + esc(region.id) + '" title="' + (region.active ? "Ocultar" : "Publicar") + '">' + icon(region.active ? "eye" : "eye-off") + '</button><button class="icon-button" data-action="edit-region" data-id="' + esc(region.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-region" data-id="' + esc(region.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div>';
       }).join("") + "</div></article></section>",
     ].join("");
   }
@@ -422,7 +488,7 @@
   function renderSupport() {
     return [
       panelHeader("Atendimento", "Configure canais publicos e padronize as mensagens enviadas pelo site.", '<button class="button button--primary" data-action="save-content">' + icon("save") + " Salvar atendimento</button>"),
-      '<section class="two-column-layout"><div class="stack"><article class="admin-card">' + cardTitle("WhatsApp comercial", "Numero e mensagens usadas em cada jornada.", "") + '<div class="form-grid">' + field("Numero principal", "brand.whatsapp", { help: "DDI + DDD + numero" }) + field("Numero secundario", "brand.whatsappSecondary", {}) + '</div>' + field("Mensagem do botao flutuante", "whatsapp.floatingMessage", { type: "textarea", rows: 3 }) + field("Mensagem de cobertura", "whatsapp.coverageTemplate", { type: "textarea", rows: 4, help: "Variaveis: {city} e {neighborhood}" }) + field("Mensagem de plano", "whatsapp.planTemplate", { type: "textarea", rows: 7, help: "Variaveis: {plan}, {speed}, {price}, {category}" }) + '</article></div><article class="admin-card">' + cardTitle("Atalhos da central", "Cards exibidos na area de atendimento.", "") + '<div class="support-admin-list">' + state.supportCards.map(function (item) {
+      '<section class="two-column-layout"><div class="stack"><article class="admin-card">' + cardTitle("WhatsApp comercial", "Numero e mensagens usadas em cada jornada.", "") + '<div class="form-grid">' + field("Numero principal", "brand.whatsapp", { help: "DDI + DDD + numero" }) + field("Numero secundario", "brand.whatsappSecondary", {}) + '</div>' + field("Mensagem do botao flutuante", "whatsapp.floatingMessage", { type: "textarea", rows: 3 }) + field("Mensagem de cobertura", "whatsapp.coverageTemplate", { type: "textarea", rows: 4, help: "Variaveis: {cep}, {city} e {neighborhood}" }) + field("Mensagem de plano", "whatsapp.planTemplate", { type: "textarea", rows: 7, help: "Variaveis: {plan}, {speed}, {price}, {category}" }) + '</article></div><article class="admin-card">' + cardTitle("Atalhos da central", "Cards exibidos na area de atendimento.", "") + '<div class="support-admin-list">' + state.supportCards.map(function (item) {
         return '<div><span>' + icon(item.icon) + '</span><div><strong>' + esc(item.title) + '</strong><p>' + esc(item.text) + '</p><small>' + esc(item.label) + '</small></div><button class="icon-button" data-action="edit-support" data-id="' + esc(item.id) + '">' + icon("pencil") + '</button><button class="icon-button" data-action="toggle-support" data-id="' + esc(item.id) + '">' + icon(item.active ? "eye" : "eye-off") + "</button></div>";
       }).join("") + "</div></article></section>",
     ].join("");
@@ -509,7 +575,7 @@
 
   function renderPanel() {
     const renderers = {
-      dashboard: renderDashboard, builder: renderBuilder, pages: renderPages, banners: renderBanners, navigation: renderNavigation,
+      dashboard: renderDashboard, builder: renderBuilder, pages: renderPages, banners: renderBanners, media: renderMedia, navigation: renderNavigation,
       appearance: renderAppearance, plans: renderPlans, catalog: renderCatalog, coverage: renderCoverage,
       support: renderSupport, campaigns: renderCampaigns, seo: renderSeo, pixels: renderPixels,
       analytics: renderAnalytics, heatmap: renderHeatmap, settings: renderSettings,
@@ -586,7 +652,16 @@
 
   function pageModal(item) {
     const page = item || { id: "", title: "", slug: "", description: "", status: "draft" };
-    openModal(modalHeader(item ? "Configurar pagina" : "Nova pagina", "Defina o endereco, a descricao para buscadores e o estado de publicacao.") + '<form class="modal-form" data-form-kind="page"><input type="hidden" name="id" value="' + esc(page.id) + '"><label class="field"><span>Titulo da pagina</span><input name="title" value="' + esc(page.title) + '" required></label><div class="form-grid"><label class="field"><span>URL amigavel</span><input name="slug" value="' + esc(page.slug) + '" placeholder="sobre-a-empresa" required></label><label class="field"><span>Status</span><select name="status"><option value="draft"' + (page.status === "draft" ? " selected" : "") + '>Rascunho</option><option value="published"' + (page.status === "published" ? " selected" : "") + '>Publicada</option></select></label></div><label class="field"><span>Descricao para buscadores</span><textarea name="description" rows="4" maxlength="170">' + esc(page.description) + '</textarea><small>Recomendado: ate 160 caracteres.</small></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + " Salvar pagina</button></div></form>");
+    openModal(modalHeader(item ? "Configurar pagina" : "Nova pagina", "Defina o endereco, a descricao para buscadores e o estado de publicacao.") + '<form class="modal-form" data-form-kind="page"><input type="hidden" name="id" value="' + esc(page.id) + '"><label class="field"><span>Titulo da pagina</span><input name="title" value="' + esc(page.title) + '" required></label>' + (item ? "" : '<label class="field"><span>Modelo inicial</span><select name="template"><option value="institutional">Institucional completa</option><option value="campaign">Campanha comercial</option><option value="legal">Documento e regulamento</option><option value="blank">Pagina simples</option></select><small>O modelo cria blocos editaveis que podem ser reorganizados depois.</small></label>') + '<div class="form-grid"><label class="field"><span>URL amigavel</span><input name="slug" value="' + esc(page.slug) + '" placeholder="sobre-a-empresa" required></label><label class="field"><span>Status</span><select name="status"><option value="draft"' + (page.status === "draft" ? " selected" : "") + '>Rascunho</option><option value="published"' + (page.status === "published" ? " selected" : "") + '>Publicada</option></select></label></div><label class="field"><span>Descricao para buscadores</span><textarea name="description" rows="4" maxlength="170">' + esc(page.description) + '</textarea><small>Recomendado: ate 160 caracteres.</small></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + " Salvar pagina</button></div></form>");
+  }
+
+  function pageTemplateBlocks(template, title, description) {
+    const hero = { id: FL.uid("block"), type: "hero", eyebrow: state.brand.name, title, text: description, visible: true };
+    const cta = { id: FL.uid("block"), type: "cta", title: "Fale com a " + state.brand.name, text: "Nossa equipe esta pronta para ajudar.", label: "Falar no WhatsApp", url: "whatsapp", visible: true };
+    if (template === "legal") return [hero, { id: FL.uid("block"), type: "text", title: "Informacoes do documento", text: "Edite o conteudo e apresente as condicoes de forma clara.", visible: true }, { id: FL.uid("block"), type: "callout", title: "Informacao importante", text: "Destaque prazos, regras ou orientacoes essenciais.", visible: true }, { id: FL.uid("block"), type: "document", title: "Documento completo", text: "Disponibilize o arquivo oficial para consulta.", label: "Abrir documento", url: "#", visible: true }, cta];
+    if (template === "campaign") return [hero, { id: FL.uid("block"), type: "image", title: "Uma oferta feita para sua rotina", text: "Apresente a campanha com uma imagem real e uma mensagem objetiva.", label: "Campanha " + state.brand.name, url: state.banners[0].image, visible: true }, { id: FL.uid("block"), type: "stats", title: "Por que escolher esta oferta", text: "100% | fibra optica\n5 | cidades atendidas\nSuporte local | perto de voce", visible: true }, cta];
+    if (template === "blank") return [hero, { id: FL.uid("block"), type: "text", title: "Conteudo da pagina", text: "Edite este bloco para publicar suas informacoes.", visible: true }, cta];
+    return [hero, { id: FL.uid("block"), type: "text", title: "Sobre a " + state.brand.name, text: "Conte a historia, o proposito e os diferenciais da empresa.", visible: true }, { id: FL.uid("block"), type: "stats", title: "Conexao que cresce com a regiao", text: "100% | fibra optica\n5 | cidades atendidas\n18 | planos e combos", visible: true }, { id: FL.uid("block"), type: "image", title: "Tecnologia com atendimento proximo", text: "Use uma imagem da biblioteca para aproximar a marca do publico.", label: "Equipe e infraestrutura", url: state.banners[1] ? state.banners[1].image : state.banners[0].image, visible: true }, { id: FL.uid("block"), type: "faq", title: "Perguntas frequentes", text: "Como consultar cobertura? | Informe seu CEP e fale com nossa equipe.\nComo contratar? | Escolha um plano e continue pelo WhatsApp.", visible: true }, cta];
   }
 
   function couponModal(item) {
@@ -597,6 +672,43 @@
   function popupModal(item) {
     const campaign = item || { id: "", name: "", type: "coupon", title: "", description: "", eyebrow: "", image: state.banners[0].image, couponId: state.coupons[0] ? state.coupons[0].id : "", ctaLabel: "Ver oferta", ctaLink: "#planos", trigger: "delay", delaySeconds: 8, scrollPercent: 45, frequency: "session", startsAt: new Date().toISOString().slice(0, 10), expiresAt: "", active: true };
     openModal(modalHeader(item ? "Editar campanha" : "Nova campanha popup", "A campanha aparece sobre o site conforme a regra escolhida.") + '<form class="modal-form" data-form-kind="popup"><input type="hidden" name="id" value="' + esc(campaign.id) + '"><div class="form-grid"><label class="field"><span>Nome interno</span><input name="name" value="' + esc(campaign.name) + '" required></label><label class="field"><span>Cupom associado</span><select name="couponId"><option value="">Sem cupom</option>' + state.coupons.map(function (coupon) { return '<option value="' + esc(coupon.id) + '"' + (coupon.id === campaign.couponId ? " selected" : "") + ">" + esc(coupon.code) + "</option>"; }).join("") + '</select></label></div><label class="field"><span>Chamada curta</span><input name="eyebrow" value="' + esc(campaign.eyebrow) + '"></label><label class="field"><span>Titulo</span><input name="title" value="' + esc(campaign.title) + '" required></label><label class="field"><span>Descricao</span><textarea name="description" rows="3">' + esc(campaign.description) + '</textarea></label><label class="field"><span>Imagem</span><input name="image" value="' + esc(campaign.image) + '"></label><div class="form-grid"><label class="field"><span>Gatilho</span><select name="trigger"><option value="delay"' + (campaign.trigger === "delay" ? " selected" : "") + '>Tempo na pagina</option><option value="scroll"' + (campaign.trigger === "scroll" ? " selected" : "") + '>Rolagem da pagina</option><option value="exit"' + (campaign.trigger === "exit" ? " selected" : "") + '>Intencao de saida</option></select></label><label class="field"><span>Atraso em segundos</span><input name="delaySeconds" type="number" min="2" value="' + campaign.delaySeconds + '"></label><label class="field"><span>Rolagem (%)</span><input name="scrollPercent" type="number" min="10" max="90" value="' + campaign.scrollPercent + '"></label><label class="field"><span>Frequencia</span><select name="frequency"><option value="session"' + (campaign.frequency === "session" ? " selected" : "") + '>Uma vez por sessao</option><option value="always"' + (campaign.frequency === "always" ? " selected" : "") + '>Sempre</option></select></label><label class="field"><span>Inicio</span><input name="startsAt" type="date" value="' + esc(campaign.startsAt) + '"></label><label class="field"><span>Termino</span><input name="expiresAt" type="date" value="' + esc(campaign.expiresAt) + '"></label><label class="field"><span>Texto do botao</span><input name="ctaLabel" value="' + esc(campaign.ctaLabel) + '"></label><label class="field"><span>Destino</span><input name="ctaLink" value="' + esc(campaign.ctaLink) + '"></label></div><label class="check-field"><input name="active" type="checkbox"' + (campaign.active ? " checked" : "") + '><span>Campanha ativa</span></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + " Salvar campanha</button></div></form>", true);
+  }
+
+  function regionModal(item) {
+    const region = item || { id: "", name: "", type: "cep", cep: "", stateCode: state.coverageSettings.defaultState, address: "", status: "Consulta de viabilidade", interest: 50, leads: 0, lat: "", lng: "", radiusKm: state.coverageSettings.defaultRadiusKm, color: state.theme.mapAccent, active: true };
+    openModal(modalHeader(item ? "Editar area de cobertura" : "Nova area de cobertura", "Cadastre uma cidade, um CEP central ou uma regiao comercial e confirme sua posicao no mapa.") + '<form class="modal-form region-form" data-form-kind="region"><input type="hidden" name="id" value="' + esc(region.id) + '"><div class="form-grid"><label class="field"><span>Tipo de area</span><select name="type"><option value="cep"' + (region.type === "cep" ? " selected" : "") + '>CEP e raio</option><option value="city"' + (region.type === "city" ? " selected" : "") + '>Cidade</option><option value="region"' + (region.type === "region" ? " selected" : "") + '>Regiao comercial</option></select></label><label class="field"><span>CEP de referencia</span><span class="input-action"><input id="region-cep" name="cep" inputmode="numeric" value="' + esc(region.cep || "") + '" placeholder="00000-000"><button id="lookup-region-cep" type="button" title="Buscar CEP">' + icon("search") + '</button></span><small id="region-cep-status">Preenche endereco e coordenadas automaticamente.</small></label><label class="field"><span>Cidade ou nome da regiao</span><input name="name" value="' + esc(region.name) + '" required></label><label class="field"><span>UF</span><input name="stateCode" maxlength="2" value="' + esc(region.stateCode || "SP") + '" required></label></div><label class="field"><span>Endereco de referencia</span><input name="address" value="' + esc(region.address || "") + '" placeholder="Rua, bairro, cidade - UF"></label><div class="form-grid"><label class="field"><span>Latitude</span><input name="lat" type="number" step="any" value="' + esc(region.lat) + '" required></label><label class="field"><span>Longitude</span><input name="lng" type="number" step="any" value="' + esc(region.lng) + '" required></label><label class="field"><span>Raio aproximado</span><input name="radiusKm" type="number" min="0.5" max="100" step="0.5" value="' + esc(region.radiusKm) + '"><small>Quilometros exibidos no mapa.</small></label><label class="field"><span>Cor da area</span><span class="color-input"><input name="color" type="color" value="' + esc(region.color || state.theme.mapAccent) + '"><b>' + esc(region.color || state.theme.mapAccent) + '</b></span></label></div><div class="form-grid"><label class="field"><span>Status publico</span><input name="status" value="' + esc(region.status) + '" required></label><label class="field"><span>Interesse (%)</span><input name="interest" type="number" min="0" max="100" value="' + esc(region.interest) + '"></label><label class="field"><span>Leads registrados</span><input name="leads" type="number" min="0" value="' + esc(region.leads) + '"></label></div><div class="route-preview"><span>' + icon("route") + '</span><div><strong>Validacao no Google Maps</strong><p>Confira o ponto e abra uma rota usando a localizacao atual.</p></div><a id="region-google-link" href="' + esc(googleMapsUrl(region, true)) + '" target="_blank" rel="noopener">Abrir rota ' + icon("external-link") + '</a></div><label class="check-field"><input name="active" type="checkbox"' + (region.active ? " checked" : "") + '><span>Exibir esta area no site</span></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + " Salvar area</button></div></form>", true);
+  }
+
+  async function lookupRegionCep(form) {
+    const cepInput = $("#region-cep", form);
+    const status = $("#region-cep-status", form);
+    const cep = String(cepInput.value || "").replace(/\D/g, "");
+    if (cep.length !== 8) { status.textContent = "Informe os 8 digitos do CEP."; status.className = "is-error"; return; }
+    status.textContent = "Buscando endereco e coordenadas...";
+    status.className = "is-loading";
+    try {
+      const response = await fetch("https://viacep.com.br/ws/" + cep + "/json/");
+      if (!response.ok) throw new Error("Falha ao consultar CEP");
+      const address = await response.json();
+      if (address.erro) throw new Error("CEP nao encontrado");
+      form.elements.cep.value = address.cep;
+      form.elements.name.value = address.localidade;
+      form.elements.stateCode.value = address.uf;
+      form.elements.address.value = [address.logradouro, address.bairro, address.localidade + " - " + address.uf].filter(Boolean).join(", ");
+      const query = [address.logradouro, address.bairro, address.localidade, address.uf, "Brasil"].filter(Boolean).join(", ");
+      const geoResponse = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&q=" + encodeURIComponent(query));
+      const locations = geoResponse.ok ? await geoResponse.json() : [];
+      if (locations[0]) { form.elements.lat.value = locations[0].lat; form.elements.lng.value = locations[0].lon; }
+      status.textContent = locations[0] ? "Endereco e ponto do mapa preenchidos." : "Endereco preenchido. Confirme as coordenadas no mapa.";
+      status.className = "is-success";
+      updateRegionRouteLink(form);
+    } catch (error) { status.textContent = error.message || "Nao foi possivel consultar o CEP."; status.className = "is-error"; }
+  }
+
+  function updateRegionRouteLink(form) {
+    const link = $("#region-google-link", form);
+    if (!link) return;
+    link.href = googleMapsUrl({ lat: Number(form.elements.lat.value), lng: Number(form.elements.lng.value), address: form.elements.address.value, name: form.elements.name.value }, true);
   }
 
   function simpleItemModal(kind, item) {
@@ -620,28 +732,66 @@
     openModal('<div class="popup-admin-preview"><div class="popup-admin-preview__image"><img src="' + esc(campaign.image) + '" alt=""></div><div><span class="eyebrow">' + esc(campaign.eyebrow) + '</span><h2>' + esc(campaign.title) + '</h2><p>' + esc(campaign.description) + '</p>' + (coupon ? '<button class="coupon-big-code">' + esc(coupon.code) + icon("copy") + '</button>' : "") + '<button class="button button--primary">' + esc(campaign.ctaLabel) + " " + icon("arrow-right") + "</button></div></div>", true);
   }
 
-  function compressImage(file) {
+  function optimizeImage(file, overrides) {
     return new Promise(function (resolve, reject) {
       if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error("Formato de imagem invalido."));
-      if (file.size > 5 * 1024 * 1024) return reject(new Error("A imagem deve ter no maximo 5 MB."));
+      const options = { ...state.mediaSettings, ...(overrides || {}) };
+      const maxFileBytes = Math.max(1, Number(options.maxFileMb || 8)) * 1024 * 1024;
+      if (file.size > maxFileBytes) return reject(new Error("A imagem deve ter no maximo " + options.maxFileMb + " MB."));
       const reader = new FileReader();
       reader.onerror = function () { reject(new Error("Nao foi possivel ler a imagem.")); };
       reader.onload = function () {
         const image = new Image();
         image.onerror = function () { reject(new Error("Arquivo de imagem invalido.")); };
         image.onload = function () {
-          const maxWidth = 1920;
+          const maxWidth = Math.max(320, Number(options.maxWidth || 1920));
           const scale = Math.min(1, maxWidth / image.width);
           const canvas = document.createElement("canvas");
           canvas.width = Math.round(image.width * scale);
           canvas.height = Math.round(image.height * scale);
-          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL("image/webp", 0.82));
+          const context = canvas.getContext("2d", { alpha: options.format !== "image/jpeg" });
+          if (options.format === "image/jpeg") { context.fillStyle = "#ffffff"; context.fillRect(0, 0, canvas.width, canvas.height); }
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(function (blob) {
+            if (!blob) { reject(new Error("O navegador nao conseguiu converter esta imagem.")); return; }
+            if (blob.size > 1.8 * 1024 * 1024) { reject(new Error("A imagem otimizada ainda ficou muito grande. Reduza a largura ou a qualidade.")); return; }
+            const outputReader = new FileReader();
+            outputReader.onerror = function () { reject(new Error("Nao foi possivel preparar a imagem otimizada.")); };
+            outputReader.onload = function () {
+              resolve({ dataUrl: outputReader.result, width: canvas.width, height: canvas.height, bytes: blob.size, originalBytes: file.size, type: blob.type || options.format, name: file.name });
+            };
+            outputReader.readAsDataURL(blob);
+          }, options.format || "image/webp", Math.min(0.95, Math.max(0.45, Number(options.quality || 82) / 100)));
         };
         image.src = reader.result;
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  async function addMediaFiles(fileList, usage) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    let completed = 0;
+    for (const file of files) {
+      try {
+        const result = await optimizeImage(file);
+        storeOptimizedMedia(result, file, usage || "Biblioteca");
+        completed += 1;
+      } catch (error) { toast(file.name + ": " + error.message, "error"); }
+    }
+    if (completed) { saveDraft(completed + (completed === 1 ? " imagem otimizada" : " imagens otimizadas")); renderPanel(); }
+  }
+
+  function storeOptimizedMedia(result, file, usage) {
+    const projectedBytes = stateSize() + String(result.dataUrl || "").length * 2;
+    if (projectedBytes > 4.2 * 1024 * 1024) throw new Error("A biblioteca local esta cheia. Remova arquivos antigos ou reduza a largura da imagem.");
+    state.mediaLibrary.unshift({
+      id: FL.uid("media"), name: file.name.replace(/\.[^.]+$/, ""), url: result.dataUrl,
+      type: result.type, width: result.width, height: result.height, bytes: result.bytes,
+      originalBytes: result.originalBytes, usage: usage, createdAt: new Date().toISOString().slice(0, 10),
+    });
+    return result.dataUrl;
   }
 
   function slugify(value) {
@@ -656,7 +806,7 @@
       let image = data.image;
       const file = $("#banner-image-file", form).files[0];
       if (file) {
-        try { image = await compressImage(file); }
+        try { const optimized = await optimizeImage(file); image = storeOptimizedMedia(optimized, file, "Banner"); }
         catch (error) { toast(error.message, "error"); return; }
       }
       const item = { id: data.id || FL.uid("banner"), name: data.name, eyebrow: data.eyebrow, title: data.title, subtitle: data.subtitle, image, mobileImage: image, primaryLabel: data.primaryLabel, primaryLink: data.primaryLink, secondaryLabel: data.secondaryLabel, secondaryLink: data.secondaryLink, badge: data.badge, position: data.position, overlay: Number(data.overlay), active: form.elements.active.checked };
@@ -679,7 +829,7 @@
       let logo = data.logo || (existing ? existing.logo : "");
       const file = $("#app-logo-file", form).files[0];
       if (file) {
-        try { logo = await compressImage(file); }
+        try { const optimized = await optimizeImage(file, { maxWidth: 512, format: "image/webp" }); logo = storeOptimizedMedia(optimized, file, "Logo de app"); }
         catch (error) { toast(error.message, "error"); return; }
       }
       const item = { id: data.id || FL.uid("app"), name: data.name, category: data.category, logo };
@@ -693,11 +843,7 @@
       if (existing) {
         Object.assign(existing, { title: data.title, slug, description: data.description, status: data.status, updatedAt: new Date().toISOString().slice(0, 10) });
       } else {
-        const page = { id: FL.uid("page"), title: data.title, slug, description: data.description, status: data.status, updatedAt: new Date().toISOString().slice(0, 10), blocks: [
-          { id: FL.uid("block"), type: "hero", eyebrow: state.brand.name, title: data.title, text: data.description, visible: true },
-          { id: FL.uid("block"), type: "text", title: "Conteudo da pagina", text: "Edite este bloco no construtor visual para publicar as informacoes da pagina.", visible: true },
-          { id: FL.uid("block"), type: "cta", title: "Fale com a Fibra Lider", text: "Nossa equipe esta pronta para ajudar.", label: "Falar no WhatsApp", url: "whatsapp", visible: true },
-        ] };
+        const page = { id: FL.uid("page"), title: data.title, slug, description: data.description, status: data.status, updatedAt: new Date().toISOString().slice(0, 10), blocks: pageTemplateBlocks(data.template || "blank", data.title, data.description) };
         state.pages.push(page);
         pageEditId = page.id;
         selectedPageBlockId = page.blocks[0].id;
@@ -719,7 +865,7 @@
       const existing = list.find(function (item) { return item.id === data.id; });
       let item;
       if (kind === "benefit") item = { id: data.id || FL.uid("benefit"), title: data.title, icon: data.icon, text: data.text };
-      if (kind === "region") item = { id: data.id || FL.uid("region"), name: data.name, status: data.status, interest: Number(data.interest), leads: Number(data.leads), lat: Number(data.lat), lng: Number(data.lng), active: existing ? existing.active : true };
+      if (kind === "region") item = { id: data.id || FL.uid("region"), name: data.name, type: data.type, cep: data.cep, stateCode: data.stateCode.toUpperCase(), address: data.address, status: data.status, interest: Number(data.interest), leads: Number(data.leads), lat: Number(data.lat), lng: Number(data.lng), radiusKm: Number(data.radiusKm), color: data.color || state.theme.mapAccent, active: form.elements.active.checked };
       if (kind === "support") item = { ...existing, id: data.id, title: data.title, text: data.text, label: data.label, url: data.url, icon: data.icon };
       if (existing) Object.assign(existing, item); else list.push(item);
     }
@@ -742,6 +888,19 @@
     }); });
     const resetCategory = $("[data-category-reset]", $("#admin-modal"));
     if (resetCategory) resetCategory.addEventListener("click", function () { categoryModal(); });
+    const cepButton = $("#lookup-region-cep", $("#admin-modal"));
+    const cepInput = $("#region-cep", $("#admin-modal"));
+    if (cepButton && form) cepButton.addEventListener("click", function () { lookupRegionCep(form); });
+    if (cepInput && form) {
+      let lookupTimer;
+      cepInput.addEventListener("input", function () {
+        const digits = cepInput.value.replace(/\D/g, "").slice(0, 8);
+        cepInput.value = digits.replace(/(\d{5})(\d)/, "$1-$2");
+        clearTimeout(lookupTimer);
+        if (digits.length === 8) lookupTimer = setTimeout(function () { lookupRegionCep(form); }, 450);
+      });
+      [form.elements.lat, form.elements.lng, form.elements.address].forEach(function (element) { if (element) element.addEventListener("input", function () { updateRegionRouteLink(form); }); });
+    }
   }
 
   function currentPage() {
@@ -770,7 +929,28 @@
     if (action === "toggle-banner") { const item = find(state.banners); item.active = !item.active; saveDraft(); renderPanel(); }
     if (action === "duplicate-banner") { const item = FL.clone(find(state.banners)); item.id = FL.uid("banner"); item.name += " - copia"; item.active = false; state.banners.push(item); saveDraft("Slide duplicado"); renderPanel(); }
     if (action === "delete-banner" && state.banners.length > 1 && confirm("Excluir este slide?")) { state.banners = state.banners.filter(function (item) { return item.id !== id; }); saveDraft("Slide excluido"); renderPanel(); }
+    if (action === "copy-media") {
+      const item = find(state.mediaLibrary);
+      if (item && navigator.clipboard) navigator.clipboard.writeText(item.url);
+      toast("Endereco da imagem copiado");
+    }
+    if (action === "download-media") {
+      const item = find(state.mediaLibrary);
+      if (item) { const link = document.createElement("a"); link.href = item.url; link.download = slugify(item.name) + "." + (item.type || "image/webp").split("/")[1].replace("jpeg", "jpg"); link.click(); }
+    }
+    if (action === "delete-media") {
+      const item = find(state.mediaLibrary);
+      const used = item && (state.banners.some(function (banner) { return banner.image === item.url || banner.mobileImage === item.url; }) || state.apps.some(function (app) { return app.logo === item.url; }) || state.popupCampaigns.some(function (campaign) { return campaign.image === item.url; }) || state.pages.some(function (page) { return page.blocks.some(function (block) { return block.url === item.url; }); }));
+      if (used) toast("Esta imagem esta em uso. Troque-a no conteudo antes de remover.", "error");
+      else if (item && confirm("Remover esta imagem da biblioteca?")) { state.mediaLibrary = state.mediaLibrary.filter(function (media) { return media.id !== id; }); saveDraft("Imagem removida"); renderPanel(); }
+    }
     if (action === "save-content") { saveDraft("Alteracoes salvas em rascunho"); renderPanel(); }
+    if (action === "apply-theme-preset") {
+      const preset = THEME_PRESETS[element.dataset.preset];
+      if (preset) { Object.assign(state.theme, preset); saveDraft("Paleta " + preset.label + " aplicada"); renderPanel(); }
+    }
+    if (action === "theme-preview-mode") { themePreviewMode = element.dataset.mode; renderPanel(); }
+    if (action === "refresh-theme-preview") { const frame = $("#theme-live-frame"); if (frame) frame.src = "./index.html?preview=" + Date.now() + "&theme=" + themePreviewMode; }
     if (action === "move-nav-up") { moveInArray(state.navigation, id, -1); saveDraft(); renderPanel(); }
     if (action === "toggle-nav") { const item = find(state.navigation); item.visible = !item.visible; saveDraft(); renderPanel(); }
     if (action === "add-nav-link") { state.navigation.push({ id: FL.uid("nav"), label: "Novo link", href: "#", visible: true }); saveDraft(); renderPanel(); }
@@ -785,8 +965,11 @@
     if (action === "delete-app" && confirm("Excluir este app?")) { state.apps = state.apps.filter(function (item) { return item.id !== id; }); saveDraft(); renderPanel(); }
     if (action === "add-benefit") simpleItemModal("benefit");
     if (action === "edit-benefit") simpleItemModal("benefit", find(state.benefits));
-    if (action === "add-region") simpleItemModal("region");
-    if (action === "edit-region") simpleItemModal("region", find(state.regions));
+    if (action === "add-region") regionModal();
+    if (action === "edit-region") regionModal(find(state.regions));
+    if (action === "toggle-region") { const item = find(state.regions); item.active = !item.active; saveDraft(); renderPanel(); }
+    if (action === "delete-region" && state.regions.length > 1 && confirm("Excluir esta area de cobertura?")) { state.regions = state.regions.filter(function (item) { return item.id !== id; }); saveDraft("Area removida"); renderPanel(); }
+    if (action === "open-region-route") { const item = find(state.regions); if (item) window.open(googleMapsUrl(item, true), "_blank", "noopener"); }
     if (action === "edit-support") simpleItemModal("support", find(state.supportCards));
     if (action === "toggle-support") { const item = find(state.supportCards); item.active = !item.active; saveDraft(); renderPanel(); }
     if (action === "new-coupon") couponModal();
@@ -819,12 +1002,15 @@
         callout: { title: "Informacao importante", text: "Use este bloco para destacar uma orientacao." },
         document: { title: "Documento", text: "Descreva o arquivo ou link.", label: "Abrir documento", url: "#" },
         image: { title: "Imagem", text: "", label: "Descricao da imagem", url: "./assets/img/banner-streaming-family.jpg" },
+        stats: { title: "Numeros que mostram nossa presenca", text: "5 | cidades atendidas\n18 | planos disponiveis\n100% | fibra optica" },
+        faq: { title: "Perguntas frequentes", text: "Como consultar cobertura? | Informe seu CEP e fale com nossa equipe.\nComo contratar? | Escolha um plano e continue pelo WhatsApp." },
         cta: { title: "Pronto para conversar?", text: "Nossa equipe esta disponivel para ajudar.", label: "Falar no WhatsApp", url: "whatsapp" },
       };
       const block = { id: FL.uid("block"), type, visible: true, ...(defaults[type] || defaults.text) };
       page.blocks.push(block); selectedPageBlockId = block.id; touchPage(page, "Bloco adicionado"); renderPanel();
     }
     if (action === "move-page-block-up" || action === "move-page-block-down") { const page = currentPage(); if (page) { moveInArray(page.blocks, selectedPageBlockId, action.endsWith("up") ? -1 : 1); touchPage(page); renderPanel(); } }
+    if (action === "duplicate-page-block") { const page = currentPage(); const source = page && page.blocks.find(function (item) { return item.id === selectedPageBlockId; }); if (source) { const copy = FL.clone(source); copy.id = FL.uid("block"); copy.title = (copy.title || "Bloco") + " - copia"; page.blocks.splice(page.blocks.indexOf(source) + 1, 0, copy); selectedPageBlockId = copy.id; touchPage(page, "Bloco duplicado"); renderPanel(); } }
     if (action === "delete-page-block") { const page = currentPage(); if (page && page.blocks.length > 1 && confirm("Excluir este bloco?")) { page.blocks = page.blocks.filter(function (item) { return item.id !== selectedPageBlockId; }); selectedPageBlockId = page.blocks[0].id; touchPage(page, "Bloco excluido"); renderPanel(); } }
     if (action === "export-report") exportCsv();
     if (action === "export-state") exportState();
@@ -843,6 +1029,7 @@
         setPath(element.dataset.bind, value);
         if (element.type === "color") { const label = element.closest(".color-input").querySelector("b"); if (label) label.textContent = element.value; }
         saveDraft();
+        if (element.dataset.bind.indexOf("coverageSettings.") === 0 && eventName === "change") renderPanel();
       });
     });
     $$("[data-select-block]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { selectedBlockId = element.dataset.selectBlock; renderPanel(); }); });
@@ -852,21 +1039,37 @@
     const tone = $("[data-block-tone]", $("#admin-panel"));
     if (tone) tone.addEventListener("change", function () { const block = state.pageBlocks.find(function (item) { return item.id === tone.dataset.blockTone; }); block.tone = tone.value; saveDraft(); });
     $$("[data-device]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { builderDevice = element.dataset.device; renderPanel(); }); });
+    $$("[data-builder-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { builderMobileTab = element.dataset.builderTab; renderPanel(); }); });
     bindBuilderDrag();
     $$("[data-select-page-block]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { selectedPageBlockId = element.dataset.selectPageBlock; renderPanel(); }); });
     $$("[data-toggle-page-block]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { const page = currentPage(); const block = page && page.blocks.find(function (item) { return item.id === element.dataset.togglePageBlock; }); if (block) { block.visible = block.visible === false; touchPage(page); renderPanel(); } }); });
     $$("[data-page-device]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { pageBuilderDevice = element.dataset.pageDevice; renderPanel(); }); });
+    $$("[data-page-builder-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { pageBuilderMobileTab = element.dataset.pageBuilderTab; renderPanel(); }); });
     $$("[data-page-field]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const page = currentPage(); const block = page && page.blocks.find(function (item) { return item.id === selectedPageBlockId; }); if (block) { block[element.dataset.pageField] = element.value; touchPage(page); } }); });
+    const pageMedia = $("[data-page-media]", $("#admin-panel"));
+    if (pageMedia) pageMedia.addEventListener("change", function () { const page = currentPage(); const block = page && page.blocks.find(function (item) { return item.id === selectedPageBlockId; }); if (block && pageMedia.value) { block.url = pageMedia.value; touchPage(page, "Imagem aplicada"); renderPanel(); } });
     bindPageBuilderDrag();
     const categoryFilter = $("#plan-category-filter");
     if (categoryFilter) categoryFilter.addEventListener("change", function () { planFilter = categoryFilter.value; renderPanel(); });
     const search = $("#plan-search");
     if (search) search.addEventListener("input", function () { $$(".plan-admin-card").forEach(function (card) { card.hidden = !card.dataset.search.includes(search.value.toLowerCase()); }); });
+    const regionSearch = $("#region-search");
+    if (regionSearch) regionSearch.addEventListener("input", function () { $$("[data-region-search]").forEach(function (row) { row.hidden = !row.dataset.regionSearch.includes(regionSearch.value.toLowerCase()); }); });
     $$("[data-campaign-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { activeCampaignTab = element.dataset.campaignTab; renderPanel(); }); });
     $$("[data-nav-label]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const item = state.navigation.find(function (nav) { return nav.id === element.dataset.navLabel; }); item.label = element.value; saveDraft(); }); });
     $$("[data-nav-href]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const item = state.navigation.find(function (nav) { return nav.id === element.dataset.navHref; }); item.href = element.value; saveDraft(); }); });
     const importInput = $("#import-state-file");
     if (importInput) importInput.addEventListener("change", importState);
+    const mediaInput = $("#media-upload-input");
+    if (mediaInput) mediaInput.addEventListener("change", function () { addMediaFiles(mediaInput.files, "Biblioteca"); });
+    const mediaDropInput = $("#media-drop-input");
+    if (mediaDropInput) mediaDropInput.addEventListener("change", function () { addMediaFiles(mediaDropInput.files, "Biblioteca"); });
+    const dropzone = $("#media-dropzone");
+    if (dropzone) {
+      ["dragenter", "dragover"].forEach(function (name) { dropzone.addEventListener(name, function (event) { event.preventDefault(); dropzone.classList.add("is-dragging"); }); });
+      ["dragleave", "drop"].forEach(function (name) { dropzone.addEventListener(name, function (event) { event.preventDefault(); dropzone.classList.remove("is-dragging"); }); });
+      dropzone.addEventListener("drop", function (event) { addMediaFiles(event.dataTransfer.files, "Biblioteca"); });
+    }
   }
 
   function bindBuilderDrag() {

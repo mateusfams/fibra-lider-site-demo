@@ -1,7 +1,8 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "fibra-lider-studio-state-v7";
+  const STORAGE_KEY = "fibra-lider-studio-state-v8";
+  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v7"];
   const EVENTS_KEY = "fibra-lider-studio-events-v2";
   const SESSION_KEY = "fibra-lider-studio-session-v2";
 
@@ -11,7 +12,7 @@
 
   const defaultState = {
     meta: {
-      version: "1.1.0-mvp",
+      version: "1.2.0-mvp",
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
       status: "published",
@@ -44,6 +45,12 @@
       panel: "#ffffff",
       radius: "16",
       font: "Inter",
+      density: "comfortable",
+      buttonStyle: "soft",
+      cardStyle: "bordered",
+      shadow: "soft",
+      sectionReveal: true,
+      mapAccent: "#0874e7",
       defaultMode: "light",
       visitorThemeToggle: true,
       motion: "comfortable",
@@ -175,11 +182,34 @@
       { id: "nba", name: "NBA", category: "Esportes", logo: "" }, { id: "ubook", name: "Ubook", category: "Audiobooks", logo: "" },
     ],
     regions: [
-      { id: "sumare", name: "Sumare", status: "Cobertura ativa", interest: 94, leads: 86, lat: -22.8217964, lng: -47.2671050, active: true },
-      { id: "hortolandia", name: "Hortolandia", status: "Cobertura ativa", interest: 78, leads: 64, lat: -22.8620175, lng: -47.2164219, active: true },
-      { id: "nova-odessa", name: "Nova Odessa", status: "Expansao monitorada", interest: 62, leads: 41, lat: -22.7805746, lng: -47.2993805, active: true },
-      { id: "campinas", name: "Campinas", status: "Consulta de viabilidade", interest: 49, leads: 32, lat: -22.9056391, lng: -47.0595640, active: true },
-      { id: "paulinia", name: "Paulinia", status: "Expansao futura", interest: 34, leads: 18, lat: -22.7630391, lng: -47.1532213, active: true },
+      { id: "sumare", name: "Sumare", type: "city", cep: "13170-001", stateCode: "SP", address: "Sumare - SP", status: "Cobertura ativa", interest: 94, leads: 86, lat: -22.8217964, lng: -47.2671050, radiusKm: 7, color: "#0874e7", active: true },
+      { id: "hortolandia", name: "Hortolandia", type: "city", cep: "13184-190", stateCode: "SP", address: "Hortolandia - SP", status: "Cobertura ativa", interest: 78, leads: 64, lat: -22.8620175, lng: -47.2164219, radiusKm: 6, color: "#0da86f", active: true },
+      { id: "nova-odessa", name: "Nova Odessa", type: "city", cep: "13380-009", stateCode: "SP", address: "Nova Odessa - SP", status: "Expansao monitorada", interest: 62, leads: 41, lat: -22.7805746, lng: -47.2993805, radiusKm: 5, color: "#497de7", active: true },
+      { id: "campinas", name: "Campinas", type: "city", cep: "13010-111", stateCode: "SP", address: "Campinas - SP", status: "Consulta de viabilidade", interest: 49, leads: 32, lat: -22.9056391, lng: -47.0595640, radiusKm: 5, color: "#e39a16", active: true },
+      { id: "paulinia", name: "Paulinia", type: "city", cep: "13140-001", stateCode: "SP", address: "Paulinia - SP", status: "Expansao futura", interest: 34, leads: 18, lat: -22.7630391, lng: -47.1532213, radiusKm: 4, color: "#db7b20", active: true },
+    ],
+    coverageSettings: {
+      mapStyle: "brand",
+      routeProvider: "google",
+      cepLookup: true,
+      showInterest: true,
+      showLabels: true,
+      defaultRadiusKm: 5,
+      defaultState: "SP",
+      centerLat: -22.835,
+      centerLng: -47.19,
+    },
+    mediaSettings: {
+      format: "image/webp",
+      quality: 82,
+      maxWidth: 1920,
+      maxFileMb: 8,
+    },
+    mediaLibrary: [
+      { id: "media-hero-family", name: "Familia conectada", url: "./assets/img/hero-family-fiber.jpg", type: "image/jpeg", width: 1774, height: 887, bytes: 224939, originalBytes: 224939, usage: "Banner", createdAt: "2026-09-21" },
+      { id: "media-streaming", name: "Streaming em familia", url: "./assets/img/banner-streaming-family.jpg", type: "image/jpeg", width: 1672, height: 941, bytes: 227341, originalBytes: 227341, usage: "Banner", createdAt: "2026-09-21" },
+      { id: "media-business", name: "Fibra para empresas", url: "./assets/img/banner-business-fiber.jpg", type: "image/jpeg", width: 1672, height: 941, bytes: 180411, originalBytes: 180411, usage: "Banner", createdAt: "2026-09-21" },
+      { id: "media-logo", name: "Logo Fibra Lider", url: "./assets/img/fibra-lider-logo.png", type: "image/png", width: 800, height: 250, bytes: 25041, originalBytes: 25041, usage: "Marca", createdAt: "2026-09-21" },
     ],
     testimonials: [
       { id: "review-1", name: "Mariana S.", city: "Sumare", rating: 5, text: "Atendimento rapido e internet estavel mesmo com a casa toda conectada." },
@@ -207,7 +237,7 @@
     ],
     whatsapp: {
       floatingMessage: "Ola Fibra Lider, vim pelo site e preciso de atendimento.",
-      coverageTemplate: "Ola Fibra Lider! Quero consultar cobertura.\n\nCidade: {city}\nBairro: {neighborhood}",
+      coverageTemplate: "Ola Fibra Lider! Quero consultar cobertura.\n\nCEP: {cep}\nCidade: {city}\nBairro: {neighborhood}",
       planTemplate: "Oi, sou visitante do site e tenho interesse em adquirir o plano:\n\nPlano: {plan}\nVelocidade: {speed}\nValor: {price}\nCategoria: {category}\n\nPode me passar mais informacoes?",
       businessTemplate: "Ola Fibra Lider, quero saber mais sobre link dedicado para minha empresa ou evento.",
     },
@@ -274,14 +304,26 @@
   }
   function saveJson(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
   function getState() {
-    const stored = loadJson(STORAGE_KEY, defaultState);
+    let stored;
+    try {
+      const current = localStorage.getItem(STORAGE_KEY);
+      const legacyKey = LEGACY_STORAGE_KEYS.find(function (key) { return localStorage.getItem(key); });
+      stored = current ? JSON.parse(current) : legacyKey ? JSON.parse(localStorage.getItem(legacyKey)) : clone(defaultState);
+    } catch (error) {
+      console.warn("Nao foi possivel migrar os dados locais.", error);
+      stored = clone(defaultState);
+    }
     const next = { ...clone(defaultState), ...stored };
-    ["meta", "brand", "theme", "slider", "content", "whatsapp", "seo", "integrations", "footer", "dashboardTargets"].forEach(function (key) {
+    ["meta", "brand", "theme", "slider", "content", "whatsapp", "seo", "integrations", "footer", "dashboardTargets", "coverageSettings", "mediaSettings"].forEach(function (key) {
       next[key] = { ...clone(defaultState[key]), ...(stored[key] || {}) };
     });
-    ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "pageBlocks", "pages"].forEach(function (key) {
+    ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "pageBlocks", "pages", "mediaLibrary"].forEach(function (key) {
       next[key] = Array.isArray(stored[key]) ? stored[key] : clone(defaultState[key]);
     });
+    next.regions = next.regions.map(function (region, index) {
+      return { type: "city", cep: "", stateCode: "SP", address: region.name + " - SP", radiusKm: next.coverageSettings.defaultRadiusKm, color: index === 0 ? next.theme.mapAccent : region.color || next.theme.primary, ...region };
+    });
+    next.meta.version = defaultState.meta.version;
     return next;
   }
   function saveState(state, publish) {

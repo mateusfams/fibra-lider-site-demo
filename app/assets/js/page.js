@@ -20,6 +20,11 @@
     root.style.setProperty("--brand-dark", theme.primaryDark);
     root.style.setProperty("--accent", theme.accent);
     root.style.setProperty("--radius", theme.radius + "px");
+    root.style.setProperty("--site-font", theme.font === "Arial" ? "Arial, sans-serif" : '"' + theme.font + '", Inter, Arial, sans-serif');
+    root.dataset.density = theme.density || "comfortable";
+    root.dataset.buttonStyle = theme.buttonStyle || "soft";
+    root.dataset.cardStyle = theme.cardStyle || "bordered";
+    root.dataset.shadow = theme.shadow || "soft";
     const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     const previewMode = new URLSearchParams(location.search).get("theme");
     const mode = ["light", "dark"].includes(previewMode) ? previewMode : localStorage.getItem("fl-site-theme") || (theme.defaultMode === "system" ? preferred : theme.defaultMode);
@@ -49,6 +54,14 @@
     if (block.type === "callout") return '<section class="inner-content-section inner-content-section--compact"><div class="shell"><article class="document-callout"><span>' + icon("info") + '</span><div><h2>' + esc(block.title) + "</h2>" + paragraphs(block.text) + "</div></article></div></section>";
     if (block.type === "document") return '<section class="inner-content-section inner-content-section--compact"><div class="shell"><article class="document-download"><span>' + icon("file-check-2") + '</span><div><h2>' + esc(block.title) + '</h2><p>' + esc(block.text) + '</p></div><a class="button button--primary" href="' + esc(pageUrl(block.url)) + '" target="_blank" rel="noopener">' + esc(block.label || "Abrir documento") + " " + icon("external-link") + "</a></article></div></section>";
     if (block.type === "image") return '<section class="inner-content-section"><div class="shell page-image-block"><img src="' + esc(block.url) + '" alt="' + esc(block.label || block.title) + '" loading="lazy"><div><h2>' + esc(block.title) + "</h2>" + paragraphs(block.text) + "</div></div></section>";
+    if (block.type === "stats") {
+      const items = String(block.text || "").split("\n").map(function (line) { const parts = line.split("|"); return { value: (parts.shift() || "").trim(), label: parts.join("|").trim() }; }).filter(function (item) { return item.value; });
+      return '<section class="inner-content-section page-stats-block"><div class="shell"><h2>' + esc(block.title) + '</h2><div>' + items.map(function (item) { return '<article><strong>' + esc(item.value) + '</strong><span>' + esc(item.label) + '</span></article>'; }).join("") + '</div></div></section>';
+    }
+    if (block.type === "faq") {
+      const items = String(block.text || "").split("\n").map(function (line) { const parts = line.split("|"); return { question: (parts.shift() || "").trim(), answer: parts.join("|").trim() }; }).filter(function (item) { return item.question; });
+      return '<section class="inner-content-section page-faq-block"><div class="shell"><h2>' + esc(block.title) + '</h2><div>' + items.map(function (item, index) { return '<details' + (index === 0 ? " open" : "") + '><summary>' + esc(item.question) + icon("plus") + '</summary><p>' + esc(item.answer) + '</p></details>'; }).join("") + '</div></div></section>';
+    }
     if (block.type === "cta") return '<section class="page-cta"><div class="shell"><div><h2>' + esc(block.title) + '</h2><p>' + esc(block.text) + '</p></div><a class="button button--light" href="' + esc(pageUrl(block.url)) + '"' + (block.url === "whatsapp" ? ' target="_blank" rel="noopener"' : "") + '>' + esc(block.label || "Saiba mais") + " " + icon("arrow-right") + "</a></div></section>";
     return "";
   }

@@ -37,6 +37,12 @@
     root.style.setProperty("--brand-dark", theme.primaryDark);
     root.style.setProperty("--accent", theme.accent);
     root.style.setProperty("--radius", theme.radius + "px");
+    root.style.setProperty("--site-font", theme.font === "Arial" ? "Arial, sans-serif" : '"' + theme.font + '", Inter, Arial, sans-serif');
+    root.style.setProperty("--map-accent", theme.mapAccent || theme.primary);
+    root.dataset.density = theme.density || "comfortable";
+    root.dataset.buttonStyle = theme.buttonStyle || "soft";
+    root.dataset.cardStyle = theme.cardStyle || "bordered";
+    root.dataset.shadow = theme.shadow || "soft";
     const saved = localStorage.getItem("fl-site-theme");
     const previewMode = new URLSearchParams(location.search).get("theme");
     const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -227,9 +233,7 @@
   }
 
   function regionColor(region) {
-    if (region.status === "Cobertura ativa") return "#12b76a";
-    if (region.interest >= 60) return "#0874e7";
-    return "#f59e0b";
+    return region.color || state.theme.mapAccent || state.theme.primary;
   }
 
   function selectCoverageRegion(name) {
@@ -253,7 +257,9 @@
     }
     element.hidden = false;
     fallback.hidden = true;
-    publicMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true, attributionControl: true }).setView([-22.835, -47.19], 11);
+    const mapShell = element.closest(".coverage-map");
+    if (mapShell) mapShell.className = "coverage-map map-style--" + (state.coverageSettings.mapStyle || "brand");
+    publicMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true, attributionControl: true }).setView([Number(state.coverageSettings.centerLat), Number(state.coverageSettings.centerLng)], 11);
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -264,13 +270,13 @@
       bounds.push(point);
       const color = regionColor(region);
       const circle = window.L.circle(point, {
-        radius: 1400 + (Number(region.interest) * 18), color, fillColor: color,
-        fillOpacity: 0.32, weight: 2,
+        radius: Math.max(500, Number(region.radiusKm || state.coverageSettings.defaultRadiusKm) * 1000), color, fillColor: color,
+        fillOpacity: state.coverageSettings.showInterest ? 0.14 + Number(region.interest || 0) / 520 : 0.24, weight: 2,
       }).addTo(publicMap);
       circle.bindTooltip('<strong>' + escapeHtml(region.name) + '</strong><span>' + escapeHtml(region.status) + '</span><small>' + region.interest + '% de interesse</small>', { direction: "top", className: "coverage-tooltip" });
       circle.on("click", function () { selectCoverageRegion(region.name); });
       const marker = window.L.circleMarker(point, { radius: 7, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(publicMap);
-      marker.bindTooltip(escapeHtml(region.name), { permanent: true, direction: "top", offset: [0, -8], className: "region-map-label" });
+      marker.bindTooltip(escapeHtml(region.name), { permanent: state.coverageSettings.showLabels, direction: "top", offset: [0, -8], className: "region-map-label" });
       marker.on("click", function () { selectCoverageRegion(region.name); });
     });
     publicMap.fitBounds(bounds, { padding: [32, 32], maxZoom: 11 });
@@ -345,6 +351,17 @@
     });
   }
 
+  function setupSectionReveal() {
+    if (!state.theme.sectionReveal || state.theme.motion === "reduced" || !window.IntersectionObserver) return;
+    const sections = $$("#conteudo > .page-section").filter(function (section) { return !section.classList.contains("hero-section") && !section.hidden; });
+    const observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) { entry.target.classList.add("is-visible"); observer.unobserve(entry.target); }
+      });
+    }, { threshold: 0.08, rootMargin: "0px 0px -30px" });
+    sections.forEach(function (section) { section.classList.add("reveal-ready"); observer.observe(section); });
+  }
+
   function renderAll() {
     applyTheme();
     applySeo();
@@ -361,6 +378,7 @@
     renderSupport();
     renderFinalAndFooter();
     applyPageBlocks();
+    setupSectionReveal();
     refreshIcons();
     startSlider();
   }
@@ -419,16 +437,52 @@
     }
   }
 
+  function normalizeText(value) {
+    return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  async function lookupPublicCep() {
+    const input = $("#coverage-cep");
+    const status = $("#coverage-cep-status");
+    const cep = input.value.replace(/\D/g, "");
+    if (cep.length !== 8 || !state.coverageSettings.cepLookup) return;
+    status.textContent = "Localizando seu endereco...";
+    status.className = "is-loading";
+    try {
+      const response = await fetch("https://viacep.com.br/ws/" + cep + "/json/");
+      if (!response.ok) throw new Error("Nao foi possivel consultar agora");
+      const address = await response.json();
+      if (address.erro) throw new Error("CEP nao encontrado");
+      input.value = address.cep;
+      $("#coverage-neighborhood").value = address.bairro || "";
+      const region = state.regions.find(function (item) { return normalizeText(item.name) === normalizeText(address.localidade); });
+      if (region) {
+        $("#coverage-city").value = region.name;
+        if (publicMap) publicMap.setView([Number(region.lat), Number(region.lng)], 12, { animate: true });
+        status.textContent = "Endereco localizado em " + region.name + ".";
+        status.className = "is-success";
+      } else {
+        const select = $("#coverage-city");
+        let option = Array.from(select.options).find(function (item) { return item.value === address.localidade; });
+        if (!option) { option = document.createElement("option"); option.value = address.localidade; option.textContent = address.localidade + " - consulta especial"; select.appendChild(option); }
+        select.value = address.localidade;
+        status.textContent = "Endereco localizado. Vamos confirmar a viabilidade.";
+        status.className = "is-success";
+      }
+    } catch (error) { status.textContent = error.message; status.className = "is-error"; }
+  }
+
   function handleCoverage(event) {
     event.preventDefault();
     const city = $("#coverage-city").value;
     const neighborhood = $("#coverage-neighborhood").value.trim();
+    const cep = $("#coverage-cep").value.trim();
     if (!city || !neighborhood) return;
     const region = state.regions.find(function (item) { return item.name === city; });
     const result = $("#coverage-result");
     result.hidden = false;
-    result.innerHTML = '<span>' + icon(region && region.status === "Cobertura ativa" ? "circle-check" : "map-pinned") + '</span><div><strong>' + escapeHtml(region ? region.status : "Consulta recebida") + '</strong><p>Confirme a viabilidade exata para ' + escapeHtml(neighborhood) + ' com nossa equipe.</p><a href="' + escapeHtml(FL.whatsappLink(state.brand.whatsapp, FL.interpolate(state.whatsapp.coverageTemplate, { city, neighborhood }))) + '" target="_blank" rel="noopener">Continuar no WhatsApp ' + icon("arrow-up-right") + "</a></div>";
-    FL.trackEvent("coverage_search", { region: city, neighborhood, found: Boolean(region) });
+    result.innerHTML = '<span>' + icon(region && region.status === "Cobertura ativa" ? "circle-check" : "map-pinned") + '</span><div><strong>' + escapeHtml(region ? region.status : "Consulta recebida") + '</strong><p>Confirme a viabilidade exata para ' + escapeHtml(neighborhood) + ' com nossa equipe.</p><a href="' + escapeHtml(FL.whatsappLink(state.brand.whatsapp, FL.interpolate(state.whatsapp.coverageTemplate, { city, neighborhood, cep }))) + '" target="_blank" rel="noopener">Continuar no WhatsApp ' + icon("arrow-up-right") + "</a></div>";
+    FL.trackEvent("coverage_search", { region: city, neighborhood, cep, found: Boolean(region) });
     refreshIcons();
   }
 
@@ -496,6 +550,13 @@
       if (link) FL.trackEvent("whatsapp_click", { planId: link.dataset.planId, source: "plan_card" });
     });
     $("#coverage-form").addEventListener("submit", handleCoverage);
+    let cepTimer;
+    $("#coverage-cep").addEventListener("input", function () {
+      const digits = this.value.replace(/\D/g, "").slice(0, 8);
+      this.value = digits.replace(/(\d{5})(\d)/, "$1-$2");
+      clearTimeout(cepTimer);
+      if (digits.length === 8) cepTimer = setTimeout(lookupPublicCep, 420);
+    });
     $("#faq-list").addEventListener("click", function (event) {
       const button = event.target.closest(".faq-item > button");
       if (!button) return;
