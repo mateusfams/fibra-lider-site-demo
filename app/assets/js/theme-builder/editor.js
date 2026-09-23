@@ -104,7 +104,7 @@
   function toolbarMarkup() {
     const history = historyFor(runtime.document.documentId);
     const documents = Object.values(runtime.workspace.documents);
-    return '<header class="vb-studio__toolbar"><div class="vb-studio__document"><span class="vb-studio__mark">' + icon("panels-top-left") + '</span><label><span>Pagina</span><select data-vb-page-select>' + documents.map(function (documentValue) { return '<option value="' + esc(documentValue.documentId) + '"' + (documentValue.documentId === runtime.document.documentId ? " selected" : "") + '>' + esc(documentValue.name) + '</option>'; }).join("") + '</select></label><button type="button" data-vb-action="new-page" title="Nova pagina">' + icon("plus") + '</button></div><div class="vb-studio__history"><button type="button" data-vb-action="undo" title="Desfazer (Ctrl+Z)"' + (history.canUndo() ? "" : " disabled") + '>' + icon("undo-2") + '</button><button type="button" data-vb-action="redo" title="Refazer (Ctrl+Shift+Z)"' + (history.canRedo() ? "" : " disabled") + '>' + icon("redo-2") + '</button><button type="button" data-vb-action="copy" title="Copiar">' + icon("copy") + '</button><button type="button" data-vb-action="paste" title="Colar"' + (runtime.clipboard ? "" : " disabled") + '>' + icon("clipboard-paste") + '</button></div><div class="vb-device-switch" role="group" aria-label="Dispositivo">' + Object.keys(DEVICES).map(function (key) { return '<button type="button" class="' + (runtime.device === key ? "is-active" : "") + '" data-vb-device="' + key + '" title="' + DEVICES[key].label + '">' + icon(DEVICES[key].icon) + '<span>' + DEVICES[key].label + '</span></button>'; }).join("") + '</div><div class="vb-studio__zoom"><button type="button" data-vb-action="zoom-out" title="Reduzir">' + icon("minus") + '</button><output>' + runtime.zoom + '%</output><button type="button" data-vb-action="zoom-in" title="Ampliar">' + icon("plus") + '</button></div><div class="vb-studio__publish"><button type="button" class="vb-toolbar-button" data-vb-action="validate">' + icon("shield-check") + '<span>Validar</span></button><button type="button" class="vb-toolbar-button" data-vb-action="preview">' + icon("play") + '<span>Visualizar</span></button><button type="button" class="vb-toolbar-button vb-toolbar-button--primary" data-vb-action="publish">' + icon("rocket") + '<span>Publicar</span></button></div></header>';
+    return '<header class="vb-studio__toolbar"><div class="vb-studio__document"><span class="vb-studio__mark">' + icon("panels-top-left") + '</span><label><span>Pagina</span><select data-vb-page-select>' + documents.map(function (documentValue) { return '<option value="' + esc(documentValue.documentId) + '"' + (documentValue.documentId === runtime.document.documentId ? " selected" : "") + '>' + esc(documentValue.name) + '</option>'; }).join("") + '</select></label><button type="button" data-vb-action="new-page" title="Nova pagina">' + icon("plus") + '</button><button type="button" data-vb-action="sync-home" title="Restaurar a Home base"' + (runtime.document.settings.slug === "/" ? "" : " disabled") + '>' + icon("wand-sparkles") + '</button></div><div class="vb-studio__history"><button type="button" data-vb-action="undo" title="Desfazer (Ctrl+Z)"' + (history.canUndo() ? "" : " disabled") + '>' + icon("undo-2") + '</button><button type="button" data-vb-action="redo" title="Refazer (Ctrl+Shift+Z)"' + (history.canRedo() ? "" : " disabled") + '>' + icon("redo-2") + '</button><button type="button" data-vb-action="copy" title="Copiar">' + icon("copy") + '</button><button type="button" data-vb-action="paste" title="Colar"' + (runtime.clipboard ? "" : " disabled") + '>' + icon("clipboard-paste") + '</button></div><div class="vb-device-switch" role="group" aria-label="Dispositivo">' + Object.keys(DEVICES).map(function (key) { return '<button type="button" class="' + (runtime.device === key ? "is-active" : "") + '" data-vb-device="' + key + '" title="' + DEVICES[key].label + '">' + icon(DEVICES[key].icon) + '<span>' + DEVICES[key].label + '</span></button>'; }).join("") + '</div><div class="vb-studio__zoom"><button type="button" data-vb-action="zoom-out" title="Reduzir">' + icon("minus") + '</button><output>' + runtime.zoom + '%</output><button type="button" data-vb-action="zoom-in" title="Ampliar">' + icon("plus") + '</button></div><div class="vb-studio__publish"><button type="button" class="vb-toolbar-button" data-vb-action="validate">' + icon("shield-check") + '<span>Validar</span></button><button type="button" class="vb-toolbar-button" data-vb-action="preview">' + icon("play") + '<span>Visualizar</span></button><button type="button" class="vb-toolbar-button vb-toolbar-button--primary" data-vb-action="publish">' + icon("rocket") + '<span>Publicar</span></button></div></header>';
   }
 
   function leftPanelMarkup() {
@@ -123,7 +123,10 @@
   function libraryMarkup() {
     const definitions = TB.registry.list({ search: runtime.librarySearch });
     const categories = Array.from(new Set(definitions.map(function (definition) { return definition.category; })));
-    return '<div class="vb-panel-heading"><div><strong>Componentes</strong><span>' + definitions.length + ' disponiveis</span></div></div><label class="vb-search">' + icon("search") + '<input type="search" data-vb-library-search value="' + esc(runtime.librarySearch) + '" placeholder="Buscar componente"></label><div class="vb-component-library">' + categories.map(function (category) { return '<section><h3>' + esc(CATEGORY_LABELS[category] || category) + '</h3><div>' + definitions.filter(function (definition) { return definition.category === category; }).map(function (definition) { return '<button type="button" draggable="true" data-vb-component="' + esc(definition.type) + '"><span>' + icon(definition.icon) + '</span><b>' + esc(definition.label) + '</b><small>Arraste ou clique</small></button>'; }).join("") + '</div></section>'; }).join("") + '</div>';
+    const selected = selectedNode();
+    const quickTypes = ["layout.section", "layout.row", "marketing.banner", "marketing.slider", "commerce.plan-grid", "domain.coverage"];
+    const quick = quickTypes.map(function (type) { const definition = TB.registry.get(type); const placement = definition && placementFor(type); return definition && placement ? '<button type="button" data-vb-component="' + esc(type) + '">' + icon(definition.icon) + '<span>' + esc(definition.label) + '</span></button>' : ""; }).join("");
+    return '<div class="vb-panel-heading"><div><strong>Adicionar</strong><span>' + definitions.length + ' componentes</span></div></div><div class="vb-insert-context">' + icon("mouse-pointer-2") + '<span>O novo item entra perto de <strong>' + esc(selected && selected.name || "Pagina") + '</strong></span></div><section class="vb-quick-start"><h3>Mais usados</h3><div>' + quick + '</div></section><label class="vb-search">' + icon("search") + '<input type="search" data-vb-library-search value="' + esc(runtime.librarySearch) + '" placeholder="O que voce quer adicionar?"></label><div class="vb-component-library">' + categories.map(function (category) { const entries = definitions.filter(function (definition) { return definition.category === category; }); return '<section><h3>' + esc(CATEGORY_LABELS[category] || category) + '</h3><div>' + entries.map(function (definition) { const placement = placementFor(definition.type); return '<button type="button" draggable="' + (placement ? "true" : "false") + '" data-vb-component="' + esc(definition.type) + '"' + (placement ? "" : " disabled") + '><span>' + icon(definition.icon) + '</span><b>' + esc(definition.label) + '</b><small>' + (placement ? "Clique para adicionar" : "Selecione um container") + '</small></button>'; }).join("") + '</div></section>'; }).join("") + '</div>';
   }
 
   function treeNodeMarkup(nodeId, depth) {
@@ -191,13 +194,25 @@
   function assetFieldMarkup(key, schema, node) {
     const value = node.props && node.props[key] || "";
     const media = (runtime.state.mediaLibrary || []).slice(0, 12);
-    return '<div class="vb-asset-field"><span>' + esc(schema.label) + '</span><div class="vb-asset-preview">' + (value ? '<img src="' + esc(TB.safeMediaUrl(value, "")) + '" alt="">' : icon("image")) + '<label title="Enviar imagem">' + icon("upload") + '<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-vb-media-upload="' + esc(key) + '"></label></div><input type="url" value="' + esc(value) + '" data-vb-prop="' + esc(key) + '" placeholder="URL ou arquivo da biblioteca"><div class="vb-media-strip">' + media.map(function (item) { return '<button type="button" data-vb-media-pick="' + esc(key) + '" data-url="' + esc(item.url) + '" title="' + esc(item.name) + '"><img src="' + esc(item.url) + '" alt=""></button>'; }).join("") + '</div><small>Imagens sao convertidas e comprimidas antes de entrar na biblioteca.</small></div>';
+    return '<div class="vb-asset-field"><span>' + esc(schema.label) + '</span><div class="vb-asset-preview">' + (value ? '<img src="' + esc(TB.safeMediaUrl(value, "")) + '" alt="">' : icon("image")) + '<label title="Enviar imagem">' + icon("upload") + '<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-vb-media-upload="' + esc(key) + '"></label></div><input type="url" value="' + esc(value) + '" data-vb-prop="' + esc(key) + '" placeholder="URL ou arquivo da biblioteca"><div class="vb-media-strip">' + media.map(function (item) { return '<button type="button" data-vb-media-pick="' + esc(key) + '" data-url="' + esc(item.url) + '" title="' + esc(item.name) + '"><img src="' + esc(item.url) + '" alt=""></button>'; }).join("") + '</div><small>' + esc(schema.help || "Imagens sao convertidas e comprimidas antes de entrar na biblioteca.") + '</small></div>';
   }
 
   function propsByGroups(definition, node, groups) {
     const entries = Object.entries(definition.propsSchema || {}).filter(function (entry) { return groups.includes(entry[1].group || "content"); });
     if (!entries.length) return '<div class="vb-empty-inspector">Este componente nao possui propriedades nesta categoria.</div>';
     return entries.map(function (entry) { return propFieldMarkup(entry[0], entry[1], node); }).join("");
+  }
+
+  function slotManagerMarkup(definition, node) {
+    const manager = definition.editor && definition.editor.slotManager;
+    if (!manager || !node.slots || !node.slots[manager.slot]) return "";
+    const ids = node.slots[manager.slot];
+    return '<section class="vb-inspector-section vb-slot-manager"><header><div><h3>' + esc(manager.label || "Itens") + '</h3><small>' + ids.length + ' cadastrado(s)</small></div><button type="button" data-vb-slot-add="' + esc(manager.addType) + '" data-slot="' + esc(manager.slot) + '" title="Adicionar ' + esc(manager.singular || "item") + '">' + icon("plus") + '</button></header><div>' + ids.map(function (id, index) {
+      const item = runtime.document.nodes[id];
+      if (!item) return "";
+      const image = manager.imageProp && item.props && TB.safeMediaUrl(item.props[manager.imageProp], "");
+      return '<article><button type="button" class="vb-slot-item-main" data-vb-select="' + esc(item.id) + '">' + (image ? '<img src="' + esc(image) + '" alt="">' : '<span>' + icon(definitionFor(item) && definitionFor(item).icon || "box") + '</span>') + '<div><strong>' + esc(item.name || (manager.singular || "Item") + " " + (index + 1)) + '</strong><small>' + esc(manager.singular || "Item") + ' ' + (index + 1) + '</small></div></button><div class="vb-slot-item-actions"><button type="button" data-vb-slot-move="up" data-id="' + esc(item.id) + '"' + (index === 0 ? " disabled" : "") + ' title="Mover para cima">' + icon("chevron-up") + '</button><button type="button" data-vb-slot-move="down" data-id="' + esc(item.id) + '"' + (index === ids.length - 1 ? " disabled" : "") + ' title="Mover para baixo">' + icon("chevron-down") + '</button><button type="button" data-vb-slot-duplicate="' + esc(item.id) + '" title="Duplicar">' + icon("copy-plus") + '</button><button type="button" data-vb-slot-delete="' + esc(item.id) + '"' + (ids.length <= 1 ? " disabled" : "") + ' title="Excluir">' + icon("trash-2") + '</button></div></article>';
+    }).join("") + '</div></section>';
   }
 
   function styleControlMarkup(key, node) {
@@ -257,7 +272,7 @@
 
   function inspectorBodyMarkup(node, definition) {
     if (node.id === runtime.document.rootId && runtime.inspectorTab === "advanced") return pageSettingsMarkup(node);
-    if (runtime.inspectorTab === "content") return '<section class="vb-inspector-section"><h3>Conteudo</h3>' + propsByGroups(definition, node, ["content", "data", "behavior"]) + '</section>';
+    if (runtime.inspectorTab === "content") return slotManagerMarkup(definition, node) + '<section class="vb-inspector-section"><h3>Conteudo</h3>' + propsByGroups(definition, node, ["content", "data", "behavior"]) + '</section>';
     if (runtime.inspectorTab === "layout") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Propriedades</h3>' + propsByGroups(definition, node, ["layout"]) + '</section><section class="vb-inspector-section"><h3>Layout e espacamento</h3>' + styleGroupMarkup("layout", node) + '</section>';
     if (runtime.inspectorTab === "style") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Fundo e bordas</h3>' + propsByGroups(definition, node, ["style"]) + styleGroupMarkup("style", node) + '</section>';
     if (runtime.inspectorTab === "typography") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Tipografia</h3>' + styleGroupMarkup("typography", node) + '</section>';
@@ -418,12 +433,14 @@
   }
 
   function placementFor(type) {
-    const selected = selectedNode();
-    if (selected) {
-      const slot = firstSlot(selected, type);
-      if (slot) return { parentId: selected.id, slot: slot, index: (selected.slots[slot] || []).length };
-      const parent = TB.parentOf(runtime.document, selected.id);
-      if (parent && TB.canInsert(runtime.document, parent.parentId, parent.slot, type).ok) return { parentId: parent.parentId, slot: parent.slot, index: parent.index + 1 };
+    let current = selectedNode();
+    while (current) {
+      const slot = firstSlot(current, type);
+      if (slot) return { parentId: current.id, slot: slot, index: (current.slots[slot] || []).length };
+      const parent = TB.parentOf(runtime.document, current.id);
+      if (!parent) break;
+      if (TB.canInsert(runtime.document, parent.parentId, parent.slot, type).ok) return { parentId: parent.parentId, slot: parent.slot, index: parent.index + 1 };
+      current = runtime.document.nodes[parent.parentId];
     }
     const root = runtime.document.nodes[runtime.document.rootId];
     const slot = firstSlot(root, type);
@@ -433,8 +450,13 @@
   function insertComponent(type, placement) {
     const target = placement || placementFor(type);
     if (!target) { notify("Selecione um container compativel para inserir este componente.", "error"); return; }
-    const node = TB.createNode(type);
-    execute({ type: "insert", payload: { node: node, parentId: target.parentId, slot: target.slot, index: target.index }, label: "Adicionar " + node.name }, { select: node.id });
+    const subtree = TB.createComponentSubtree(type);
+    const node = subtree.nodes[subtree.rootId];
+    const result = execute({ type: "insert-subtree", payload: { subtree: subtree, parentId: target.parentId, slot: target.slot, index: target.index }, label: "Adicionar " + node.name }, { select: node.id });
+    if (result) {
+      notify(node.name + " adicionado", "success");
+      window.setTimeout(function () { postPreview("scroll-to", { id: node.id }); }, 120);
+    }
   }
 
   function moveComponent(nodeId, placement) {
@@ -442,12 +464,12 @@
     execute({ type: "move", payload: { nodeId: nodeId, parentId: placement.parentId, slot: placement.slot, index: placement.index }, label: "Mover componente" }, { select: nodeId });
   }
 
-  function treePlacement(targetId, position) {
+  function treePlacement(targetId, position, childType) {
     const target = runtime.document.nodes[targetId];
     if (!target) return null;
     if (position === "inside") {
       const definition = definitionFor(target);
-      const slot = definition && Object.keys(definition.slots || {})[0];
+      const slot = definition && Object.keys(definition.slots || {}).find(function (slotName) { return !childType || TB.canInsert(runtime.document, target.id, slotName, childType).ok; });
       if (slot) return { parentId: target.id, slot: slot, index: (target.slots[slot] || []).length };
     }
     const parent = TB.parentOf(runtime.document, targetId);
@@ -611,6 +633,22 @@
     if (media) { setNodeValue("props." + media.dataset.vbMediaPick, media.dataset.url, "Selecionar imagem"); return; }
     const quick = event.target.closest("[data-vb-quick-add]");
     if (quick) { const node = selectedNode(); const slot = quick.dataset.slot; insertComponent(quick.dataset.vbQuickAdd, { parentId: node.id, slot: slot, index: (node.slots[slot] || []).length }); return; }
+    const slotAdd = event.target.closest("[data-vb-slot-add]");
+    if (slotAdd) { const node = selectedNode(); const slot = slotAdd.dataset.slot; insertComponent(slotAdd.dataset.vbSlotAdd, { parentId: node.id, slot: slot, index: (node.slots[slot] || []).length }); return; }
+    const slotMove = event.target.closest("[data-vb-slot-move]");
+    if (slotMove) {
+      const parent = TB.parentOf(runtime.document, slotMove.dataset.id);
+      if (parent) {
+        // The move command removes the node before normalizing the target index.
+        const index = slotMove.dataset.vbSlotMove === "up" ? parent.index - 1 : parent.index + 2;
+        moveComponent(slotMove.dataset.id, { parentId: parent.parentId, slot: parent.slot, index: index });
+      }
+      return;
+    }
+    const slotDuplicate = event.target.closest("[data-vb-slot-duplicate]");
+    if (slotDuplicate) { execute({ type: "duplicate", payload: { nodeId: slotDuplicate.dataset.vbSlotDuplicate }, label: "Duplicar item" }, { select: true }); return; }
+    const slotDelete = event.target.closest("[data-vb-slot-delete]");
+    if (slotDelete) { const item = runtime.document.nodes[slotDelete.dataset.vbSlotDelete]; if (item && window.confirm("Excluir " + item.name + "?")) execute({ type: "delete", payload: { nodeId: item.id }, label: "Excluir item" }); return; }
     const insertSaved = event.target.closest("[data-vb-insert-fragment]");
     if (insertSaved) { insertFragment(insertSaved.dataset.vbInsertFragment); return; }
     const deleteSaved = event.target.closest("[data-vb-delete-fragment]");
@@ -634,6 +672,21 @@
     else if (name === "locate") postPreview("scroll-to", { id: runtime.selectedId });
     else if (name === "zoom-in" || name === "zoom-out") { runtime.zoom = Math.max(40, Math.min(120, runtime.zoom + (name === "zoom-in" ? 5 : -5))); fitCanvas(); const output = runtime.root.querySelector(".vb-studio__zoom output"); if (output) output.textContent = runtime.zoom + "%"; }
     else if (name === "new-page") newPage();
+    else if (name === "sync-home" && runtime.document.settings.slug === "/") {
+      if (!window.confirm("Restaurar a Home base atual? A versao deste rascunho sera guardada como backup local.")) return;
+      const backupKey = "fl-vb-manual-backup:" + runtime.tenant + ":" + Date.now();
+      localStorage.setItem(backupKey, JSON.stringify(runtime.document));
+      const previousId = runtime.document.documentId;
+      const next = TB.createDefaultDocument(runtime.state);
+      delete runtime.workspace.documents[previousId];
+      runtime.workspace.documents[next.documentId] = next;
+      runtime.workspace.activeDocumentId = next.documentId;
+      runtime.workspace.meta = { ...(runtime.workspace.meta || {}), manualBackupKey: backupKey };
+      runtime.document = next;
+      runtime.selectedId = initialSelection(next);
+      runtime.histories.set(next.documentId, new TB.CommandHistory(120));
+      scheduleSave(); repaintPanels(); sendPreview(); notify("Home restaurada a partir do template atual", "success");
+    }
     else if (name === "duplicate-page") duplicatePage(action.dataset.id);
     else if (name === "delete-page") deletePage(action.dataset.id);
     else if (name === "save-fragment") saveFragment();
@@ -714,9 +767,10 @@
     const treeNode = event.target.closest("[data-vb-tree-node]");
     if (!treeNode) return;
     event.preventDefault();
-    const placement = treePlacement(treeNode.dataset.vbTreeNode, treeNode.dataset.dropPosition || "inside");
     const nodeId = event.dataTransfer.getData("application/x-fl-vb-node");
     const componentType = event.dataTransfer.getData("application/x-fl-vb-component");
+    const childType = componentType || nodeId && runtime.document.nodes[nodeId] && runtime.document.nodes[nodeId].type;
+    const placement = treePlacement(treeNode.dataset.vbTreeNode, treeNode.dataset.dropPosition || "inside", childType);
     clearTreeDrop();
     if (!placement) return;
     if (nodeId && nodeId !== treeNode.dataset.vbTreeNode) moveComponent(nodeId, placement);

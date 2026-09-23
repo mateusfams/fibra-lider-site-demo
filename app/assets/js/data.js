@@ -12,7 +12,7 @@
 
   const defaultState = {
     meta: {
-      version: "1.8.0-mvp",
+      version: "1.9.0-mvp",
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
       status: "published",
@@ -209,7 +209,8 @@
       precisePolygonCheck: true,
       showInterest: true,
       showLabels: true,
-      showImportedLabels: false,
+      showImportedLabels: true,
+      autoIdentifyImportedAreas: true,
       defaultRadiusKm: 5,
       defaultState: "SP",
       centerLat: -22.835,
@@ -385,6 +386,48 @@
     return sampled;
   }
 
+  const CLICKNET_GEOGRAPHY = [
+    [[1, 4, 36, 45, 46, 48], "Centro", "Hortolandia", "Rua Antonia Mancini Pinelli", "13184-213"],
+    [[2], "Jardim Amanda", "Hortolandia", "Rua Marechal Floriano Peixoto", "13188-242"],
+    [[3, 21], "Jardim Florenca", "Sumare", "Rodovia Virginia Viel Campo Dall'Orto", "13177-440"],
+    [[5, 34], "Jardim Rosolem", "Hortolandia", "Rua Jose Pereira de Lira", "13185-139"],
+    [[6, 7], "Jardim Santana", "Hortolandia", "Rua Joaquim Martarolli", "13186-620"],
+    [[8], "Resende", "Monte Mor", "Rua Antonio L. Bandini", "13197-362"],
+    [[9, 10], "Ouro Verde", "Campinas", "", "13056-300"],
+    [[11], "Jardim Nova Hortolandia", "Hortolandia", "Rua Mariza de Souza Fernandes", "13183-640"],
+    [[12, 52], "Vila Padre Anchieta", "Campinas", "Rodovia Anhanguera", "13068-605"],
+    [[13], "Jardim Irmaos Sigrist", "Campinas", "", "13054-709"],
+    [[14, 15, 38], "Jardim Villagio Ghiraldelli", "Hortolandia", "Residencial Santa Barbara", "13186-501"],
+    [[16], "Jardim Campineiro", "Campinas", "Rua Marconi Guglielmo", "13082-225"],
+    [[17], "Jardim Mirassol", "Campinas", "", "13069-096"],
+    [[18, 19, 30], "Campo Grande", "Campinas", "", "13059-128"],
+    [[20, 22], "Chacaras Santa Antonieta", "Sumare", "Rua Ariovaldo Luiz Mazon", "13175-490"],
+    [[23], "Matao", "Sumare", "Rua Benedito Matheus", "13180-290"],
+    [[24, 26], "Pimentas", "Monte Mor", "", "13190-307"],
+    [[25], "Avenida Janio Quadros", "Monte Mor", "Avenida Janio Quadros", "13190-307"],
+    [[27, 28, 29, 49, 50, 51], "Real Parque", "Sumare", "Rua Nadir Esquarize", "13175-695"],
+    [[31], "San Martin", "Campinas", "Estrada Municipal Jose Sedano", "13069-335"],
+    [[32, 39, 40, 41, 42], "Jardim Santa Candida", "Hortolandia", "Rua Antonio Fernandes Leite", "13185-280"],
+    [[33], "Jardim Rosolem", "Hortolandia", "Rua Sao Joao Del Rey", "13185-157"],
+    [[35], "Jardim Nova Europa", "Hortolandia", "Avenida Wanderley Paes Soares", "13184-862"],
+    [[37], "Adventista Campineiro", "Hortolandia", "", "13187-176"],
+    [[43], "Jardim Villagio Ghiraldelli", "Hortolandia", "Rua Therezinha Navarro da Silva", "13186-330"],
+    [[44, 53], "Parque Sao Jorge", "Campinas", "", "13064-812"],
+    [[47], "Chacaras Recreio da Alvorada", "Hortolandia", "", "13183-723"]
+  ];
+
+  function identifyBundledFeatures(features) {
+    const byIndex = new Map();
+    CLICKNET_GEOGRAPHY.forEach(function (entry) { entry[0].forEach(function (index) { byIndex.set(index, entry); }); });
+    return features.map(function (feature, index) {
+      feature = { ...feature, featureIndex: Number(feature.featureIndex || index + 1) };
+      const match = byIndex.get(feature.featureIndex);
+      if (!match) return feature;
+      const geography = { neighborhood: match[1], city: match[2], road: match[3], postcode: match[4], provider: "seed-reviewed" };
+      return { ...feature, technicalName: feature.name, publicName: (match[1] || match[3]) + ", " + match[2], geography: geography };
+    });
+  }
+
   function parseBundledKml(kmlText) {
     const text = String(kmlText || "").replace(/^\uFEFF/, "").trim();
     if (text.length > 8 * 1024 * 1024 || /<!DOCTYPE|<!ENTITY/i.test(text)) throw new Error("KML de cobertura invalido.");
@@ -396,23 +439,34 @@
       bundledKmlElements(placemark, "Polygon").forEach(function (polygon) {
         const outer = bundledKmlElements(polygon, "outerBoundaryIs")[0] || polygon;
         const node = bundledKmlElements(outer, "coordinates")[0]; const coordinates = bundledCoordinates(node ? node.textContent : "", budget);
-        if (coordinates.length >= 3) features.push({ type: "polygon", name, coordinates });
+        if (coordinates.length >= 3) features.push({ type: "polygon", name, featureIndex: index + 1, coordinates });
       });
       bundledKmlElements(placemark, "LineString").forEach(function (line) {
         const node = bundledKmlElements(line, "coordinates")[0]; const coordinates = bundledCoordinates(node ? node.textContent : "", budget);
-        if (coordinates.length >= 2) features.push({ type: "line", name, coordinates });
+        if (coordinates.length >= 2) features.push({ type: "line", name, featureIndex: index + 1, coordinates });
       });
       bundledKmlElements(placemark, "Point").forEach(function (point) {
         const node = bundledKmlElements(point, "coordinates")[0]; const coordinates = bundledCoordinates(node ? node.textContent : "", budget);
-        if (coordinates[0]) features.push({ type: "point", name, coordinates: coordinates[0] });
+        if (coordinates[0]) features.push({ type: "point", name, featureIndex: index + 1, coordinates: coordinates[0] });
       });
     });
     if (!features.length) throw new Error("O KMZ nao contem geometrias validas.");
-    return { features: features.slice(0, 160), coordinateCount: budget.used };
+    return { features: identifyBundledFeatures(features.slice(0, 160)), coordinateCount: budget.used };
   }
 
   async function loadBundledCoverage(state) {
-    if (!state || state.brand.slug !== "fibra-lider" || state.coverageFiles.some(function (file) { return file.id === "coverage-clicknet-base"; })) return state;
+    if (!state || state.brand.slug !== "fibra-lider") return state;
+    const existing = state.coverageFiles.find(function (file) { return file.id === "coverage-clicknet-base"; });
+    if (existing) {
+      if (!(existing.features || []).every(function (feature) { return feature.publicName; })) {
+        existing.features = identifyBundledFeatures(existing.features || []);
+        existing.geocodingStatus = "complete";
+        existing.geocodedAt = new Date().toISOString();
+        existing.geocodingRequests = 0;
+        return saveRuntimeState(state);
+      }
+      return state;
+    }
     if (!window.JSZip) return state;
     try {
       const response = await fetch("./AREA%20DE%20ATENDIMENTO%20Clicknet.kmz");
@@ -424,7 +478,7 @@
       const root = entries.find(function (entry) { return /(^|\/)doc\.kml$/i.test(entry.name); }) || entries[0];
       if (!root) throw new Error("KML principal nao encontrado.");
       const parsed = parseBundledKml(await root.async("string"));
-      state.coverageFiles.unshift({ id: "coverage-clicknet-base", name: "Area de atendimento Clicknet", fileName: "AREA DE ATENDIMENTO Clicknet.kmz", format: "KMZ", bytes: buffer.byteLength, importedAt: new Date().toISOString(), color: state.theme.mapAccent, active: true, coordinateCount: parsed.coordinateCount, features: parsed.features, source: "bundled" });
+      state.coverageFiles.unshift({ id: "coverage-clicknet-base", name: "Area de atendimento Clicknet", fileName: "AREA DE ATENDIMENTO Clicknet.kmz", format: "KMZ", bytes: buffer.byteLength, importedAt: new Date().toISOString(), color: state.theme.mapAccent, active: true, coordinateCount: parsed.coordinateCount, features: parsed.features, source: "bundled", geocodingStatus: "complete", geocodedAt: new Date().toISOString(), geocodingRequests: 0 });
       return saveRuntimeState(state);
     } catch (error) {
       console.warn("Nao foi possivel carregar a cobertura KMZ inicial.", error);

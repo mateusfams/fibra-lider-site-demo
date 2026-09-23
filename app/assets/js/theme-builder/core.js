@@ -177,6 +177,27 @@
     };
   }
 
+  function createComponentSubtree(type, overrides) {
+    const definition = registry.require(type);
+    const root = createNode(type, overrides || {});
+    const nodes = { [root.id]: root };
+    const append = function (parent, childType, childOverrides, slotName) {
+      const parentNode = typeof parent === "string" ? nodes[parent] : parent;
+      if (!parentNode) throw new Error("Componente pai inexistente na composicao.");
+      const slot = slotName || "default";
+      const child = createNode(childType, childOverrides || {});
+      const allowed = canInsert({ nodes: nodes }, parentNode.id, slot, child.type);
+      if (!allowed.ok) throw new Error(allowed.message);
+      nodes[child.id] = child;
+      parentNode.slots[slot].push(child.id);
+      const childDefinition = registry.require(childType);
+      if (typeof childDefinition.compose === "function") childDefinition.compose({ root: child, nodes: nodes, append: append, createNode: createNode });
+      return child;
+    };
+    if (typeof definition.compose === "function") definition.compose({ root: root, nodes: nodes, append: append, createNode: createNode });
+    return { rootId: root.id, nodes: nodes };
+  }
+
   function createDocument(options) {
     const config = options || {};
     const root = createNode("core.page", { id: config.rootId || uid("page"), name: config.name || "Pagina" });
@@ -416,8 +437,9 @@
       if (!allowed.ok && !(previous.parentId === payload.parentId && previous.slot === (payload.slot || "default"))) throw new Error(allowed.message);
       document.nodes[previous.parentId].slots[previous.slot].splice(previous.index, 1);
       const list = document.nodes[payload.parentId].slots[payload.slot || "default"];
-      let index = Math.max(0, Math.min(list.length, payload.index == null ? list.length : Number(payload.index)));
-      if (previous.parentId === payload.parentId && previous.slot === (payload.slot || "default") && previous.index < index) index -= 1;
+      let requestedIndex = payload.index == null ? list.length : Number(payload.index);
+      if (previous.parentId === payload.parentId && previous.slot === (payload.slot || "default") && previous.index < requestedIndex) requestedIndex -= 1;
+      const index = Math.max(0, Math.min(list.length, requestedIndex));
       list.splice(index, 0, payload.nodeId);
       inverse = { type: "move", payload: { nodeId: payload.nodeId, parentId: previous.parentId, slot: previous.slot, index: previous.index }, label: command.label };
     } else if (command.type === "duplicate") {
@@ -591,7 +613,24 @@
     loadWorkspace: function (state) {
       const key = storageKey(WORKSPACE_DRAFT_PREFIX, state);
       const stored = parseStored(key, null);
-      if (stored && stored.workspace && validateWorkspace(stored.workspace).valid) return stored;
+      if (stored && stored.workspace && validateWorkspace(stored.workspace).valid) {
+        const home = Object.values(stored.workspace.documents).find(function (document) { return document.settings && document.settings.slug === "/"; });
+        const currentTemplate = typeof documentFactory === "function" ? documentFactory(state) : null;
+        const expectedVersion = currentTemplate && currentTemplate.meta && currentTemplate.meta.templateVersion;
+        const actualVersion = home && home.meta && home.meta.templateVersion;
+        if (home && expectedVersion && actualVersion !== expectedVersion && home.meta && home.meta.migratedFrom === "fibra-lider-studio-state-v13") {
+          const backupKey = key + ":backup:" + new Date().toISOString().replace(/[:.]/g, "-");
+          localStorage.setItem(backupKey, JSON.stringify(stored));
+          delete stored.workspace.documents[home.documentId];
+          stored.workspace.documents[currentTemplate.documentId] = currentTemplate;
+          stored.workspace.activeDocumentId = currentTemplate.documentId;
+          stored.workspace.meta = { ...(stored.workspace.meta || {}), templateVersion: expectedVersion, migratedAt: new Date().toISOString(), migrationBackupKey: backupKey };
+          const migrated = { workspace: stored.workspace, revision: Number(stored.revision || 0) + 1, updatedAt: new Date().toISOString(), status: "draft" };
+          localStorage.setItem(key, JSON.stringify(migrated));
+          return migrated;
+        }
+        return stored;
+      }
       const workspace = createWorkspace(state);
       const legacyDraft = parseStored(storageKey(DRAFT_PREFIX, state), null);
       if (legacyDraft && legacyDraft.document && validateDocument(legacyDraft.document).valid) {
@@ -916,6 +955,8 @@
     setDocumentFactory: setDocumentFactory,
     setPageDocumentFactory: setPageDocumentFactory,
     createNode: createNode,
+    createComponentSubtree: createComponentSubtree,
+    createDefaultDocument: function (state) { return typeof documentFactory === "function" ? documentFactory(state) : null; },
     createDocument: createDocument,
     createWorkspace: createWorkspace,
     parentOf: parentOf,

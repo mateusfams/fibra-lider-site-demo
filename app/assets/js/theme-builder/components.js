@@ -13,7 +13,7 @@
   function selectField(label, values, group) { return { type: "string", control: "select", label: label, group: group || "content", options: values }; }
   function switchField(label, group) { return { type: "boolean", control: "switch", label: label, group: group || "content" }; }
   function numberField(label, group, options) { return { type: "number", control: "number", label: label, group: group || "content", ...(options || {}) }; }
-  function imageField(label, group) { return { type: "image", control: "asset", label: label, group: group || "content" }; }
+  function imageField(label, group, extra) { return { type: "image", control: "asset", label: label, group: group || "content", ...(extra || {}) }; }
   function urlField(label, group) { return { type: "url", control: "link", label: label, group: group || "content" }; }
 
   function element(tag, className) {
@@ -25,6 +25,13 @@
   function safeIcon(value) {
     const name = String(value || "sparkles").toLowerCase();
     return iconPattern.test(name) ? name : "sparkles";
+  }
+
+  function cssImageValue(value, fallback) {
+    const safe = TB.safeMediaUrl(value, fallback || "");
+    if (!safe) return "";
+    try { return new URL(safe, document.baseURI).href.replace(/["\\\n\r]/g, ""); }
+    catch (error) { return ""; }
   }
 
   function appendIcon(root, name) {
@@ -73,6 +80,7 @@
       styleCapabilities: config.styleCapabilities || ["layout", "spacing", "size", "background", "border", "effects", "responsive"],
       defaults: config.defaults || { props: {}, styles: {} },
       allowedParents: config.allowedParents,
+      compose: config.compose,
       render: function (context) {
         const root = element(config.tag || "div", config.className || "");
         if (config.role) root.setAttribute("role", config.role);
@@ -92,6 +100,7 @@
     type: "layout.section", label: "Secao", icon: "panel-top", tag: "section", className: "vb-section",
     propsSchema: { anchor: textField("Ancora", "advanced", { maxLength: 80 }), ariaLabel: textField("Nome acessivel", "advanced", { maxLength: 120 }) },
     defaults: { props: { anchor: "", ariaLabel: "" }, styles: { base: { normal: { paddingTop: "token.space.xl", paddingBottom: "token.space.xl" } } } },
+    compose: function (builder) { builder.append(builder.root, "layout.container", { name: "Container da secao" }); },
   });
   wrapperDefinition({
     type: "layout.container", label: "Container", icon: "rectangle-horizontal", className: "vb-container",
@@ -100,6 +109,7 @@
   wrapperDefinition({
     type: "layout.row", label: "Linha", icon: "rows-3", className: "vb-row",
     defaults: { props: {}, styles: { base: { normal: { display: "flex", flexDirection: "row", gap: "24px", alignItems: "center" } }, sm: { normal: { flexDirection: "column" } } } },
+    compose: function (builder) { builder.append(builder.root, "layout.column", { name: "Coluna 1" }); builder.append(builder.root, "layout.column", { name: "Coluna 2" }); },
   });
   wrapperDefinition({
     type: "layout.column", label: "Coluna", icon: "columns-3", className: "vb-column",
@@ -109,6 +119,7 @@
     type: "layout.grid", label: "Grade", icon: "layout-grid", className: "vb-grid",
     propsSchema: { columns: numberField("Colunas", "layout", { min: 1, max: 12 }) },
     defaults: { props: { columns: 3 }, styles: { base: { normal: { display: "grid", gridColumns: "repeat(3, minmax(0, 1fr))", gap: "24px" } }, md: { normal: { gridColumns: "repeat(2, minmax(0, 1fr))" } }, sm: { normal: { gridColumns: "repeat(1, minmax(0, 1fr))" } } } },
+    compose: function (builder) { for (let index = 1; index <= 3; index += 1) builder.append(builder.root, "layout.column", { name: "Item " + index }); },
   });
 
   registry.register({
@@ -208,10 +219,17 @@
 
   registry.register({
     type: "marketing.banner", version: 1, label: "Banner", category: "marketing", icon: "gallery-horizontal-end",
-    propsSchema: { image: imageField("Imagem desktop", "content"), mobileImage: imageField("Imagem mobile", "responsive"), overlay: numberField("Overlay (%)", "style", { min: 0, max: 90 }), minHeight: textField("Altura minima", "layout", { maxLength: 20 }), focalPoint: selectField("Enquadramento", [option("left", "Esquerda"), option("center", "Centro"), option("right", "Direita")], "style") },
+    propsSchema: { image: imageField("Imagem desktop", "content", { help: "Recomendado: 1920 x 900 px, WEBP ou JPG." }), mobileImage: imageField("Imagem mobile", "responsive", { help: "Recomendado: 900 x 1200 px para celulares." }), overlay: numberField("Overlay (%)", "style", { min: 0, max: 90 }), minHeight: textField("Altura minima", "layout", { maxLength: 20 }), focalPoint: selectField("Enquadramento", [option("left", "Esquerda"), option("center", "Centro"), option("right", "Direita")], "style") },
     slots: { default: { categories: ["layout", "content", "marketing"] } }, styleCapabilities: ["layout", "spacing", "size", "background", "border", "effects", "responsive"],
     defaults: { props: { image: "./assets/img/hero-family-fiber.jpg", mobileImage: "", overlay: 58, minHeight: "520px", focalPoint: "center" }, styles: { base: { normal: { minHeight: "520px", borderRadius: "token.radius.lg", overflow: "hidden" } } } },
-    render: function (context) { const root = element("section", "vb-banner"); root.style.setProperty("--vb-banner-image", 'url("' + TB.safeMediaUrl(context.props.image, "./assets/img/hero-family-fiber.jpg").replace(/["\\\n\r]/g, "") + '")'); root.style.setProperty("--vb-banner-mobile", 'url("' + TB.safeMediaUrl(context.props.mobileImage || context.props.image, "./assets/img/hero-family-fiber.jpg").replace(/["\\\n\r]/g, "") + '")'); root.style.setProperty("--vb-banner-overlay", String(Math.min(0.9, Math.max(0, Number(context.props.overlay || 0) / 100)))); root.style.backgroundPosition = ["left", "center", "right"].includes(context.props.focalPoint) ? context.props.focalPoint : "center"; const content = element("div", "vb-banner__content"); root.appendChild(content); return { element: root, slots: { default: content } }; },
+    compose: function (builder) {
+      const container = builder.append(builder.root, "layout.container", { name: "Conteudo do banner", styles: { base: { normal: { minHeight: "520px", display: "flex", alignItems: "center" } } } });
+      const column = builder.append(container, "layout.column", { name: "Mensagem", styles: { base: { normal: { maxWidth: "660px" } } } });
+      builder.append(column, "content.heading", { name: "Titulo", props: { text: "Uma oferta feita para conectar sua casa", level: "2" }, styles: { base: { normal: { color: "#ffffff", fontSize: "52px", fontWeight: "700", lineHeight: "1.08" } }, sm: { normal: { fontSize: "34px" } } } });
+      builder.append(column, "content.text", { name: "Descricao", props: { text: "Edite a imagem, a mensagem e a chamada diretamente no construtor.", tag: "p" }, styles: { base: { normal: { color: "#d8e6f4", fontSize: "18px" } } } });
+      builder.append(column, "content.button", { name: "Botao", props: { text: "Conhecer planos", url: "#planos", target: "self", icon: "arrow-right", iconPosition: "right" } });
+    },
+    render: function (context) { const root = element("section", "vb-banner"); root.style.setProperty("--vb-banner-image", 'url("' + cssImageValue(context.props.image, "./assets/img/hero-family-fiber.jpg") + '")'); root.style.setProperty("--vb-banner-mobile", 'url("' + cssImageValue(context.props.mobileImage || context.props.image, "./assets/img/hero-family-fiber.jpg") + '")'); root.style.setProperty("--vb-banner-overlay", String(Math.min(0.9, Math.max(0, Number(context.props.overlay || 0) / 100)))); root.style.backgroundPosition = ["left", "center", "right"].includes(context.props.focalPoint) ? context.props.focalPoint : "center"; const content = element("div", "vb-banner__content"); root.appendChild(content); return { element: root, slots: { default: content } }; },
   });
 
   registry.register({
@@ -219,6 +237,8 @@
     propsSchema: { autoplay: switchField("Autoplay", "behavior"), interval: numberField("Intervalo (ms)", "behavior", { min: 2500, max: 20000 }), loop: switchField("Loop", "behavior"), arrows: switchField("Setas", "behavior"), dots: switchField("Indicadores", "behavior"), pauseOnHover: switchField("Pausar no hover", "behavior"), transition: selectField("Animacao", [option("fade", "Fade"), option("slide", "Deslizar")], "effects") },
     slots: { slides: { types: ["marketing.slide"], min: 1, max: 20 } }, styleCapabilities: ["spacing", "size", "background", "border", "effects", "responsive"],
     defaults: { props: { autoplay: true, interval: 6500, loop: true, arrows: true, dots: true, pauseOnHover: true, transition: "fade" }, styles: { base: { normal: { minHeight: "620px", overflow: "hidden" } }, sm: { normal: { minHeight: "590px" } } } },
+    editor: { slotManager: { slot: "slides", label: "Slides", singular: "Slide", addType: "marketing.slide", imageProp: "image" } },
+    compose: function (builder) { builder.append(builder.root, "marketing.slide", { name: "Slide 1" }, "slides"); builder.append(builder.root, "marketing.slide", { name: "Slide 2", props: { image: "./assets/img/banner-streaming-family.jpg", mobileImage: "./assets/img/banner-streaming-family.jpg", alt: "Entretenimento para toda a familia", overlay: 62, position: "center" } }, "slides"); },
     render: function (context) {
       const root = element("section", "vb-slider vb-slider--" + (context.props.transition === "slide" ? "slide" : "fade"));
       root.dataset.autoplay = String(Boolean(context.props.autoplay)); root.dataset.interval = String(Math.max(2500, Number(context.props.interval || 6500))); root.dataset.loop = String(context.props.loop !== false); root.dataset.pause = String(context.props.pauseOnHover !== false);
@@ -233,15 +253,24 @@
 
   registry.register({
     type: "marketing.slide", version: 1, label: "Slide", category: "marketing", icon: "panel-top", hidden: true,
-    propsSchema: { image: imageField("Imagem desktop", "content"), mobileImage: imageField("Imagem mobile", "responsive"), alt: textField("Texto alternativo", "content"), overlay: numberField("Overlay (%)", "style", { min: 0, max: 90 }), position: selectField("Enquadramento", [option("left", "Esquerda"), option("center", "Centro"), option("right", "Direita")], "style") },
+    propsSchema: { image: imageField("Imagem desktop", "content", { help: "Recomendado: 1920 x 900 px, WEBP ou JPG." }), mobileImage: imageField("Imagem mobile", "responsive", { help: "Recomendado: 900 x 1200 px para celulares." }), alt: textField("Texto alternativo", "content"), overlay: numberField("Overlay (%)", "style", { min: 0, max: 90 }), position: selectField("Enquadramento", [option("left", "Esquerda"), option("center", "Centro"), option("right", "Direita")], "style") },
     slots: { default: { categories: ["layout", "content", "marketing"] } }, allowedParents: ["marketing.slider"], styleCapabilities: ["layout", "spacing", "size", "background", "responsive"],
     defaults: { props: { image: "./assets/img/hero-family-fiber.jpg", mobileImage: "", alt: "", overlay: 62, position: "center" }, styles: { base: { normal: { minHeight: "620px" } }, sm: { normal: { minHeight: "590px" } } } },
+    compose: function (builder) {
+      const container = builder.append(builder.root, "layout.container", { name: "Container do slide", styles: { base: { normal: { minHeight: "620px", display: "flex", alignItems: "center" } }, sm: { normal: { minHeight: "590px" } } } });
+      const column = builder.append(container, "layout.column", { name: "Conteudo do slide", styles: { base: { normal: { maxWidth: "720px" } } } });
+      builder.append(column, "content.text", { name: "Chamada", props: { text: "Oferta em destaque", tag: "span" }, styles: { base: { normal: { color: "#80d8ff", fontSize: "14px", fontWeight: "700", textTransform: "uppercase" } } } });
+      builder.append(column, "content.heading", { name: "Titulo", props: { text: "Internet para viver tudo o que importa", level: "1" }, styles: { base: { normal: { color: "#ffffff", fontSize: "62px", fontWeight: "700", lineHeight: "1.06" } }, md: { normal: { fontSize: "46px" } }, sm: { normal: { fontSize: "35px" } } } });
+      builder.append(column, "content.text", { name: "Descricao", props: { text: "Troque este texto, a imagem e o botao sem sair do construtor.", tag: "p" }, styles: { base: { normal: { color: "#d8e6f4", fontSize: "18px", lineHeight: "1.65" } } } });
+      builder.append(column, "content.button", { name: "Botao", props: { text: "Conhecer planos", url: "#planos", target: "self", icon: "arrow-right", iconPosition: "right" }, styles: { base: { normal: { backgroundColor: "#ffffff", color: "#0758b8" } } } });
+    },
     render: function (context) { const root = element("article", "vb-slide"); const picture = element("picture", "vb-slide__media"); const mobile = TB.safeMediaUrl(context.props.mobileImage, ""); if (mobile) { const source = element("source"); source.media = "(max-width: 767px)"; source.srcset = mobile; picture.appendChild(source); } const image = element("img"); image.src = TB.safeMediaUrl(context.props.image, "./assets/img/hero-family-fiber.jpg"); image.alt = TB.plainText(context.props.alt, 240); image.style.objectPosition = context.props.position || "center"; picture.appendChild(image); root.appendChild(picture); const shade = element("div", "vb-slide__shade"); shade.style.opacity = String(Math.min(0.9, Math.max(0, Number(context.props.overlay || 0) / 100))); root.appendChild(shade); const content = element("div", "vb-slide__content"); root.appendChild(content); return { element: root, slots: { default: content } }; },
   });
 
   wrapperDefinition({
     type: "marketing.cta", label: "Chamada comercial", category: "marketing", icon: "badge-dollar-sign", tag: "section", className: "vb-cta",
     slots: { default: { categories: ["layout", "content"] } }, defaults: { props: {}, styles: { base: { normal: { paddingTop: "52px", paddingRight: "52px", paddingBottom: "52px", paddingLeft: "52px", backgroundColor: "token.color.primary", borderRadius: "token.radius.lg" } }, sm: { normal: { paddingTop: "32px", paddingRight: "24px", paddingBottom: "32px", paddingLeft: "24px" } } } },
+    compose: function (builder) { const column = builder.append(builder.root, "layout.column", { name: "Conteudo da chamada" }); builder.append(column, "content.heading", { props: { text: "Pronto para dar o proximo passo?", level: "2" }, styles: { base: { normal: { color: "#ffffff" } } } }); builder.append(column, "content.text", { props: { text: "Edite esta mensagem e direcione o visitante para a acao certa.", tag: "p" }, styles: { base: { normal: { color: "#d8e6f4" } } } }); builder.append(column, "content.button", { props: { text: "Falar agora", url: "whatsapp", target: "blank", icon: "message-circle", iconPosition: "left" } }); },
   });
 
   registry.register({
@@ -267,14 +296,18 @@
 
   registry.register({
     type: "commerce.plan-grid", version: 1, label: "Grade de planos", category: "commerce", icon: "badge-dollar-sign",
-    propsSchema: { categoryId: textField("Categoria", "data", { maxLength: 80 }), limit: numberField("Limite", "data", { min: 1, max: 24 }), showFeatures: switchField("Mostrar beneficios", "content"), ctaLabel: textField("Texto do botao", "content", { maxLength: 120 }) }, slots: {}, dataContract: "catalog.plans", styleCapabilities: ["spacing", "size", "responsive"],
-    defaults: { props: { categoryId: "internet", limit: 3, showFeatures: true, ctaLabel: "Quero este plano" }, styles: {} },
+    propsSchema: { categoryId: textField("Categoria inicial", "data", { maxLength: 80 }), limit: numberField("Limite", "data", { min: 1, max: 24 }), showFilters: switchField("Mostrar categorias", "content"), showCoupon: switchField("Permitir cupom", "content"), showFeatures: switchField("Mostrar beneficios", "content"), ctaLabel: textField("Texto do botao", "content", { maxLength: 120 }) }, slots: {}, dataContract: "catalog.plans", styleCapabilities: ["spacing", "size", "responsive"],
+    defaults: { props: { categoryId: "internet", limit: 6, showFilters: true, showCoupon: true, showFeatures: true, ctaLabel: "Quero este plano" }, styles: {} },
     render: function (context) {
+      const shell = element("div", "vb-plan-catalog");
+      if (context.props.showFilters !== false) { const filters = element("div", "vb-plan-filters"); (context.data.categories || []).filter(function (category) { return category.active !== false; }).forEach(function (category) { const button = element("button"); button.type = "button"; button.dataset.vbPlanFilter = category.id; button.className = category.id === context.props.categoryId ? "is-active" : ""; button.textContent = TB.plainText(category.name, 80); filters.appendChild(button); }); shell.appendChild(filters); }
+      if (context.props.showCoupon !== false) { const coupon = element("form", "vb-coupon-form"); coupon.dataset.vbCouponForm = ""; const label = element("label"); label.textContent = "Tem um cupom?"; const input = element("input"); input.name = "coupon"; input.placeholder = "Digite o codigo"; input.maxLength = 24; const button = element("button"); button.type = "submit"; button.textContent = "Aplicar"; coupon.append(label, input, button); shell.appendChild(coupon); }
       const root = element("div", "vb-plan-grid");
       let plans = (context.data.plans || []).filter(function (plan) { return plan.active !== false; });
-      if (context.props.categoryId && context.props.categoryId !== "all") plans = plans.filter(function (plan) { return plan.categoryId === context.props.categoryId; });
+      if (context.props.showFilters === false && context.props.categoryId && context.props.categoryId !== "all") plans = plans.filter(function (plan) { return plan.categoryId === context.props.categoryId; });
       plans.slice(0, Math.max(1, Number(context.props.limit || 3))).forEach(function (plan) {
         const card = element("article", "vb-plan-card" + (plan.featured ? " is-featured" : ""));
+        card.dataset.planCategory = plan.categoryId || "internet";
         if (plan.badge) { const badge = element("span", "vb-plan-card__badge"); badge.textContent = TB.plainText(plan.badge, 80); card.appendChild(badge); }
         const name = element("span", "vb-plan-card__name"); name.textContent = TB.plainText(plan.title, 160);
         const speed = element("strong", "vb-plan-card__speed"); speed.textContent = TB.plainText(plan.speed, 80);
@@ -284,7 +317,8 @@
         const button = element("button", "vb-plan-card__button"); button.type = "button"; button.dataset.vbPlanId = plan.id; button.textContent = TB.plainText(context.props.ctaLabel, 120); appendIcon(button, "arrow-up-right"); card.appendChild(button); root.appendChild(card);
       });
       if (!root.children.length) { const empty = element("div", "vb-component-empty"); empty.textContent = "Nenhum plano encontrado para esta configuracao."; root.appendChild(empty); }
-      return { element: root, slots: {} };
+      shell.appendChild(root);
+      return { element: shell, slots: {}, mount: "planCatalog" };
     },
   });
 
@@ -337,6 +371,49 @@
   });
 
   registry.register({
+    type: "domain.trust-bar", version: 1, label: "Faixa de confianca", category: "domain", icon: "badge-check",
+    propsSchema: { items: textarea("Itens (icone | titulo | detalhe)", "content", { maxLength: 3000 }) }, slots: {},
+    styleCapabilities: ["spacing", "size", "background", "border", "responsive"],
+    defaults: { props: { items: "cable | 100% fibra optica | Conexao estavel\nrouter | Wi-Fi incluso | Equipamento em comodato\nmap-pin | Atendimento regional | Equipe perto de voce\nmessage-circle | Contato direto | Atendimento pelo WhatsApp" }, styles: {} },
+    render: function (context) {
+      const root = element("div", "vb-trust-bar");
+      String(context.props.items || "").split("\n").filter(Boolean).slice(0, 8).forEach(function (line) {
+        const parts = line.split("|").map(function (value) { return value.trim(); });
+        const item = element("div", "vb-trust-item"); const badge = element("span"); appendIcon(badge, parts[0] || "badge-check"); const copy = element("div"); const title = element("strong"); title.textContent = TB.plainText(parts[1] || "Diferencial", 120); const detail = element("small"); detail.textContent = TB.plainText(parts[2] || "", 180); copy.append(title, detail); item.append(badge, copy); root.appendChild(item);
+      });
+      return { element: root, slots: {} };
+    },
+  });
+
+  registry.register({
+    type: "domain.app-grid", version: 1, label: "Aplicativos inclusos", category: "domain", icon: "app-window",
+    propsSchema: { limit: numberField("Quantidade", "data", { min: 1, max: 24 }), showCategory: switchField("Mostrar categoria", "content") }, slots: {}, dataContract: "apps",
+    styleCapabilities: ["spacing", "size", "responsive"], defaults: { props: { limit: 8, showCategory: true }, styles: {} },
+    render: function (context) {
+      const root = element("div", "vb-app-grid");
+      (context.data.apps || []).slice(0, Math.max(1, Number(context.props.limit || 8))).forEach(function (app) {
+        const card = element("article", "vb-app-card"); const media = element("span", "vb-app-card__logo");
+        if (app.logo) { const image = element("img"); image.src = TB.safeMediaUrl(app.logo, ""); image.alt = ""; media.appendChild(image); } else media.textContent = TB.plainText(String(app.name || "A").slice(0, 2).toUpperCase(), 2);
+        const copy = element("div"); const name = element("strong"); name.textContent = TB.plainText(app.name, 120); copy.appendChild(name); if (context.props.showCategory !== false) { const category = element("small"); category.textContent = TB.plainText(app.category, 120); copy.appendChild(category); } card.append(media, copy); root.appendChild(card);
+      });
+      return { element: root, slots: {} };
+    },
+  });
+
+  registry.register({
+    type: "domain.support-grid", version: 1, label: "Atalhos de atendimento", category: "domain", icon: "headset",
+    propsSchema: { limit: numberField("Quantidade", "data", { min: 1, max: 12 }), buttonLabel: textField("Texto padrao do botao", "content") }, slots: {}, dataContract: "supportCards",
+    styleCapabilities: ["spacing", "size", "responsive"], defaults: { props: { limit: 4, buttonLabel: "Acessar" }, styles: {} },
+    render: function (context) {
+      const root = element("div", "vb-support-grid");
+      (context.data.supportCards || []).filter(function (item) { return item.active !== false; }).slice(0, Math.max(1, Number(context.props.limit || 4))).forEach(function (item) {
+        const card = element("article", "vb-support-card"); const badge = element("span"); appendIcon(badge, item.icon || "headphones"); const title = element("h3"); title.textContent = TB.plainText(item.title, 140); const text = element("p"); text.textContent = TB.plainText(item.text, 500); const link = element("a"); setLink(link, item.type === "whatsapp" ? "whatsapp" : item.url, context); link.textContent = TB.plainText(item.label || context.props.buttonLabel, 100); appendIcon(link, "arrow-up-right"); card.append(badge, title, text, link); root.appendChild(card);
+      });
+      return { element: root, slots: {} };
+    },
+  });
+
+  registry.register({
     type: "domain.coverage", version: 1, label: "Mapa de cobertura", category: "domain", icon: "map-pinned",
     propsSchema: { title: textField("Titulo", "content"), text: textarea("Descricao", "content"), showList: switchField("Mostrar areas", "content"), mapHeight: textField("Altura do mapa", "layout", { maxLength: 20 }) }, slots: {}, dataContract: "coverage.areas", styleCapabilities: ["spacing", "size", "background", "border", "responsive"],
     defaults: { props: { title: "Consulte a disponibilidade na sua regiao", text: "Nossa rede esta em expansao. Fale com a equipe para confirmar seu endereco.", showList: true, mapHeight: "480px" }, styles: {} },
@@ -358,6 +435,8 @@
     propsSchema: { submitLabel: textField("Texto do botao", "content"), successMessage: textField("Mensagem de sucesso", "content"), action: selectField("Acao", [option("lead", "Capturar lead"), option("whatsapp", "Abrir WhatsApp")], "behavior") },
     slots: { fields: { types: ["forms.input", "forms.textarea", "forms.select", "forms.checkbox", "forms.radio"], min: 1, max: 30 } }, styleCapabilities: ["layout", "spacing", "size", "background", "border", "effects", "responsive"],
     defaults: { props: { submitLabel: "Enviar", successMessage: "Dados recebidos.", action: "lead" }, styles: { base: { normal: { display: "flex", flexDirection: "column", gap: "16px" } } } },
+    editor: { slotManager: { slot: "fields", label: "Campos", singular: "Campo", addType: "forms.input" } },
+    compose: function (builder) { builder.append(builder.root, "forms.input", { name: "Nome", props: { label: "Seu nome", name: "name", placeholder: "Como podemos chamar voce?", required: true } }, "fields"); builder.append(builder.root, "forms.input", { name: "WhatsApp", props: { label: "WhatsApp", name: "whatsapp", placeholder: "(19) 99999-9999", required: true } }, "fields"); },
     render: function (context) { const form = element("form", "vb-form"); form.dataset.formAction = context.props.action; const fields = element("div", "vb-form__fields"); const button = element("button"); button.type = "submit"; button.textContent = TB.plainText(context.props.submitLabel, 120); form.append(fields, button); return { element: form, slots: { fields: fields }, mount: "form" }; },
   });
   formDefinition("forms.input", "Campo de texto", "text-cursor-input", "input", "text");
@@ -410,6 +489,7 @@
       } },
     });
     documentValue.meta.migratedFrom = "fibra-lider-studio-state-v13";
+    documentValue.meta.templateVersion = "fibra-home-v2.1";
     const root = documentValue.rootId;
 
     append(documentValue, root, "navigation.header", { id: "vb_header", name: "Cabecalho", props: { sticky: true, showPhone: true, showClientArea: true, ctaLabel: "Falar com a gente" } });
@@ -431,7 +511,7 @@
     const plansContainer = append(documentValue, plans.id, "layout.container", { name: "Container dos planos" });
     addTextStack(documentValue, plansContainer.id, { eyebrow: content.plansEyebrow || "Planos residenciais", title: content.plansTitle || "Escolha sua velocidade", text: content.plansText || "Planos para todos os momentos." }, { name: "Cabecalho dos planos", maxWidth: "760px" });
     append(documentValue, plansContainer.id, "layout.spacer", { props: { height: "34px" } });
-    append(documentValue, plansContainer.id, "commerce.plan-grid", { id: "vb_plan_grid", name: "Lista de planos", props: { categoryId: "internet", limit: 3, showFeatures: true, ctaLabel: "Quero este plano" } });
+    append(documentValue, plansContainer.id, "commerce.plan-grid", { id: "vb_plan_grid", name: "Lista de planos", props: { categoryId: "internet", limit: 9, showFilters: true, showCoupon: true, showFeatures: true, ctaLabel: "Quero este plano" } });
 
     const benefits = append(documentValue, root, "layout.section", { id: "vb_benefits", name: "Beneficios", styles: { base: { normal: { paddingTop: "token.space.xl", paddingBottom: "token.space.xl", backgroundColor: "token.color.surface" } } } });
     const benefitsContainer = append(documentValue, benefits.id, "layout.container", { name: "Container de beneficios" });
@@ -439,6 +519,12 @@
     append(documentValue, benefitsContainer.id, "layout.spacer", { props: { height: "34px" } });
     const benefitGrid = append(documentValue, benefitsContainer.id, "layout.grid", { name: "Grade de beneficios", props: { columns: 4 }, styles: { base: { normal: { display: "grid", gridColumns: "repeat(4, minmax(0, 1fr))", gap: "18px" } }, md: { normal: { gridColumns: "repeat(2, minmax(0, 1fr))" } }, sm: { normal: { gridColumns: "repeat(1, minmax(0, 1fr))" } } } });
     (source.benefits || []).slice(0, 4).forEach(function (benefit) { const card = append(documentValue, benefitGrid.id, "layout.column", { name: benefit.title, styles: { base: { normal: { display: "flex", flexDirection: "column", gap: "14px", paddingTop: "26px", paddingRight: "24px", paddingBottom: "26px", paddingLeft: "24px", backgroundColor: "token.color.background", borderRadius: "token.radius.md", borderWidth: "1px", borderStyle: "solid", borderColor: "#dce6f0" } } } }); append(documentValue, card.id, "content.icon", { props: { name: benefit.icon || "badge-check" }, styles: { base: { normal: { color: "token.color.primary" } } } }); append(documentValue, card.id, "content.heading", { props: { text: benefit.title, level: "3" }, styles: { base: { normal: { color: "token.color.text", fontFamily: "token.font.heading", fontSize: "21px", fontWeight: "700", lineHeight: "1.2" } }, md: { normal: { fontSize: "21px" } }, sm: { normal: { fontSize: "20px" } } } }); append(documentValue, card.id, "content.text", { props: { text: benefit.text, tag: "p" } }); });
+
+    const entertainment = append(documentValue, root, "layout.section", { id: "vb_apps", name: "Entretenimento e educacao", props: { anchor: "entretenimento" }, styles: { base: { normal: { paddingTop: "token.space.xl", paddingBottom: "token.space.xl", backgroundColor: "#07111e" } } } });
+    const entertainmentContainer = append(documentValue, entertainment.id, "layout.container", { name: "Container de aplicativos" });
+    addTextStack(documentValue, entertainmentContainer.id, { eyebrow: content.appsEyebrow || "Muito alem da conexao", title: content.appsTitle || "Conteudo para toda a familia", text: content.appsText || "Entretenimento, educacao e seguranca reunidos no seu plano." }, { name: "Cabecalho de aplicativos", light: true, maxWidth: "760px" });
+    append(documentValue, entertainmentContainer.id, "layout.spacer", { props: { height: "34px" } });
+    append(documentValue, entertainmentContainer.id, "domain.app-grid", { id: "vb_app_grid", name: "Aplicativos inclusos", props: { limit: 8, showCategory: true } });
 
     const business = append(documentValue, root, "layout.section", { id: "vb_business", name: "Empresas", styles: { base: { normal: { paddingTop: "token.space.xl", paddingBottom: "token.space.xl", backgroundColor: "#07111e" } } } });
     const businessContainer = append(documentValue, business.id, "layout.container", { name: "Fibra para empresas" });
@@ -460,6 +546,12 @@
     addTextStack(documentValue, socialContainer.id, { eyebrow: content.faqEyebrow || "Duvidas frequentes", title: content.faqTitle || "Respostas antes de contratar", text: content.faqText || "" }, { maxWidth: "720px" });
     append(documentValue, socialContainer.id, "layout.spacer", { props: { height: "28px" } });
     append(documentValue, socialContainer.id, "marketing.faq", { name: "Perguntas", props: { limit: 6, firstOpen: true } });
+
+    const support = append(documentValue, root, "layout.section", { id: "vb_support", name: "Atendimento", props: { anchor: "atendimento" }, styles: { base: { normal: { paddingTop: "token.space.xl", paddingBottom: "token.space.xl", backgroundColor: "#07111e" } } } });
+    const supportContainer = append(documentValue, support.id, "layout.container", { name: "Container de atendimento" });
+    addTextStack(documentValue, supportContainer.id, { eyebrow: content.supportEyebrow || "Estamos por perto", title: content.supportTitle || "Atendimento para cada momento", text: content.supportText || "Escolha o canal certo e fale com a nossa equipe." }, { name: "Cabecalho de atendimento", light: true, maxWidth: "760px" });
+    append(documentValue, supportContainer.id, "layout.spacer", { props: { height: "34px" } });
+    append(documentValue, supportContainer.id, "domain.support-grid", { id: "vb_support_grid", name: "Canais de atendimento", props: { limit: 4, buttonLabel: "Acessar" } });
 
     const final = append(documentValue, root, "layout.section", { id: "vb_final", name: "Chamada final", styles: { base: { normal: { paddingTop: "52px", paddingBottom: "52px", backgroundColor: "token.color.background" } } } });
     const finalContainer = append(documentValue, final.id, "layout.container", { name: "Container final" });

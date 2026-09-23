@@ -467,22 +467,35 @@
     });
     importedFiles.forEach(function (file) {
       const color = file.color || state.theme.mapAccent || state.theme.primary;
-      file.features.forEach(function (feature) {
+      file.features.forEach(function (feature, featureIndex) {
+        const label = window.FLCoverage ? FLCoverage.publicFeatureName(feature, featureIndex) : feature.name;
         if (feature.type === "polygon") {
           window.L.polygon(feature.coordinates, { pane: "coverageGlow", color, fillColor: color, fillOpacity: 0.1, opacity: 0.28, weight: 10, interactive: false }).addTo(publicMap);
           const polygon = window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.3), weight: 2.5 }).addTo(publicMap);
-          polygon.bindTooltip('<strong>' + escapeHtml(feature.name) + '</strong><span>Area atendida pela ' + escapeHtml(state.brand.name) + '</span>', { direction: "top", className: "coverage-tooltip", permanent: Boolean(state.coverageSettings.showImportedLabels) });
+          polygon.bindTooltip('<strong>' + escapeHtml(label) + '</strong><span>Area atendida pela ' + escapeHtml(state.brand.name) + '</span>', { direction: "top", className: "coverage-tooltip" });
           bounds.push.apply(bounds, feature.coordinates);
         } else if (feature.type === "line") {
-          window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(publicMap).bindTooltip(escapeHtml(feature.name));
+          window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(publicMap).bindTooltip(escapeHtml(label));
           bounds.push.apply(bounds, feature.coordinates);
         } else if (feature.type === "point") {
-          window.L.circleMarker(feature.coordinates, { radius: 6, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(publicMap).bindTooltip(escapeHtml(feature.name));
+          window.L.circleMarker(feature.coordinates, { radius: 6, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(publicMap).bindTooltip(escapeHtml(label));
           bounds.push(feature.coordinates);
         }
       });
+      if (window.FLCoverage) FLCoverage.importedAreas([file]).forEach(function (area) {
+        if (!Number.isFinite(Number(area.lat)) || !Number.isFinite(Number(area.lng))) return;
+        const marker = window.L.marker([Number(area.lat), Number(area.lng)], { icon: window.L.divIcon({ className: "coverage-place-marker", html: '<span style="--marker-color:' + escapeHtml(color) + '"></span>' + (state.coverageSettings.showImportedLabels ? '<b>' + escapeHtml(area.name) + '</b>' : ""), iconSize: [180, 32], iconAnchor: [11, 16] }), keyboard: true }).addTo(publicMap);
+        marker.bindTooltip('<strong>' + escapeHtml(area.name) + '</strong><span>' + escapeHtml([area.road, area.postcode].filter(Boolean).join(" - ") || "Cobertura confirmada") + '</span>', { direction: "top", className: "coverage-tooltip" });
+        marker.on("click", function () { selectCoverageRegion(area.city || area.name); });
+      });
     });
     publicMap.fitBounds(bounds, { padding: [32, 32], maxZoom: 11 });
+    const updatePlaceLabels = function () {
+      if (!publicMap || !publicMap._container) return;
+      publicMap._container.classList.toggle("show-place-labels", Boolean(state.coverageSettings.showImportedLabels) && publicMap.getZoom() >= 14);
+    };
+    publicMap.on("zoomend", updatePlaceLabels);
+    updatePlaceLabels();
     setTimeout(function () { if (publicMap) publicMap.invalidateSize(); }, 80);
   }
 
@@ -787,7 +800,7 @@
     if (coverageLookupPoint && state.coverageSettings.precisePolygonCheck) {
       for (const file of state.coverageFiles.filter(function (item) { return item.active; })) {
         const feature = file.features.find(function (item) { return item.type === "polygon" && pointInPolygon(coverageLookupPoint, item.coordinates); });
-        if (feature) return { region: { name: feature.name, status: "Cobertura ativa", active: true }, matchType: "kmz" };
+        if (feature) return { region: { name: window.FLCoverage ? FLCoverage.publicFeatureName(feature, file.features.indexOf(feature)) : feature.name, status: "Cobertura ativa", active: true }, matchType: "kmz" };
       }
     }
     return null;

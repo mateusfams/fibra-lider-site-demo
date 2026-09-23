@@ -799,17 +799,17 @@
         const outer = kmlElements(polygon, "outerBoundaryIs")[0] || polygon;
         const coordinates = kmlElements(outer, "coordinates")[0];
         const points = parseKmlCoordinates(coordinates ? coordinates.textContent : "", budget);
-        if (points.length >= 3) features.push({ type: "polygon", name, coordinates: points });
+        if (points.length >= 3) features.push({ type: "polygon", name, featureIndex: placemarkIndex + 1, coordinates: points });
       });
       kmlElements(placemark, "LineString").forEach(function (line) {
         const coordinates = kmlElements(line, "coordinates")[0];
         const points = parseKmlCoordinates(coordinates ? coordinates.textContent : "", budget);
-        if (points.length >= 2) features.push({ type: "line", name, coordinates: points });
+        if (points.length >= 2) features.push({ type: "line", name, featureIndex: placemarkIndex + 1, coordinates: points });
       });
       kmlElements(placemark, "Point").forEach(function (point) {
         const coordinates = kmlElements(point, "coordinates")[0];
         const points = parseKmlCoordinates(coordinates ? coordinates.textContent : "", budget);
-        if (points[0]) features.push({ type: "point", name, coordinates: points[0] });
+        if (points[0]) features.push({ type: "point", name, featureIndex: placemarkIndex + 1, coordinates: points[0] });
       });
     });
     if (!features.length) throw new Error("Nenhum poligono, linha ou ponto foi encontrado no KML.");
@@ -837,10 +837,13 @@
         kmlText = await file.text();
       }
       const parsed = parseKmlDocument(kmlText);
-      state.coverageFiles.unshift({ id: FL.uid("coverage"), name: file.name.replace(/\.(kml|kmz)$/i, ""), fileName: file.name, format: extension.toUpperCase(), bytes: file.size, importedAt: new Date().toISOString(), color: state.theme.mapAccent, active: true, coordinateCount: parsed.coordinateCount, features: parsed.features });
+      const coverageId = FL.uid("coverage");
+      const preparedFeatures = window.FLCoverage ? FLCoverage.prepareFeatures(parsed.features, state.regions) : parsed.features;
+      state.coverageFiles.unshift({ id: coverageId, name: file.name.replace(/\.(kml|kmz)$/i, ""), fileName: file.name, format: extension.toUpperCase(), bytes: file.size, importedAt: new Date().toISOString(), color: state.theme.mapAccent, active: true, coordinateCount: parsed.coordinateCount, features: preparedFeatures, geocodingStatus: "local", geocodingRequests: 0 });
       const derived = window.FLCoverage ? FLCoverage.importedAreas(state.coverageFiles.filter(function (item) { return item.id === state.coverageFiles[0].id; })).length : parsed.features.length;
       saveDraft(derived + " areas reconhecidas no arquivo", { action: "import", resource: "coverage", label: "Cobertura importada", detail: file.name + " - " + parsed.features.length + " geometrias e " + derived + " areas operacionais" });
       renderPanel();
+      if (state.coverageSettings.autoIdentifyImportedAreas && window.FLCoverage) identifyCoverageFile(coverageId, true);
     } catch (error) { setSaveStatus(state.meta.status === "published" ? "saved" : "draft"); toast(error.message || "Nao foi possivel importar a cobertura.", "error"); }
   }
 
@@ -885,21 +888,34 @@
     });
     importedFiles.forEach(function (file) {
       const color = file.color || state.theme.mapAccent;
-      file.features.forEach(function (feature) {
+      file.features.forEach(function (feature, featureIndex) {
+        const label = window.FLCoverage ? FLCoverage.publicFeatureName(feature, featureIndex) : feature.name;
+        const detail = feature.geography && [feature.geography.road, feature.geography.postcode].filter(Boolean).join(" - ") || "Area importada de " + file.fileName;
         if (feature.type === "polygon") {
           window.L.polygon(feature.coordinates, { pane: "coverageGlow", color, fillColor: color, fillOpacity: 0.1, opacity: 0.28, weight: 10, interactive: false }).addTo(adminMap);
-          window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.3), weight: 2.5 }).addTo(adminMap).bindTooltip('<strong>' + esc(feature.name) + '</strong><span>Area importada de ' + esc(file.fileName) + '</span>', { className: "coverage-tooltip" });
+          window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.3), weight: 2.5 }).addTo(adminMap).bindTooltip('<strong>' + esc(label) + '</strong><span>' + esc(detail) + '</span>', { className: "coverage-tooltip" });
           bounds.push.apply(bounds, feature.coordinates);
         } else if (feature.type === "line") {
-          window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(adminMap).bindTooltip(esc(feature.name));
+          window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(adminMap).bindTooltip(esc(label));
           bounds.push.apply(bounds, feature.coordinates);
         } else if (feature.type === "point") {
-          window.L.circleMarker(feature.coordinates, { radius: 6, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(adminMap).bindTooltip(esc(feature.name));
+          window.L.circleMarker(feature.coordinates, { radius: 6, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(adminMap).bindTooltip(esc(label));
           bounds.push(feature.coordinates);
         }
       });
+      if (window.FLCoverage) FLCoverage.importedAreas([file]).forEach(function (area) {
+        if (!Number.isFinite(Number(area.lat)) || !Number.isFinite(Number(area.lng))) return;
+        const marker = window.L.marker([Number(area.lat), Number(area.lng)], { icon: window.L.divIcon({ className: "coverage-place-marker", html: '<span style="--marker-color:' + esc(color) + '"></span>' + (state.coverageSettings.showImportedLabels ? '<b>' + esc(area.name) + '</b>' : ""), iconSize: [180, 32], iconAnchor: [11, 16] }), keyboard: true }).addTo(adminMap);
+        marker.bindTooltip('<strong>' + esc(area.name) + '</strong><span>' + esc([area.road, area.postcode].filter(Boolean).join(" - ") || area.status) + '</span>', { className: "coverage-tooltip", direction: "top" });
+      });
     });
     adminMap.fitBounds(bounds, { padding: [34, 34], maxZoom: 11, animate: false });
+    const updatePlaceLabels = function () {
+      if (!adminMap || !adminMap._container) return;
+      adminMap._container.classList.toggle("show-place-labels", Boolean(state.coverageSettings.showImportedLabels) && adminMap.getZoom() >= 14);
+    };
+    adminMap.on("zoomend", updatePlaceLabels);
+    updatePlaceLabels();
     const currentMap = adminMap;
     setTimeout(function () { if (adminMap === currentMap && currentMap._container) currentMap.invalidateSize(); }, 80);
   }
@@ -932,16 +948,22 @@
   }
 
   function renderCoverageSources(inventory) {
-    return '<section class="coverage-source-workspace"><div class="coverage-dropzone"><span>' + icon("file-up") + '</span><div><h3>Importe a malha do Google Earth</h3><p>Arquivos KML ou KMZ de ate ' + esc(state.coverageSettings.maxImportMb) + ' MB sao processados localmente e viram areas atendidas automaticamente.</p></div><label class="button button--primary file-action">' + icon("upload") + ' Selecionar arquivo<input id="coverage-file-input" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"></label></div><div class="security-notice">' + icon("shield-check") + '<div><strong>Processamento controlado no navegador</strong><p>O leitor bloqueia entidades XML, limita tamanho e quantidade de coordenadas e conserva apenas geometrias necessarias ao mapa.</p></div></div><article class="admin-card coverage-file-manager">' + cardTitle("Camadas importadas", inventory.files.length + " fonte(s) ativa(s) na operacao.", '<a class="text-button" href="https://earth.google.com" target="_blank" rel="noopener">Abrir Google Earth ' + icon("external-link") + '</a>') + (state.coverageFiles.length ? '<div class="coverage-file-list">' + state.coverageFiles.map(function (file) { const areas = window.FLCoverage ? FLCoverage.importedAreas([file]).length : file.features.length; return '<article><span>' + icon("map") + '</span><div><strong>' + esc(file.name) + '</strong><p>' + esc(file.fileName) + '</p><small>' + areas + ' areas &middot; ' + file.features.length + ' geometrias &middot; ' + formatBytes(file.bytes) + '</small></div><label class="color-mini" title="Cor da camada"><input type="color" data-coverage-file-color="' + esc(file.id) + '" value="' + esc(file.color || state.theme.mapAccent) + '"></label><button class="icon-button" data-action="toggle-coverage-file" data-id="' + esc(file.id) + '" title="' + (file.active ? "Ocultar" : "Publicar") + '">' + icon(file.active ? "eye" : "eye-off") + '</button><button class="icon-button icon-button--danger" data-action="delete-coverage-file" data-id="' + esc(file.id) + '" title="Remover">' + icon("trash-2") + '</button></article>'; }).join("") + '</div>' : FLAdmin.emptyState({ icon: "file-up", title: "Nenhuma malha importada", description: "Envie um KML ou KMZ para criar a cobertura operacional." })) + '</article></section>';
+    const files = state.coverageFiles.map(function (file) {
+      const areas = window.FLCoverage ? FLCoverage.importedAreas([file]).length : file.features.length;
+      const processing = file.geocodingStatus === "processing";
+      const status = processing ? (file.geocodingProgress || 0) + "% identificado" : file.geocodingStatus === "complete" ? "Bairros e vias identificados" : "Identificacao local aplicada";
+      return '<article class="coverage-file-row"><span>' + icon("map") + '</span><div><strong>' + esc(file.name) + '</strong><p>' + esc(file.fileName) + '</p><small>' + areas + ' areas &middot; ' + file.features.length + ' geometrias &middot; ' + formatBytes(file.bytes) + '</small><em data-geocode-progress="' + esc(file.id) + '" class="' + (file.geocodingStatus === "complete" ? "is-complete" : "") + '">' + icon(file.geocodingStatus === "complete" ? "map-pin-check" : "scan-search") + esc(status) + '</em></div><button class="icon-button" data-action="identify-coverage-file" data-id="' + esc(file.id) + '" title="Identificar bairros e vias"' + (processing ? " disabled" : "") + '>' + icon(processing ? "loader-circle" : "scan-search") + '</button><label class="color-mini" title="Cor da camada"><input type="color" data-coverage-file-color="' + esc(file.id) + '" value="' + esc(file.color || state.theme.mapAccent) + '"></label><button class="icon-button" data-action="toggle-coverage-file" data-id="' + esc(file.id) + '" title="' + (file.active ? "Ocultar" : "Publicar") + '">' + icon(file.active ? "eye" : "eye-off") + '</button><button class="icon-button icon-button--danger" data-action="delete-coverage-file" data-id="' + esc(file.id) + '" title="Remover">' + icon("trash-2") + '</button></article>';
+    }).join("");
+    return '<section class="coverage-source-workspace"><div class="coverage-dropzone"><span>' + icon("file-up") + '</span><div><h3>Importe a malha do Google Earth</h3><p>Arquivos KML ou KMZ de ate ' + esc(state.coverageSettings.maxImportMb) + ' MB viram areas publicas sem expor nomes tecnicos da rede.</p></div><label class="button button--primary file-action">' + icon("upload") + ' Selecionar arquivo<input id="coverage-file-input" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"></label></div><div class="security-notice">' + icon("shield-check") + '<div><strong>Geografia publica, referencia tecnica preservada</strong><p>O painel conserva OLT e outros nomes somente para auditoria interna. No site, os poligonos usam bairro, cidade ou via identificados e armazenados no arquivo processado.</p></div></div><article class="admin-card coverage-file-manager">' + cardTitle("Camadas importadas", inventory.files.length + " fonte(s) ativa(s) na operacao.", '<a class="text-button" href="https://earth.google.com" target="_blank" rel="noopener">Abrir Google Earth ' + icon("external-link") + '</a>') + (files ? '<div class="coverage-file-list">' + files + '</div>' : FLAdmin.emptyState({ icon: "file-up", title: "Nenhuma malha importada", description: "Envie um KML ou KMZ para criar a cobertura operacional." })) + '</article></section>';
   }
 
   function renderCoverageAreas(inventory) {
     const typeLabels = { cep: "CEP exato", cep_prefix: "Prefixo CEP", cep_range: "Faixa CEP", city: "Cidade", neighborhood: "Bairros", region: "Regiao", radius: "Raio" };
-    return '<section class="coverage-area-columns"><article class="admin-card">' + cardTitle("Regras manuais", "CEP, bairro, cidade e raio com prioridade comercial.", '<button class="button button--primary button--compact" data-action="add-region">' + icon("plus") + ' Nova area</button>') + (state.regions.length ? '<div class="region-list region-list--workspace">' + state.regions.map(function (region) { return '<div class="region-admin-row"><span class="region-heat" style="--level:' + Number(region.interest || 0) + ';--region-color:' + esc(region.color || state.theme.mapAccent) + '"></span><div><span><strong>' + esc(region.name) + '</strong><em>' + esc(typeLabels[region.type] || "Area") + '</em></span><small>' + esc(region.city || region.cep || region.status) + ' &middot; prioridade ' + esc(region.priority || 10) + '</small></div><div class="row-actions"><button class="icon-button" data-action="toggle-region" data-id="' + esc(region.id) + '" title="' + (region.active ? "Ocultar" : "Publicar") + '">' + icon(region.active ? "eye" : "eye-off") + '</button><button class="icon-button" data-action="edit-region" data-id="' + esc(region.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-region" data-id="' + esc(region.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div>'; }).join("") + '</div>' : FLAdmin.emptyState({ icon: "map-pin-plus", title: "Sem regras manuais", description: "No modo automatico, as areas do KMZ assumem a operacao sem exigir cadastro duplicado.", action: "add-region", actionLabel: "Criar primeira regra" })) + '</article><article class="admin-card imported-area-card">' + cardTitle("Areas reconhecidas no KMZ", "Nomes repetidos sao agrupados; poligonos sem nome viram setores independentes.", '<span class="status-badge status-badge--success">' + inventory.imported.length + ' areas</span>') + (inventory.imported.length ? '<div class="imported-area-list">' + inventory.imported.map(function (area) { return '<div><span style="--area-color:' + esc(area.color || state.theme.mapAccent) + '">' + icon("scan") + '</span><div><strong>' + esc(area.name) + '</strong><small>' + esc(area.sourceName) + ' &middot; ' + area.featureCount + ' geometria(s)</small></div><em>Automatica</em></div>'; }).join("") + '</div>' : FLAdmin.emptyState({ icon: "scan-search", title: "Nenhuma area derivada", description: "Ative ou importe uma camada com pontos, linhas ou poligonos." })) + '</article></section>';
+    return '<section class="coverage-area-columns"><article class="admin-card">' + cardTitle("Regras manuais", "CEP, bairro, cidade e raio com prioridade comercial.", '<button class="button button--primary button--compact" data-action="add-region">' + icon("plus") + ' Nova area</button>') + (state.regions.length ? '<div class="region-list region-list--workspace">' + state.regions.map(function (region) { return '<div class="region-admin-row"><span class="region-heat" style="--level:' + Number(region.interest || 0) + ';--region-color:' + esc(region.color || state.theme.mapAccent) + '"></span><div><span><strong>' + esc(region.name) + '</strong><em>' + esc(typeLabels[region.type] || "Area") + '</em></span><small>' + esc(region.city || region.cep || region.status) + ' &middot; prioridade ' + esc(region.priority || 10) + '</small></div><div class="row-actions"><button class="icon-button" data-action="toggle-region" data-id="' + esc(region.id) + '" title="' + (region.active ? "Ocultar" : "Publicar") + '">' + icon(region.active ? "eye" : "eye-off") + '</button><button class="icon-button" data-action="edit-region" data-id="' + esc(region.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-region" data-id="' + esc(region.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div>'; }).join("") + '</div>' : FLAdmin.emptyState({ icon: "map-pin-plus", title: "Sem regras manuais", description: "No modo automatico, as areas do KMZ assumem a operacao sem exigir cadastro duplicado.", action: "add-region", actionLabel: "Criar primeira regra" })) + '</article><article class="admin-card imported-area-card">' + cardTitle("Areas publicas reconhecidas", "Bairros, cidades e vias substituem os nomes tecnicos do arquivo no site.", '<span class="status-badge status-badge--success">' + inventory.imported.length + ' areas</span>') + (inventory.imported.length ? '<div class="imported-area-list">' + inventory.imported.map(function (area) { const place = [area.road, area.postcode].filter(Boolean).join(" - "); const reference = area.technicalNames && area.technicalNames.length ? "Referencia interna: " + area.technicalNames.slice(0, 3).join(", ") : area.sourceName; return '<div><span style="--area-color:' + esc(area.color || state.theme.mapAccent) + '">' + icon("map-pin") + '</span><div><strong>' + esc(area.name) + '</strong><small>' + (place ? esc(place) + '<br>' : '') + esc(reference) + ' &middot; ' + area.featureCount + ' geometria(s)</small></div><em>Publica</em></div>'; }).join("") + '</div>' : FLAdmin.emptyState({ icon: "scan-search", title: "Nenhuma area derivada", description: "Ative ou importe uma camada com pontos, linhas e poligonos." })) + '</article></section>';
   }
 
   function renderCoverageSettings() {
-    return '<section class="settings-layout"><div class="stack"><article class="admin-card">' + cardTitle("Origem da cobertura", "Escolha como o site resolve as areas atendidas.", "") + field("Modo de operacao", "coverageSettings.areaSourceMode", { type: "select", options: [{ value: "auto", label: "Automatico: manual ou KMZ" }, { value: "hybrid", label: "Hibrido: combinar tudo" }, { value: "manual", label: "Somente regras manuais" }, { value: "imported", label: "Somente arquivos importados" }], help: "Automatico usa o KMZ quando nao ha area manual ativa." }) + toggle("Validacao precisa no poligono", "coverageSettings.precisePolygonCheck", "Cruza o endereco geocodificado com a malha importada") + toggle("Consulta automatica de CEP", "coverageSettings.cepLookup", "Preenche cidade e bairro pelo ViaCEP") + '</article><article class="admin-card">' + cardTitle("Aparencia cartografica", "Aplique o mapa da marca em todo o site.", "") + field("Estilo", "coverageSettings.mapStyle", { type: "select", options: [{ value: "brand", label: "Cartografia da marca" }, { value: "street", label: "Mapa urbano claro" }, { value: "dark", label: "Contraste escuro" }] }) + '<div class="form-grid">' + field("Raio padrao (km)", "coverageSettings.defaultRadiusKm", { type: "number", min: 1, max: 100, step: 1 }) + field("Opacidade do KMZ", "coverageSettings.importedAreaOpacity", { type: "number", min: 0.1, max: 0.6, step: 0.05, help: "Use de 0.10 a 0.60" }) + '</div>' + toggle("Mostrar nomes manuais", "coverageSettings.showLabels", "Exibe rotulos permanentes para cidades e pontos") + toggle("Mostrar nomes importados", "coverageSettings.showImportedLabels", "Exibe rotulos das areas derivadas do KMZ") + toggle("Representar interesse", "coverageSettings.showInterest", "Usa intensidade visual para a demanda regional") + '</article></div><aside class="stack"><article class="admin-card">' + cardTitle("Centro inicial", "Ponto usado quando ainda nao ha geometria.", "") + '<div class="form-grid">' + field("Latitude", "coverageSettings.centerLat", { type: "number", min: -90, max: 90, step: 0.000001 }) + field("Longitude", "coverageSettings.centerLng", { type: "number", min: -180, max: 180, step: 0.000001 }) + '</div></article><div class="integration-route-card"><span>' + icon("blocks") + '</span><div><strong>APIs e geocodificacao</strong><p>Google Maps Platform, chaves publicas, ViaCEP e Nominatim ficam centralizados em Integracoes.</p></div><button class="button button--ghost" data-goto="pixels">Abrir integracoes</button></div></aside></section>';
+    return '<section class="settings-layout"><div class="stack"><article class="admin-card">' + cardTitle("Origem da cobertura", "Escolha como o site resolve as areas atendidas.", "") + field("Modo de operacao", "coverageSettings.areaSourceMode", { type: "select", options: [{ value: "auto", label: "Automatico: manual ou KMZ" }, { value: "hybrid", label: "Hibrido: combinar tudo" }, { value: "manual", label: "Somente regras manuais" }, { value: "imported", label: "Somente arquivos importados" }], help: "Automatico usa o KMZ quando nao ha area manual ativa." }) + toggle("Validacao precisa no poligono", "coverageSettings.precisePolygonCheck", "Cruza o endereco geocodificado com a malha importada") + toggle("Consulta automatica de CEP", "coverageSettings.cepLookup", "Preenche cidade e bairro pelo ViaCEP") + toggle("Identificar importacoes automaticamente", "coverageSettings.autoIdentifyImportedAreas", "Busca bairro e via depois de importar um KML ou KMZ") + '</article><article class="admin-card">' + cardTitle("Aparencia cartografica", "Aplique o mapa da marca em todo o site.", "") + field("Estilo", "coverageSettings.mapStyle", { type: "select", options: [{ value: "brand", label: "Cartografia da marca" }, { value: "street", label: "Mapa urbano claro" }, { value: "dark", label: "Contraste escuro" }] }) + '<div class="form-grid">' + field("Raio padrao (km)", "coverageSettings.defaultRadiusKm", { type: "number", min: 1, max: 100, step: 1 }) + field("Opacidade do KMZ", "coverageSettings.importedAreaOpacity", { type: "number", min: 0.1, max: 0.6, step: 0.05, help: "Use de 0.10 a 0.60" }) + '</div>' + toggle("Mostrar nomes manuais", "coverageSettings.showLabels", "Exibe rotulos permanentes para cidades e pontos") + toggle("Mostrar nomes importados", "coverageSettings.showImportedLabels", "Exibe rotulos publicos das areas derivadas do KMZ") + toggle("Representar interesse", "coverageSettings.showInterest", "Usa intensidade visual para a demanda regional") + '</article></div><aside class="stack"><article class="admin-card">' + cardTitle("Centro inicial", "Ponto usado quando ainda nao ha geometria.", "") + '<div class="form-grid">' + field("Latitude", "coverageSettings.centerLat", { type: "number", min: -90, max: 90, step: 0.000001 }) + field("Longitude", "coverageSettings.centerLng", { type: "number", min: -180, max: 180, step: 0.000001 }) + '</div></article><div class="integration-route-card"><span>' + icon("blocks") + '</span><div><strong>APIs e geocodificacao</strong><p>Google Maps Platform, chaves publicas, ViaCEP e Nominatim ficam centralizados em Integracoes.</p></div><button class="button button--ghost" data-goto="pixels">Abrir integracoes</button></div></aside></section>';
   }
 
   function renderCoverageWorkspace() {
@@ -1746,6 +1768,32 @@
     }
   }
 
+  async function identifyCoverageFile(id, automatic) {
+    const file = state.coverageFiles.find(function (item) { return item.id === id; });
+    if (!file || !window.FLCoverage || file.geocodingStatus === "processing") return;
+    file.geocodingStatus = "processing";
+    file.geocodingProgress = 0;
+    setSaveStatus("saving");
+    if (!automatic) toast("Identificando bairros e vias no mapa...", "success");
+    if (activePanel === "coverage") renderPanel();
+    try {
+      const enriched = await FLCoverage.enrichFile(file, state, function (progress) {
+        file.geocodingProgress = Math.round((progress.current / Math.max(1, progress.total)) * 100);
+        const indicator = document.querySelector('[data-geocode-progress="' + String(id).replace(/[^a-zA-Z0-9_-]/g, "") + '"]');
+        if (indicator) indicator.textContent = file.geocodingProgress + "% identificado";
+      });
+      const index = state.coverageFiles.findIndex(function (item) { return item.id === id; });
+      if (index >= 0) state.coverageFiles[index] = enriched;
+      saveDraft("Areas identificadas por bairro e via", { action: "update", resource: "coverage", label: "Geografia da cobertura identificada", detail: enriched.geocodingRequests + " consultas geograficas com cache local" });
+      toast("Bairros e vias da cobertura foram identificados.", "success");
+    } catch (error) {
+      file.geocodingStatus = "error";
+      saveDraft();
+      toast(error.message || "Nao foi possivel identificar as areas.", "error");
+    }
+    if (activePanel === "coverage") renderPanel();
+  }
+
   function currentPage() {
     return state.pages.find(function (item) { return item.id === pageEditId; });
   }
@@ -1837,6 +1885,7 @@
     if (action === "delete-region" && state.regions.length > 1) { const item = find(state.regions); requestConfirmation({ title: "Excluir a area " + (item ? item.name : "selecionada") + "?", description: "A regra deixara de participar das consultas de cobertura e do mapa.", impact: "Camadas importadas por KML/KMZ nao serao alteradas.", confirmLabel: "Excluir area" }, function () { state.regions = state.regions.filter(function (region) { return region.id !== id; }); saveDraft("Area removida", { action: "delete", resource: "coverage", label: "Area de cobertura excluida", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "open-region-route") { const item = find(state.regions); if (item) window.open(googleMapsUrl(item, true), "_blank", "noopener"); }
     if (action === "toggle-coverage-file") { const item = find(state.coverageFiles); if (item) { item.active = !item.active; saveDraft(); renderPanel(); } }
+    if (action === "identify-coverage-file") identifyCoverageFile(id, false);
     if (action === "delete-coverage-file") { const item = find(state.coverageFiles); requestConfirmation({ title: "Remover a camada " + (item ? item.name : "selecionada") + "?", description: "Os poligonos, linhas e pontos desta importacao serao removidos do mapa.", impact: item ? item.features.length + " geometrias e " + item.coordinateCount + " coordenadas normalizadas serao descartadas." : "A camada sera removida.", confirmLabel: "Remover camada" }, function () { state.coverageFiles = state.coverageFiles.filter(function (file) { return file.id !== id; }); saveDraft("Camada removida", { action: "delete", resource: "coverage", label: "Camada de cobertura removida", detail: item ? item.fileName : id }); renderPanel(); }); }
     if (action === "edit-support") simpleItemModal("support", find(state.supportCards));
     if (action === "toggle-support") { const item = find(state.supportCards); item.active = !item.active; saveDraft(); renderPanel(); }

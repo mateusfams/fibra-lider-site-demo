@@ -9640,6 +9640,18 @@ body {
 :root[data-theme="dark"] .map-style--brand .leaflet-tile-pane,
 :root[data-admin-theme="dark"] .map-style--brand .leaflet-tile-pane { filter: grayscale(.62) brightness(.62) contrast(1.32) saturate(.66) invert(.88) hue-rotate(172deg); }
 .leaflet-overlay-pane path { vector-effect: non-scaling-stroke; }
+.coverage-place-marker { align-items: center; background: transparent; border: 0; display: flex; gap: 7px; overflow: visible; }
+.coverage-place-marker > span { background: var(--marker-color, var(--brand)); border: 3px solid #fff; border-radius: 50% 50% 50% 0; box-shadow: 0 5px 16px rgba(6,17,31,.28); display: block; flex: 0 0 auto; height: 20px; position: relative; transform: rotate(-45deg); width: 20px; }
+.coverage-place-marker > span::after { background: #fff; border-radius: 50%; content: ""; height: 5px; left: 50%; position: absolute; top: 50%; transform: translate(-50%,-50%); width: 5px; }
+.coverage-place-marker > b { background: rgba(6,17,31,.88); border: 1px solid rgba(255,255,255,.16); border-radius: 4px; box-shadow: 0 8px 20px rgba(6,17,31,.2); color: #fff; font-size: .65rem; font-weight: 750; max-width: 150px; opacity: 0; overflow: hidden; padding: 5px 7px; pointer-events: none; text-overflow: ellipsis; transform: translateX(-4px); transition: opacity .16s ease, transform .16s ease; white-space: nowrap; }
+.show-place-labels .coverage-place-marker > b,
+.coverage-place-marker:hover > b { opacity: 1; transform: translateX(0); }
+.coverage-file-row > div > em { align-items: center; color: var(--muted); display: flex; font-size: .65rem; font-style: normal; gap: 5px; margin-top: 6px; }
+.coverage-file-row > div > em.is-complete { color: #16805b; }
+.coverage-file-row > div > em svg { height: 13px; width: 13px; }
+.coverage-file-row [data-action="identify-coverage-file"] svg { height: 16px; width: 16px; }
+.coverage-file-row [data-action="identify-coverage-file"]:disabled svg { animation: coverage-spin 1s linear infinite; }
+@keyframes coverage-spin { to { transform: rotate(360deg); } }
 
 .dashboard-map-block { margin-top: 15px; }
 .dashboard-mini-insight { display: flex; align-items: center; gap: 9px; margin-top: 18px; padding: 10px; border-radius: 7px; background: var(--admin-panel-2); }

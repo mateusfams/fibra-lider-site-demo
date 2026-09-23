@@ -41,16 +41,15 @@
   function parentPlacement(documentValue, nodeId) {
     const parent = TB.parentOf(documentValue, nodeId);
     if (!parent) return null;
-    const list = parent.node.slots[parent.slot] || [];
-    return { parentId: parent.node.id, slot: parent.slot, index: list.indexOf(nodeId) };
+    return { parentId: parent.parentId, slot: parent.slot, index: parent.index };
   }
 
-  function dropPlacement(documentValue, targetId, position) {
+  function dropPlacement(documentValue, targetId, position, childType) {
     const target = documentValue.nodes[targetId];
     if (!target) return null;
     if (position === "inside") {
       const definition = TB.registry.get(target.type);
-      const slot = definition && Object.keys(definition.slots || {})[0];
+      const slot = definition && Object.keys(definition.slots || {}).find(function (slotName) { return !childType || TB.canInsert(documentValue, target.id, slotName, childType).ok; });
       if (slot) return { parentId: target.id, slot: slot, index: (target.slots[slot] || []).length };
     }
     const parent = parentPlacement(documentValue, targetId);
@@ -233,10 +232,11 @@
         if (!target) return;
         event.preventDefault();
         event.stopPropagation();
-        const position = target.dataset.vbDropPosition || "inside";
-        const placement = dropPlacement(this.document, target.dataset.vbNode, position);
         const nodeId = event.dataTransfer.getData("application/x-fl-vb-node");
         const componentType = event.dataTransfer.getData("application/x-fl-vb-component");
+        const childType = componentType || nodeId && this.document.nodes[nodeId] && this.document.nodes[nodeId].type;
+        const position = target.dataset.vbDropPosition || "inside";
+        const placement = dropPlacement(this.document, target.dataset.vbNode, position, childType);
         clearDrop();
         if (!placement) return;
         if (nodeId && nodeId !== target.dataset.vbNode && this.callbacks.move) this.callbacks.move(nodeId, placement);
@@ -258,6 +258,7 @@
     mountIntegration(name, element, context) {
       const handlers = {
         slider: () => this.mountSlider(element, context),
+        planCatalog: () => this.mountPlanCatalog(element, context),
         countdown: () => this.mountCountdown(element),
         header: () => this.mountHeader(element, context),
         coverage: () => this.mountCoverage(element),
@@ -288,6 +289,21 @@
       let timer = null;
       if (context.props.autoplay && this.mode !== "editor" && slides.length > 1) timer = window.setInterval(function () { go(1); }, Math.max(2000, Number(context.props.interval || 6000)));
       this.cleanups.push(function () { if (timer) window.clearInterval(timer); });
+    }
+
+    mountPlanCatalog(element, context) {
+      const filters = Array.from(element.querySelectorAll("[data-vb-plan-filter]"));
+      const cards = Array.from(element.querySelectorAll("[data-plan-category]"));
+      const apply = function (category) {
+        filters.forEach(function (button) { button.classList.toggle("is-active", button.dataset.vbPlanFilter === category); });
+        cards.forEach(function (card) { card.hidden = category && category !== "all" && card.dataset.planCategory !== category; });
+      };
+      const listeners = [];
+      filters.forEach(function (button) { const listener = function (event) { event.preventDefault(); apply(button.dataset.vbPlanFilter); }; button.addEventListener("click", listener); listeners.push(function () { button.removeEventListener("click", listener); }); });
+      if (filters.length) apply((filters.find(function (button) { return button.classList.contains("is-active"); }) || filters[0]).dataset.vbPlanFilter);
+      const coupon = element.querySelector("[data-vb-coupon-form]");
+      if (coupon) { const submit = function (event) { event.preventDefault(); const input = coupon.elements.coupon; if (!input || !input.value.trim()) return; coupon.classList.add("is-applied"); const label = coupon.querySelector("label"); if (label) label.textContent = "Cupom selecionado: " + TB.plainText(input.value.trim().toUpperCase(), 24); }; coupon.addEventListener("submit", submit); listeners.push(function () { coupon.removeEventListener("submit", submit); }); }
+      this.cleanups.push(function () { listeners.forEach(function (cleanup) { cleanup(); }); });
     }
 
     mountCountdown(element) {
@@ -329,19 +345,41 @@
       const target = element.querySelector("[data-vb-coverage-map]");
       if (!target || !window.L) return;
       try {
-        const map = window.L.map(target, { zoomControl: true, scrollWheelZoom: false, attributionControl: false }).setView([-22.973, -43.372], 10);
-        window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+        const settings = this.data.coverageSettings || {};
+        const accent = this.data.theme && (this.data.theme.mapAccent || this.data.theme.primary) || "#0874e7";
+        const map = window.L.map(target, { zoomControl: true, scrollWheelZoom: false, attributionControl: true, zoomAnimation: false }).setView([Number(settings.centerLat || -22.835), Number(settings.centerLng || -47.19)], 10);
+        window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
+        target.classList.add("map-style--" + (settings.mapStyle || "brand"));
         const areas = window.FLCoverage ? window.FLCoverage.effectiveAreas(this.data) : this.data.regions || [];
         const bounds = [];
         areas.forEach(function (area) {
           const latitude = Number(area.lat || area.latitude);
           const longitude = Number(area.lng || area.longitude);
           if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-          const marker = window.L.circleMarker([latitude, longitude], { radius: 8, color: "#ffffff", weight: 3, fillColor: "#0874e7", fillOpacity: 0.95 }).addTo(map);
+          const color = area.color || accent;
+          const marker = window.L.circleMarker([latitude, longitude], { radius: 8, color: "#ffffff", weight: 3, fillColor: color, fillOpacity: 0.95 }).addTo(map);
           marker.bindTooltip(TB.plainText(area.name || area.city, 160));
           bounds.push([latitude, longitude]);
         });
+        (this.data.coverageFiles || []).filter(function (file) { return file.active !== false; }).forEach(function (file) {
+          const color = file.color || accent;
+          (file.features || []).forEach(function (feature, index) {
+            const label = window.FLCoverage ? window.FLCoverage.publicFeatureName(feature, index) : feature.name;
+            if (feature.type === "polygon") { window.L.polygon(feature.coordinates, { color: color, fillColor: color, fillOpacity: Number(settings.importedAreaOpacity || .3), weight: 2 }).addTo(map).bindTooltip(TB.plainText(label, 180)); bounds.push.apply(bounds, feature.coordinates); }
+            else if (feature.type === "line") { window.L.polyline(feature.coordinates, { color: color, opacity: .85, weight: 3 }).addTo(map).bindTooltip(TB.plainText(label, 180)); bounds.push.apply(bounds, feature.coordinates); }
+            else if (feature.type === "point") { bounds.push(feature.coordinates); }
+          });
+          if (window.FLCoverage) window.FLCoverage.importedAreas([file]).forEach(function (area) {
+            if (!Number.isFinite(Number(area.lat)) || !Number.isFinite(Number(area.lng))) return;
+            window.L.marker([Number(area.lat), Number(area.lng)], { icon: window.L.divIcon({ className: "coverage-place-marker", html: '<span style="--marker-color:' + TB.escapeHtml(color) + '"></span>' + (settings.showImportedLabels ? '<b>' + TB.escapeHtml(area.name) + '</b>' : ""), iconSize: [180, 32], iconAnchor: [11, 16] }) }).addTo(map).bindTooltip(TB.plainText(area.name, 180));
+          });
+        });
         if (bounds.length) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 13 });
+        const updatePlaceLabels = function () {
+          target.classList.toggle("show-place-labels", Boolean(settings.showImportedLabels) && map.getZoom() >= 14);
+        };
+        map.on("zoomend", updatePlaceLabels);
+        updatePlaceLabels();
         window.setTimeout(function () { map.invalidateSize(); }, 80);
         this.cleanups.push(function () { map.remove(); });
       } catch (error) { target.classList.add("is-map-unavailable"); }
