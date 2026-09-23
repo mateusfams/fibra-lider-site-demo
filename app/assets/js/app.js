@@ -98,7 +98,7 @@
     const robots = $('meta[name="robots"]');
     if (robots) robots.content = state.seo.indexSite ? "index,follow" : "noindex,nofollow";
     const canonical = $('link[rel="canonical"]');
-    if (canonical) canonical.href = state.seo.canonicalUrl;
+    if (canonical) canonical.href = FL.safeUrl(state.seo.canonicalUrl, location.href);
 
     const oldSchema = $("#local-business-schema");
     if (oldSchema) oldSchema.remove();
@@ -120,13 +120,13 @@
   }
 
   function renderHeader() {
-    $("#site-logo").src = document.documentElement.dataset.theme === "dark" ? state.brand.logo : state.brand.logoDark;
+    $("#site-logo").src = FL.safeImageUrl(document.documentElement.dataset.theme === "dark" ? state.brand.logo : state.brand.logoDark, "./assets/img/fibra-lider-logo.png");
     $("#site-nav").innerHTML = state.navigation.filter(function (item) { return item.visible; }).map(function (item) {
-      return '<a href="' + escapeHtml(item.href) + '">' + escapeHtml(item.label) + "</a>";
+      return '<a href="' + escapeHtml(FL.safeUrl(item.href)) + '">' + escapeHtml(item.label) + "</a>";
     }).join("");
     $("#header-phone").href = "tel:" + state.brand.phone.replace(/\D/g, "");
     $("#header-phone").innerHTML = icon("phone") + " " + escapeHtml(state.brand.phone);
-    $("#header-client-area").href = state.brand.clientAreaUrl;
+    $("#header-client-area").href = FL.safeUrl(state.brand.clientAreaUrl);
     const whatsappUrl = FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.floatingMessage));
     $("#header-whatsapp").href = whatsappUrl;
     $("#floating-whatsapp").href = whatsappUrl;
@@ -137,7 +137,7 @@
   }
 
   function slideLink(link) {
-    return link === "whatsapp" ? FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.floatingMessage)) : link;
+    return link === "whatsapp" ? FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.floatingMessage)) : FL.safeUrl(link);
   }
 
   function renderHero() {
@@ -150,7 +150,7 @@
       const speedParts = featuredPlan ? String(featuredPlan.speed).split(/\s+/) : [];
       return [
         '<article class="hero-slide' + (index === activeSlide ? " is-active" : "") + '" data-slide="' + index + '" style="--hero-overlay:' + Number(banner.overlay || 65) / 100 + '">',
-        '<img class="hero-slide__image hero-slide__image--' + escapeHtml(banner.position || "center") + '" src="' + escapeHtml(banner.image) + '" alt=""' + (index ? ' loading="lazy"' : "") + ">",
+        '<img class="hero-slide__image hero-slide__image--' + escapeHtml(banner.position || "center") + '" src="' + escapeHtml(FL.safeImageUrl(banner.image, "./assets/img/hero-family-fiber.jpg")) + '" alt=""' + (index ? ' loading="lazy"' : "") + ">",
         '<div class="hero-slide__shade"></div>',
         '<div class="shell hero-slide__content">',
         '<div class="hero-copy">',
@@ -352,7 +352,8 @@
     setText("apps-eyebrow", state.content.appsEyebrow);
     setText("apps-title", state.content.appsTitle);
     $("#apps-grid").innerHTML = state.apps.map(function (item, index) {
-      const logo = item.logo ? '<img src="' + escapeHtml(item.logo) + '" alt="" loading="lazy">' : escapeHtml(item.name.slice(0, 2));
+      const logoUrl = FL.safeImageUrl(item.logo, "");
+      const logo = logoUrl ? '<img src="' + escapeHtml(logoUrl) + '" alt="" loading="lazy">' : escapeHtml(item.name.slice(0, 2));
       return '<div class="app-pill app-pill--' + ((index % 4) + 1) + '"><span class="app-pill__logo">' + logo + '</span><div><strong>' + escapeHtml(item.name) + "</strong><small>" + escapeHtml(item.category) + "</small></div></div>";
     }).join("");
   }
@@ -461,7 +462,7 @@
   }
 
   function supportUrl(item) {
-    return item.type === "whatsapp" ? FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.floatingMessage)) : item.url;
+    return item.type === "whatsapp" ? FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.floatingMessage)) : FL.safeUrl(item.url);
   }
 
   function renderSupport() {
@@ -480,14 +481,14 @@
     const whatsappUrl = FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.floatingMessage));
     $("#final-whatsapp").href = whatsappUrl;
     $("#footer-social-whatsapp").href = whatsappUrl;
-    $("#footer-instagram").href = state.brand.instagram;
-    $("#footer-facebook").href = state.brand.facebook;
-    $("#footer-logo").src = state.brand.logo;
+    $("#footer-instagram").href = FL.safeUrl(state.brand.instagram);
+    $("#footer-facebook").href = FL.safeUrl(state.brand.facebook);
+    $("#footer-logo").src = FL.safeImageUrl(state.brand.logo, "./assets/img/fibra-lider-logo.png");
     setText("footer-description", state.footer.description);
     $("#footer-columns").innerHTML = state.footer.columns.map(function (column) {
       return '<div><h3>' + escapeHtml(column.title) + "</h3>" + column.links.map(function (link) {
         const external = /^https?:/.test(link.href) ? ' target="_blank" rel="noopener"' : "";
-        return '<a href="' + escapeHtml(link.href) + '"' + external + ">" + escapeHtml(link.label) + "</a>";
+        return '<a href="' + escapeHtml(FL.safeUrl(link.href)) + '"' + external + ">" + escapeHtml(link.label) + "</a>";
       }).join("") + "</div>";
     }).join("");
     $("#footer-phone").href = "tel:" + state.brand.phone.replace(/\D/g, "");
@@ -569,7 +570,7 @@
       section.dataset.hideMobile = String(Boolean(block.hideMobile));
       section.dataset.hideDesktop = String(Boolean(block.hideDesktop));
       const background = String(block.backgroundImage || "");
-      const safeBackground = /^(https?:\/\/|data:image\/|\.\/)/i.test(background) ? background : "";
+      const safeBackground = FL.safeImageUrl(background, "");
       section.classList.toggle("has-builder-background", Boolean(safeBackground));
       section.style.backgroundImage = safeBackground ? 'url("' + safeBackground.replace(/["\n\r]/g, "") + '")' : "";
       section.style.backgroundPosition = block.backgroundPosition || "center";
@@ -635,7 +636,7 @@
   function openCampaign(campaign) {
     const coupon = state.coupons.find(function (item) { return item.id === campaign.couponId && FL.couponAvailableForChannel(item, "campaign"); });
     activeCampaignId = campaign.id;
-    $("#campaign-image").src = campaign.image;
+    $("#campaign-image").src = FL.safeImageUrl(campaign.image, "./assets/img/hero-family-fiber.jpg");
     setText("campaign-eyebrow", campaign.eyebrow);
     setText("campaign-title", campaign.title);
     setText("campaign-description", campaign.description);

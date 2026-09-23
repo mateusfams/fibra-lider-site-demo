@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "fibra-lider-studio-state-v11";
-  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v10", "fibra-lider-studio-state-v9", "fibra-lider-studio-state-v8", "fibra-lider-studio-state-v7"];
+  const STORAGE_KEY = "fibra-lider-studio-state-v12";
+  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v11", "fibra-lider-studio-state-v10", "fibra-lider-studio-state-v9", "fibra-lider-studio-state-v8", "fibra-lider-studio-state-v7"];
   const EVENTS_KEY = "fibra-lider-studio-events-v2";
   const SESSION_KEY = "fibra-lider-studio-session-v2";
 
@@ -12,7 +12,7 @@
 
   const defaultState = {
     meta: {
-      version: "1.5.0-mvp",
+      version: "1.6.0-mvp",
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
       status: "published",
@@ -333,6 +333,11 @@
       { id: "support", label: "Central de atendimento", type: "support", visible: true, locked: false, tone: "dark" },
       { id: "final", label: "Chamada final", type: "final", visible: true, locked: true, tone: "brand" },
     ],
+    auditLog: [
+      { id: "audit-seed-publish", action: "publish", resource: "site", label: "Site publicado", detail: "Configuracao inicial da demonstracao", actor: "Administrador", createdAt: "2026-09-22T18:30:00.000Z" },
+      { id: "audit-seed-coverage", action: "import", resource: "coverage", label: "Cobertura Clicknet carregada", detail: "53 geometrias normalizadas do arquivo KMZ", actor: "Administrador", createdAt: "2026-09-22T18:10:00.000Z" },
+      { id: "audit-seed-campaign", action: "update", resource: "campaign", label: "Campanha de boas-vindas atualizada", detail: "Cupom LIDER10 associado ao popup", actor: "Administrador", createdAt: "2026-09-22T17:40:00.000Z" }
+    ],
     dashboardTargets: { monthlyVisitors: 4200, monthlyLeads: 260, conversionRate: 7.4, whatsappResponse: "3 min" },
   };
 
@@ -426,7 +431,7 @@
     ["meta", "brand", "theme", "slider", "content", "whatsapp", "leadSettings", "seo", "integrations", "footer", "dashboardTargets", "coverageSettings", "mediaSettings", "builderSettings"].forEach(function (key) {
       next[key] = { ...clone(defaultState[key]), ...(stored[key] || {}) };
     });
-    ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "coverageFiles", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "leads", "whatsappTemplates", "whatsappCampaigns", "pageBlocks", "pages", "mediaLibrary"].forEach(function (key) {
+    ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "coverageFiles", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "leads", "whatsappTemplates", "whatsappCampaigns", "pageBlocks", "pages", "mediaLibrary", "auditLog"].forEach(function (key) {
       next[key] = Array.isArray(stored[key]) ? stored[key] : clone(defaultState[key]);
     });
     next.regions = next.regions.map(function (region, index) {
@@ -449,6 +454,10 @@
     next.whatsappCampaigns = next.whatsappCampaigns.map(function (campaign) {
       return { type: "followup", templateId: "", planIds: [], stages: [], sources: [], region: "", contactsSent: 0, ...campaign };
     });
+    next.auditLog = next.auditLog.slice(0, 120).map(function (entry) {
+      const createdAt = Number.isNaN(new Date(entry.createdAt).getTime()) ? new Date().toISOString() : entry.createdAt;
+      return { id: entry.id || uid("audit"), action: String(entry.action || "update").slice(0, 32), resource: String(entry.resource || "site").slice(0, 48), label: String(entry.label || "Alteracao administrativa").slice(0, 140), detail: String(entry.detail || "").slice(0, 240), actor: String(entry.actor || "Administrador").slice(0, 80), createdAt };
+    });
     defaultState.coupons.forEach(function (coupon) { if (!next.coupons.some(function (item) { return item.id === coupon.id; })) next.coupons.push(clone(coupon)); });
     if (!String(next.whatsapp.planTemplate || "").includes("{name}")) next.whatsapp.planTemplate = defaultState.whatsapp.planTemplate;
     next.meta.version = defaultState.meta.version;
@@ -466,6 +475,13 @@
     saveJson(STORAGE_KEY, next);
     window.dispatchEvent(new CustomEvent("fl:state", { detail: next }));
     return next;
+  }
+  function recordAudit(state, action, resource, label, detail) {
+    state.auditLog = Array.isArray(state.auditLog) ? state.auditLog : [];
+    const entry = { id: uid("audit"), action: String(action || "update"), resource: String(resource || "site"), label: String(label || "Alteracao administrativa").slice(0, 140), detail: String(detail || "").slice(0, 240), actor: "Administrador", createdAt: new Date().toISOString() };
+    state.auditLog.unshift(entry);
+    state.auditLog = state.auditLog.slice(0, 120);
+    return entry;
   }
   function resetState() { localStorage.removeItem(STORAGE_KEY); return getState(); }
   function getEvents() { return loadJson(EVENTS_KEY, []); }
@@ -538,8 +554,24 @@
     const coupon = context.coupon || null;
     return interpolate(state.whatsapp.planTemplate, { brand: state.brand.name, name: context.name || "visitante do site", leadWhatsapp: context.whatsapp || "nao informado", plan: item.title, speed: item.speed, price: formatCurrency(coupon ? couponPrice(item, coupon) : item.price), category: categoryName(state, item.categoryId), offer: coupon ? couponLabel(coupon) : "sem cupom aplicado", region: context.region || "" });
   }
+  function safeUrl(value, fallback) {
+    const input = String(value || "").trim();
+    const safeFallback = fallback == null ? "#" : fallback;
+    if (!input) return safeFallback;
+    if (input.charAt(0) === "#" || input.startsWith("./") || input.startsWith("/")) return input;
+    try { return ["http:", "https:", "mailto:", "tel:"].includes(new URL(input).protocol) ? input : safeFallback; }
+    catch (error) { return safeFallback; }
+  }
+  function safeImageUrl(value, fallback) {
+    const input = String(value || "").trim();
+    const safeFallback = fallback == null ? "" : fallback;
+    if (/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=\s]+$/i.test(input)) return input;
+    if (input.startsWith("./") || input.startsWith("/")) return input;
+    try { return ["http:", "https:"].includes(new URL(input).protocol) ? input : safeFallback; }
+    catch (error) { return safeFallback; }
+  }
   function whatsappLink(phone, message) { return "https://wa.me/" + String(phone || "").replace(/\D/g, "") + "?text=" + encodeURIComponent(message || ""); }
   function uid(prefix) { return (prefix || "item") + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-  window.FL = { STORAGE_KEY, EVENTS_KEY, SESSION_KEY, defaultState, clone, getState, saveState, saveRuntimeState, loadBundledCoverage, resetState, getEvents, saveEvents, trackEvent, seedEventsIfEmpty, formatCurrency, categoryName, interpolate, couponIsActive, couponAppliesToPlan, couponPrice, couponLabel, activeCouponForPlan, couponAvailableForChannel, couponByCode, selectedCouponForPlan, planMessage, whatsappLink, uid };
+  window.FL = { STORAGE_KEY, EVENTS_KEY, SESSION_KEY, defaultState, clone, getState, saveState, saveRuntimeState, recordAudit, loadBundledCoverage, resetState, getEvents, saveEvents, trackEvent, seedEventsIfEmpty, formatCurrency, categoryName, interpolate, couponIsActive, couponAppliesToPlan, couponPrice, couponLabel, activeCouponForPlan, couponAvailableForChannel, couponByCode, selectedCouponForPlan, planMessage, safeUrl, safeImageUrl, whatsappLink, uid };
 })();

@@ -24,6 +24,8 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`.
 - Cobertura regional por KMZ, CEP exato/prefixo/faixa, cidade, bairro, regiao e raio.
 - Funil de leads, atribuicao comercial, templates e campanhas manuais de WhatsApp.
 - Campanhas popup, SEO, pixels e analytics.
+- Navegacao por dominios, listagens com busca/filtros/ordenacao/paginacao e acoes em massa.
+- Confirmacoes destrutivas acessiveis, validacao inline e trilha local de atividade administrativa.
 - Temas claro e escuro.
 
 ## Importante

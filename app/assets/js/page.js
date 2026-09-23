@@ -34,13 +34,13 @@
     root.style.setProperty("--surface", palette.surface);
     root.style.setProperty("--panel", palette.panel);
     root.dataset.theme = mode;
-    $("#page-logo").src = mode === "dark" ? state.brand.logo : state.brand.logoDark;
+    $("#page-logo").src = FL.safeImageUrl(mode === "dark" ? state.brand.logo : state.brand.logoDark, "./assets/img/fibra-lider-logo.png");
     $("#page-theme-toggle").innerHTML = icon(mode === "dark" ? "sun" : "moon");
   }
 
   function pageUrl(url) {
     if (url === "whatsapp") return FL.whatsappLink(state.brand.whatsapp, FL.interpolate(state.whatsapp.floatingMessage, { brand: state.brand.name }));
-    return url || "#";
+    return FL.safeUrl(url);
   }
 
   function paragraphs(text) {
@@ -53,7 +53,7 @@
     if (block.type === "text") return '<section class="inner-content-section"><div class="shell document-copy"><h2>' + esc(block.title) + "</h2>" + paragraphs(block.text) + "</div></section>";
     if (block.type === "callout") return '<section class="inner-content-section inner-content-section--compact"><div class="shell"><article class="document-callout"><span>' + icon("info") + '</span><div><h2>' + esc(block.title) + "</h2>" + paragraphs(block.text) + "</div></article></div></section>";
     if (block.type === "document") return '<section class="inner-content-section inner-content-section--compact"><div class="shell"><article class="document-download"><span>' + icon("file-check-2") + '</span><div><h2>' + esc(block.title) + '</h2><p>' + esc(block.text) + '</p></div><a class="button button--primary" href="' + esc(pageUrl(block.url)) + '" target="_blank" rel="noopener">' + esc(block.label || "Abrir documento") + " " + icon("external-link") + "</a></article></div></section>";
-    if (block.type === "image") return '<section class="inner-content-section"><div class="shell page-image-block"><img src="' + esc(block.url) + '" alt="' + esc(block.label || block.title) + '" loading="lazy"><div><h2>' + esc(block.title) + "</h2>" + paragraphs(block.text) + "</div></div></section>";
+    if (block.type === "image") return '<section class="inner-content-section"><div class="shell page-image-block"><img src="' + esc(FL.safeImageUrl(block.url, "./assets/img/hero-family-fiber.jpg")) + '" alt="' + esc(block.label || block.title) + '" loading="lazy"><div><h2>' + esc(block.title) + "</h2>" + paragraphs(block.text) + "</div></div></section>";
     if (block.type === "stats") {
       const items = String(block.text || "").split("\n").map(function (line) { const parts = line.split("|"); return { value: (parts.shift() || "").trim(), label: parts.join("|").trim() }; }).filter(function (item) { return item.value; });
       return '<section class="inner-content-section page-stats-block"><div class="shell"><h2>' + esc(block.title) + '</h2><div>' + items.map(function (item) { return '<article><strong>' + esc(item.value) + '</strong><span>' + esc(item.label) + '</span></article>'; }).join("") + '</div></div></section>';
@@ -67,13 +67,13 @@
   }
 
   function renderHeaderAndFooter() {
-    $("#page-nav").innerHTML = state.navigation.filter(function (item) { return item.visible; }).map(function (item) { return '<a href="./index.html' + esc(item.href) + '">' + esc(item.label) + "</a>"; }).join("");
+    $("#page-nav").innerHTML = state.navigation.filter(function (item) { return item.visible; }).map(function (item) { const href = item.href.charAt(0) === "#" ? "./index.html" + item.href : FL.safeUrl(item.href, "./index.html"); return '<a href="' + esc(href) + '">' + esc(item.label) + "</a>"; }).join("");
     $("#page-header-phone").href = "tel:" + state.brand.phone.replace(/\D/g, "");
     $("#page-header-phone span").textContent = state.brand.phone;
-    $("#page-client-area").href = state.brand.clientAreaUrl;
+    $("#page-client-area").href = FL.safeUrl(state.brand.clientAreaUrl);
     $("#page-whatsapp").href = FL.whatsappLink(state.brand.whatsapp, FL.interpolate(state.whatsapp.floatingMessage, { brand: state.brand.name }));
     $("#page-footer-description").textContent = state.footer.description;
-    $("#page-footer-columns").innerHTML = state.footer.columns.map(function (column) { return '<div><h3>' + esc(column.title) + "</h3>" + column.links.map(function (link) { const href = link.href.charAt(0) === "#" ? "./index.html" + link.href : link.href; return '<a href="' + esc(href) + '">' + esc(link.label) + "</a>"; }).join("") + "</div>"; }).join("");
+    $("#page-footer-columns").innerHTML = state.footer.columns.map(function (column) { return '<div><h3>' + esc(column.title) + "</h3>" + column.links.map(function (link) { const href = link.href.charAt(0) === "#" ? "./index.html" + link.href : FL.safeUrl(link.href); return '<a href="' + esc(href) + '">' + esc(link.label) + "</a>"; }).join("") + "</div>"; }).join("");
     $("#page-footer-phone").href = "tel:" + state.brand.phone.replace(/\D/g, "");
     $("#page-footer-phone span").textContent = state.brand.phone;
     $("#page-footer-email").href = "mailto:" + state.brand.email;

@@ -13,6 +13,7 @@
     <script defer src="./assets/vendor/leaflet.js"></script>
     <script defer src="./assets/vendor/jszip.min.js"></script>
     <script defer src="./assets/js/data.js"></script>
+    <script defer src="./assets/js/admin-core.js"></script>
     <script defer src="./assets/js/admin.js"></script>
   </head>
   <body class="admin-body">
@@ -65,33 +66,39 @@
             <span>Visao geral</span>
             <button data-panel="dashboard"><i data-lucide="layout-dashboard"></i><b>Dashboard</b></button>
           </div>
-          <div class="nav-group">
-            <span>Site</span>
-            <button data-panel="builder"><i data-lucide="panels-top-left"></i><b>Construtor</b></button>
-            <button data-panel="pages"><i data-lucide="files"></i><b>Paginas</b></button>
-            <button data-panel="media"><i data-lucide="images"></i><b>Central de midia</b></button>
+          <div class="nav-group" data-nav-group="experience">
+            <button class="nav-group__toggle" type="button" data-nav-group-toggle="experience" aria-expanded="true"><span>Experiencia do site</span><i data-lucide="chevron-down"></i></button>
+            <div class="nav-group__items">
+              <button data-panel="builder"><i data-lucide="panels-top-left"></i><b>Site Studio</b></button>
+              <button data-panel="pages"><i data-lucide="files"></i><b>Paginas</b></button>
+              <button data-panel="media"><i data-lucide="images"></i><b>Midia</b></button>
+            </div>
           </div>
-          <div class="nav-group">
-            <span>Conteudo</span>
-            <button data-panel="plans"><i data-lucide="badge-dollar-sign"></i><b>Planos e combos</b><em id="nav-plan-count">0</em></button>
-            <button data-panel="catalog"><i data-lucide="shapes"></i><b>Apps e beneficios</b></button>
-            <button data-panel="coverage"><i data-lucide="map-pinned"></i><b>Cobertura</b></button>
-            <button data-panel="support"><i data-lucide="contact-round"></i><b>Leads e WhatsApp</b></button>
+          <div class="nav-group" data-nav-group="commercial">
+            <button class="nav-group__toggle" type="button" data-nav-group-toggle="commercial" aria-expanded="true"><span>Operacao comercial</span><i data-lucide="chevron-down"></i></button>
+            <div class="nav-group__items">
+              <button data-panel="plans"><i data-lucide="badge-dollar-sign"></i><b>Planos e ofertas</b><em id="nav-plan-count">0</em></button>
+              <button data-panel="catalog"><i data-lucide="shapes"></i><b>Apps e beneficios</b></button>
+              <button data-panel="coverage"><i data-lucide="map-pinned"></i><b>Cobertura</b></button>
+              <button data-panel="support"><i data-lucide="contact-round"></i><b>Leads e WhatsApp</b></button>
+            </div>
           </div>
-          <div class="nav-group">
-            <span>Marketing</span>
-            <button data-panel="campaigns"><i data-lucide="megaphone"></i><b>Campanhas e cupons</b></button>
-            <button data-panel="seo"><i data-lucide="search-check"></i><b>SEO local</b></button>
-            <button data-panel="pixels"><i data-lucide="scan-line"></i><b>Pixels e analytics</b></button>
+          <div class="nav-group" data-nav-group="growth">
+            <button class="nav-group__toggle" type="button" data-nav-group-toggle="growth" aria-expanded="true"><span>Crescimento</span><i data-lucide="chevron-down"></i></button>
+            <div class="nav-group__items">
+              <button data-panel="campaigns"><i data-lucide="megaphone"></i><b>Campanhas e cupons</b></button>
+              <button data-panel="seo"><i data-lucide="search-check"></i><b>SEO local</b></button>
+              <button data-panel="pixels"><i data-lucide="scan-line"></i><b>Integracoes</b></button>
+              <button data-panel="analytics"><i data-lucide="chart-no-axes-combined"></i><b>Desempenho</b></button>
+              <button data-panel="heatmap"><i data-lucide="map"></i><b>Mapa de interesse</b></button>
+            </div>
           </div>
-          <div class="nav-group">
-            <span>Audiencia</span>
-            <button data-panel="analytics"><i data-lucide="chart-no-axes-combined"></i><b>Desempenho</b></button>
-            <button data-panel="heatmap"><i data-lucide="map"></i><b>Mapa de interesse</b></button>
-          </div>
-          <div class="nav-group">
-            <span>Sistema</span>
-            <button data-panel="settings"><i data-lucide="settings-2"></i><b>Configuracoes</b></button>
+          <div class="nav-group" data-nav-group="admin">
+            <button class="nav-group__toggle" type="button" data-nav-group-toggle="admin" aria-expanded="true"><span>Administracao</span><i data-lucide="chevron-down"></i></button>
+            <div class="nav-group__items">
+              <button data-panel="activity"><i data-lucide="history"></i><b>Atividade</b></button>
+              <button data-panel="settings"><i data-lucide="settings-2"></i><b>Configuracoes</b></button>
+            </div>
           </div>
         </nav>
         <div class="sidebar-footer">
@@ -118,11 +125,19 @@
             <button class="icon-button" id="admin-theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema"><i data-lucide="moon"></i></button>
             <a class="button button--ghost topbar-preview" href="./index.html" target="_blank" rel="noopener"><i data-lucide="external-link"></i> Ver site</a>
             <button class="button button--primary" id="publish-button" type="button"><i data-lucide="rocket"></i> Publicar</button>
-            <button class="admin-user" type="button" aria-label="Conta">
-              <span>FL</span>
-              <div><strong>Administrador</strong><small>Fibra Lider</small></div>
-              <i data-lucide="chevron-down"></i>
-            </button>
+            <div class="admin-account">
+              <button class="admin-user" id="admin-user-button" type="button" aria-label="Abrir menu da conta" aria-expanded="false" aria-controls="admin-account-menu">
+                <span>FL</span>
+                <div><strong>Administrador</strong><small>Fibra Lider</small></div>
+                <i data-lucide="chevron-down"></i>
+              </button>
+              <div class="admin-account-menu" id="admin-account-menu" role="menu" hidden>
+                <div><span class="workspace-avatar">FL</span><div><strong>Administrador</strong><small>Fibra Lider</small></div></div>
+                <button type="button" role="menuitem" data-account-panel="activity"><i data-lucide="history"></i> Atividade</button>
+                <button type="button" role="menuitem" data-account-panel="settings"><i data-lucide="settings-2"></i> Configuracoes</button>
+                <button type="button" role="menuitem" id="account-logout"><i data-lucide="log-out"></i> Sair</button>
+              </div>
+            </div>
           </div>
         </header>
 

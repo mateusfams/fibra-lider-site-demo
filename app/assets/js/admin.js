@@ -3,22 +3,23 @@
 
   const PANEL_META = {
     dashboard: ["Dashboard", "Visao geral"],
-    builder: ["Construtor do site", "Site"],
-    pages: ["Paginas", "Site"],
-    banners: ["Banners e slides", "Site"],
-    media: ["Central de midia", "Site"],
-    navigation: ["Menu e rodape", "Site"],
-    appearance: ["Identidade visual", "Site"],
-    plans: ["Planos e combos", "Conteudo"],
-    catalog: ["Apps e beneficios", "Conteudo"],
-    coverage: ["Cobertura regional", "Conteudo"],
-    support: ["Leads e WhatsApp", "Conteudo"],
-    campaigns: ["Campanhas e cupons", "Marketing"],
-    seo: ["SEO local", "Marketing"],
-    pixels: ["Pixels e analytics", "Marketing"],
-    analytics: ["Desempenho", "Audiencia"],
-    heatmap: ["Mapa de interesse", "Audiencia"],
-    settings: ["Configuracoes", "Sistema"],
+    builder: ["Site Studio", "Experiencia do site"],
+    pages: ["Paginas", "Experiencia do site"],
+    banners: ["Banners e slides", "Experiencia do site"],
+    media: ["Midia", "Experiencia do site"],
+    navigation: ["Menu e rodape", "Experiencia do site"],
+    appearance: ["Identidade visual", "Experiencia do site"],
+    plans: ["Planos e ofertas", "Operacao comercial"],
+    catalog: ["Apps e beneficios", "Operacao comercial"],
+    coverage: ["Cobertura", "Operacao comercial"],
+    support: ["Leads e WhatsApp", "Operacao comercial"],
+    campaigns: ["Campanhas e cupons", "Crescimento"],
+    seo: ["SEO local", "Crescimento"],
+    pixels: ["Integracoes", "Crescimento"],
+    analytics: ["Desempenho", "Crescimento"],
+    heatmap: ["Mapa de interesse", "Crescimento"],
+    activity: ["Atividade", "Administracao"],
+    settings: ["Configuracoes", "Administracao"],
   };
 
   let state;
@@ -30,17 +31,32 @@
   let builderStudioTab = "layout";
   let activeCampaignTab = "popups";
   let leadWorkspaceTab = "leads";
-  let planFilter = "all";
   let pageEditId = null;
   let selectedPageBlockId = null;
   let pageBuilderDevice = "desktop";
   let builderMobileTab = "canvas";
   let pageBuilderMobileTab = "canvas";
   let themePreviewMode = "light";
+  let analyticsPeriod = 28;
   let adminMap = null;
   let builderHistory = [];
   let builderFuture = [];
   let builderPreviewTimer = null;
+  let crudSearchTimer = null;
+  let pendingConfirmation = null;
+  let modalReturnFocus = null;
+
+  const crudState = {
+    plans: { search: "", category: "all", status: "all", sort: "featured", page: 1, pageSize: 6, selected: new Set() },
+    pages: { search: "", status: "all", sort: "updated", page: 1, pageSize: 6, selected: new Set() },
+    apps: { search: "", category: "all", sort: "name", page: 1, pageSize: 6, selected: new Set() },
+    media: { search: "", usage: "all", sort: "recent", page: 1, pageSize: 8, selected: new Set() },
+    regions: { search: "", type: "all", status: "all", sort: "priority", page: 1, pageSize: 8, selected: new Set() },
+    leads: { search: "", source: "all", sort: "recent", page: 1, pageSize: 50, selected: new Set() },
+    popups: { search: "", status: "all", sort: "recent", page: 1, pageSize: 6, selected: new Set() },
+    coupons: { search: "", status: "all", sort: "recent", page: 1, pageSize: 6, selected: new Set() },
+    activity: { search: "", resource: "all", sort: "recent", page: 1, pageSize: 12, selected: new Set() },
+  };
 
   const HOME_SECTION_LIBRARY = {
     content: { label: "Conteudo livre", description: "Titulo, texto e botao com alinhamento flexivel.", icon: "text" },
@@ -95,24 +111,45 @@
     element.dataset.status = status;
   }
 
-  function saveDraft(message) {
+  function writeAudit(action, resource, label, detail) {
+    if (window.FL && FL.recordAudit) FL.recordAudit(state, action, resource, label, detail);
+  }
+
+  function saveDraft(message, auditEntry) {
+    if (auditEntry) writeAudit(auditEntry.action, auditEntry.resource, auditEntry.label, auditEntry.detail);
     setSaveStatus("saving");
     state = FL.saveState(state, false);
     setTimeout(function () { setSaveStatus("draft"); }, 180);
     if (message) toast(message);
   }
 
-  function saveRuntime(message) {
+  function saveRuntime(message, auditEntry) {
+    if (auditEntry) writeAudit(auditEntry.action, auditEntry.resource, auditEntry.label, auditEntry.detail);
     state = FL.saveRuntimeState(state);
     setSaveStatus(state.meta.status === "published" ? "saved" : "draft");
     if (message) toast(message);
   }
 
   function publish() {
+    writeAudit("publish", "site", "Site publicado", "Versao " + state.meta.version + " enviada para o site publico");
     state = FL.saveState(state, true);
     setSaveStatus("saved");
     toast("Site publicado com sucesso", "success");
     renderPanel();
+  }
+
+  function requestConfirmation(config, callback) {
+    pendingConfirmation = callback;
+    openModal(FLAdmin.confirmation(config));
+  }
+
+  function auditLabel(action) {
+    return { create: "Criacao", update: "Atualizacao", delete: "Exclusao", publish: "Publicacao", import: "Importacao", export: "Exportacao", bulk: "Acao em massa", contact: "Contato" }[action] || "Alteracao";
+  }
+
+  function navGroupPreferences() {
+    try { return JSON.parse(localStorage.getItem("fl-admin-nav-groups") || "{}"); }
+    catch (error) { return {}; }
   }
 
   function getPath(path) {
@@ -238,13 +275,14 @@
 
   function analyticsData() {
     const events = FL.getEvents();
-    const publicEvents = events.filter(function (event) { return event.path !== "/admin.html"; });
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - analyticsPeriod);
+    const publicEvents = events.filter(function (event) { return event.path !== "/admin.html" && new Date(event.ts) >= cutoff; });
     const count = function (type) { return publicEvents.filter(function (event) { return event.type === type; }).length; };
     const views = count("page_view");
     const planClicks = count("plan_click");
     const whatsapp = count("whatsapp_click");
     const coverage = count("coverage_search");
-    const leads = state.leads.length;
+    const leads = state.leads.filter(function (lead) { return new Date(lead.createdAt) >= cutoff; }).length;
     const conversion = views ? ((leads / views) * 100) : 0;
     return { events: publicEvents, views, planClicks, whatsapp, leads, coverage, conversion };
   }
@@ -270,6 +308,9 @@
     const maxSource = sourceEntries.length ? sourceEntries[0][1] : 1;
     const planCounts = groupByPayload(data.events.filter(function (event) { return event.type === "plan_click" || event.type === "whatsapp_click"; }), "planId");
     const topPlans = Object.entries(planCounts).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 4);
+    const leadingPlan = state.plans.find(function (plan) { return topPlans[0] && plan.id === topPlans[0][0]; }) || state.plans.find(function (plan) { return plan.featured && plan.active; }) || state.plans[0];
+    const leadingRegions = state.regions.slice().sort(function (a, b) { return Number(b.interest || 0) - Number(a.interest || 0); });
+    const leadingRegion = leadingRegions[0] ? leadingRegions[0].name : "Regiao principal";
     const days = Array.from({ length: 14 }, function (_, index) {
       const day = new Date(); day.setDate(day.getDate() - (13 - index));
       const key = day.toISOString().slice(0, 10);
@@ -283,13 +324,13 @@
     const mediaWeight = state.mediaLibrary.reduce(function (sum, item) { return sum + Number(item.bytes || 0); }, 0);
     const mappedRegions = state.regions.filter(function (item) { return item.active && item.lat !== null && item.lat !== "" && item.lng !== null && item.lng !== "" && Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng)); }).length;
     return [
-      panelHeader("Visao geral", "Acompanhe a jornada de aquisicao e os pontos que mais geram interesse.", '<div class="heading-actions"><select class="compact-select"><option>Ultimos 28 dias</option><option>Ultimos 7 dias</option></select><button class="button button--ghost" data-action="export-report">' + icon("download") + " Exportar</button></div>"),
-      '<section class="dashboard-welcome"><div><span><i class="status-dot"></i> Site ' + status.toLowerCase() + '</span><h3>Bom trabalho, equipe ' + esc(state.brand.name) + '.</h3><p>As campanhas estao gerando interesse principalmente nos planos de 600 Mega.</p><button class="text-button" data-goto="support">Abrir fila comercial ' + icon("arrow-right") + '</button></div><div class="welcome-score"><small>Meta mensal de leads</small><strong>' + data.leads + '<span> / ' + state.dashboardTargets.monthlyLeads + '</span></strong><div><i style="width:' + Math.min(100, (data.leads / state.dashboardTargets.monthlyLeads) * 100) + '%"></i></div><p>' + Math.round((data.leads / state.dashboardTargets.monthlyLeads) * 100) + '% da meta</p></div></section>',
+      panelHeader("Visao geral", "Acompanhe a jornada de aquisicao e os pontos que mais geram interesse.", '<div class="heading-actions"><select class="compact-select" data-analytics-period aria-label="Periodo das metricas"><option value="28"' + (analyticsPeriod === 28 ? " selected" : "") + '>Ultimos 28 dias</option><option value="7"' + (analyticsPeriod === 7 ? " selected" : "") + '>Ultimos 7 dias</option><option value="1"' + (analyticsPeriod === 1 ? " selected" : "") + '>Hoje</option></select><button class="button button--ghost" data-action="export-report">' + icon("download") + " Exportar</button></div>"),
+      '<section class="dashboard-welcome"><div><span><i class="status-dot"></i> Site ' + status.toLowerCase() + '</span><h3>Bom trabalho, equipe ' + esc(state.brand.name) + '.</h3><p>' + esc(leadingPlan ? leadingPlan.speed + " lidera o interesse comercial no periodo." : "As campanhas ja estao gerando novos sinais comerciais.") + '</p><button class="text-button" data-goto="support">Abrir fila comercial ' + icon("arrow-right") + '</button></div><div class="welcome-score"><small>Meta mensal de leads</small><strong>' + data.leads + '<span> / ' + state.dashboardTargets.monthlyLeads + '</span></strong><div><i style="width:' + Math.min(100, (data.leads / state.dashboardTargets.monthlyLeads) * 100) + '%"></i></div><p>' + Math.round((data.leads / state.dashboardTargets.monthlyLeads) * 100) + '% da meta</p></div></section>',
       '<section class="metrics-grid">',
       metricCard("Visitantes", String(data.views), "+12,8%", "32% vieram do Google", "users", "blue"),
-      metricCard("Interesse em planos", String(data.planClicks), "+18,4%", "600 Mega lidera cliques", "mouse-pointer-click", "violet"),
+      metricCard("Interesse em planos", String(data.planClicks), "+18,4%", leadingPlan ? leadingPlan.speed + " lidera cliques" : "ofertas em observacao", "mouse-pointer-click", "violet"),
       metricCard("Leads capturados", String(data.leads), "+9,2%", data.conversion.toFixed(1).replace(".", ",") + "% de conversao", "contact-round", "green"),
-      metricCard("Consultas de cobertura", String(data.coverage), "+6,7%", "Sumare concentra a procura", "map-pin-check", "orange"),
+      metricCard("Consultas de cobertura", String(data.coverage), "+6,7%", leadingRegion + " concentra a procura", "map-pin-check", "orange"),
       "</section>",
       '<section class="signal-grid">',
       '<article><span class="signal-icon signal-icon--green">' + icon("badge-check") + '</span><div><small>Conversao comercial</small><strong>' + data.conversion.toFixed(1).replace(".", ",") + '%</strong><p>visitas que enviaram o formulario</p></div></article>',
@@ -375,8 +416,8 @@
       if (type === "select") return '<label class="field"><span>' + esc(label) + '</span><select data-banner-field="' + key + '">' + options.map(function (item) { return '<option value="' + esc(item.value) + '"' + (String(item.value) === String(value) ? " selected" : "") + '>' + esc(item.label) + '</option>'; }).join("") + '</select></label>';
       return '<label class="field"><span>' + esc(label) + '</span><input data-banner-field="' + key + '"' + (type ? ' type="' + type + '"' : "") + ' value="' + esc(value) + '"></label>';
     };
-    return '<div class="builder-banner-switcher"><div>' + state.banners.map(function (item, index) { return '<button type="button" class="' + (item.id === banner.id ? "is-active" : "") + '" data-action="select-builder-banner" data-id="' + esc(item.id) + '" title="Editar ' + esc(item.name) + '"><img src="' + esc(item.image) + '" alt=""><span>0' + (index + 1) + '</span></button>'; }).join("") + '</div><button class="icon-button" data-action="builder-add-banner" title="Adicionar slide">' + icon("plus") + '</button></div>' +
-      '<div class="builder-banner-preview"><img src="' + esc(banner.image) + '" alt=""><span>' + esc(banner.badge || banner.name) + '</span><strong>' + esc(banner.title) + '</strong></div>' +
+    return '<div class="builder-banner-switcher"><div>' + state.banners.map(function (item, index) { return '<button type="button" class="' + (item.id === banner.id ? "is-active" : "") + '" data-action="select-builder-banner" data-id="' + esc(item.id) + '" title="Editar ' + esc(item.name) + '"><img src="' + esc(FL.safeImageUrl(item.image, "./assets/img/hero-family-fiber.jpg")) + '" alt=""><span>0' + (index + 1) + '</span></button>'; }).join("") + '</div><button class="icon-button" data-action="builder-add-banner" title="Adicionar slide">' + icon("plus") + '</button></div>' +
+      '<div class="builder-banner-preview"><img src="' + esc(FL.safeImageUrl(banner.image, "./assets/img/hero-family-fiber.jpg")) + '" alt=""><span>' + esc(banner.badge || banner.name) + '</span><strong>' + esc(banner.title) + '</strong></div>' +
       '<div class="builder-banner-actions"><button class="button button--ghost" data-action="move-builder-banner-up" data-id="' + esc(banner.id) + '" title="Mover para tras">' + icon("arrow-left") + '</button><button class="button button--ghost" data-action="move-builder-banner-down" data-id="' + esc(banner.id) + '" title="Mover para frente">' + icon("arrow-right") + '</button><button class="button button--ghost" data-action="duplicate-builder-banner" data-id="' + esc(banner.id) + '">' + icon("copy") + ' Duplicar</button><button class="icon-button icon-button--danger" data-action="delete-builder-banner" data-id="' + esc(banner.id) + '" title="Excluir">' + icon("trash-2") + '</button></div>' +
       bannerField("Nome interno", "name") + bannerField("Chamada curta", "eyebrow") + bannerField("Titulo principal", "title") + bannerField("Descricao", "subtitle", "textarea") +
       '<div class="upload-zone upload-zone--compact"><input id="builder-banner-upload" type="file" accept="image/jpeg,image/png,image/webp"><span>' + icon("image-up") + '</span><div><strong>Trocar imagem</strong><p>1920 x 800 px. A imagem sera comprimida e convertida.</p></div></div>' +
@@ -470,7 +511,7 @@
 
   function renderStudioSlides() {
     return '<section class="studio-editor-grid"><div class="studio-editor-stack"><article class="admin-card studio-summary-card">' + cardTitle("Carrossel principal", "Crie e ordene as mensagens da primeira dobra.", '<button class="button button--primary" data-action="new-banner">' + icon("plus") + ' Novo slide</button>') + '<div class="studio-spec-row"><span>' + icon("monitor") + '<b>1920 x 800</b><small>desktop</small></span><span>' + icon("smartphone") + '<b>1080 x 1350</b><small>mobile</small></span><span>' + icon("image-down") + '<b>WebP ou JPG</b><small>ate 5 MB</small></span></div><div class="settings-inline">' + toggle("Rotacao automatica", "slider.autoplay", "Troca os slides sem interacao") + toggle("Pausar no hover", "slider.pauseOnHover", "Mantem a leitura confortavel") + field("Intervalo", "slider.interval", { type: "number", help: "Milissegundos" }) + '</div></article><div class="studio-slide-list">' + state.banners.map(function (banner, index) {
-      return '<article class="studio-slide-card"><div class="studio-slide-card__image"><img src="' + esc(banner.image) + '" alt=""><span>0' + (index + 1) + '</span></div><div><span class="status-badge ' + (banner.active ? "status-badge--success" : "") + '">' + (banner.active ? "Publicado" : "Pausado") + '</span><h3>' + esc(banner.name) + '</h3><p>' + esc(banner.title) + '</p><small>' + esc(banner.primaryLabel) + ' &middot; camada ' + banner.overlay + '%</small></div><div class="row-actions"><button class="icon-button" data-action="toggle-banner" data-id="' + esc(banner.id) + '" title="' + (banner.active ? "Pausar" : "Ativar") + '">' + icon(banner.active ? "pause" : "play") + '</button><button class="icon-button" data-action="edit-banner" data-id="' + esc(banner.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button" data-action="duplicate-banner" data-id="' + esc(banner.id) + '" title="Duplicar">' + icon("copy") + '</button><button class="icon-button icon-button--danger" data-action="delete-banner" data-id="' + esc(banner.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></article>';
+      return '<article class="studio-slide-card"><div class="studio-slide-card__image"><img src="' + esc(FL.safeImageUrl(banner.image, "./assets/img/hero-family-fiber.jpg")) + '" alt=""><span>0' + (index + 1) + '</span></div><div><span class="status-badge ' + (banner.active ? "status-badge--success" : "") + '">' + (banner.active ? "Publicado" : "Pausado") + '</span><h3>' + esc(banner.name) + '</h3><p>' + esc(banner.title) + '</p><small>' + esc(banner.primaryLabel) + ' &middot; camada ' + banner.overlay + '%</small></div><div class="row-actions"><button class="icon-button" data-action="toggle-banner" data-id="' + esc(banner.id) + '" title="' + (banner.active ? "Pausar" : "Ativar") + '">' + icon(banner.active ? "pause" : "play") + '</button><button class="icon-button" data-action="edit-banner" data-id="' + esc(banner.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button" data-action="duplicate-banner" data-id="' + esc(banner.id) + '" title="Duplicar">' + icon("copy") + '</button><button class="icon-button icon-button--danger" data-action="delete-banner" data-id="' + esc(banner.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></article>';
     }).join("") + '</div></div>' + studioPreview("Banner e primeira dobra", "hero") + "</section>";
   }
 
@@ -520,16 +561,22 @@
   function renderPages() {
     const page = pageEditId && state.pages.find(function (item) { return item.id === pageEditId; });
     if (page) return renderPageEditor(page);
+    const view = crudState.pages;
+    const result = FLAdmin.collection(state.pages, { search: view.search, page: view.page, pageSize: view.pageSize, searchText: function (item) { return [item.title, item.slug, item.description, item.status].join(" "); }, predicate: function (item) { return view.status === "all" || item.status === view.status; }, sort: function (a, b) { if (view.sort === "name") return String(a.title).localeCompare(String(b.title), "pt-BR"); if (view.sort === "status") return String(a.status).localeCompare(String(b.status)); return String(b.updatedAt).localeCompare(String(a.updatedAt)); } });
+    view.page = result.page;
     const published = state.pages.filter(function (item) { return item.status === "published"; }).length;
     const blocks = state.pages.reduce(function (total, item) { return total + item.blocks.length; }, 0);
     return [
       panelHeader("Paginas do site", "Crie paginas institucionais, documentos e campanhas com blocos reutilizaveis.", '<button class="button button--primary" data-action="new-page">' + icon("plus") + " Nova pagina</button>"),
       '<section class="quick-stats page-stats"><article><span>' + icon("files") + '</span><div><strong>' + state.pages.length + '</strong><small>paginas cadastradas</small></div></article><article><span>' + icon("globe-2") + '</span><div><strong>' + published + '</strong><small>paginas publicadas</small></div></article><article><span>' + icon("layout-template") + '</span><div><strong>' + blocks + '</strong><small>blocos de conteudo</small></div></article><article><span>' + icon("search-check") + '</span><div><strong>SEO</strong><small>titulo e descricao por pagina</small></div></article></section>',
+      FLAdmin.toolbar({ key: "pages", search: view.search, placeholder: "Buscar por titulo, URL ou descricao", count: result.filteredTotal, singular: "pagina", plural: "paginas", filters: [{ name: "status", label: "Status", value: view.status, options: [{ value: "all", label: "Todos os status" }, { value: "published", label: "Publicadas" }, { value: "draft", label: "Rascunhos" }] }], sortValue: view.sort, sortOptions: [{ value: "updated", label: "Atualizadas recentemente" }, { value: "name", label: "Nome A-Z" }, { value: "status", label: "Status" }] }),
+      FLAdmin.bulkBar({ key: "pages", count: view.selected.size, actions: [{ id: "publish", label: "Publicar", icon: "globe-2" }, { id: "draft", label: "Mover para rascunho", icon: "file-clock" }, { id: "delete", label: "Excluir", icon: "trash-2", danger: true }] }),
       '<section class="admin-card page-library">',
       cardTitle("Biblioteca de paginas", "Cada pagina possui URL, status e construtor visual proprios.", '<span class="status-badge status-badge--success">Estrutura pronta</span>'),
-      '<div class="page-list">' + state.pages.map(function (item) {
-        return '<article class="page-row"><span class="page-row__icon">' + icon("file-text") + '</span><div class="page-row__main"><div><strong>' + esc(item.title) + '</strong><span class="status-badge ' + (item.status === "published" ? "status-badge--success" : "") + '">' + (item.status === "published" ? "Publicada" : "Rascunho") + '</span></div><p>/' + esc(item.slug) + '</p><small>' + item.blocks.length + ' blocos &middot; atualizada em ' + esc(item.updatedAt) + '</small></div><div class="row-actions"><button class="button button--ghost" data-action="open-page" data-id="' + esc(item.id) + '">' + icon("external-link") + ' Visualizar</button><button class="icon-button" data-action="edit-page" data-id="' + esc(item.id) + '" title="Abrir construtor">' + icon("panels-top-left") + '</button><button class="icon-button" data-action="page-settings" data-id="' + esc(item.id) + '" title="Configuracoes">' + icon("settings-2") + '</button><button class="icon-button" data-action="duplicate-page" data-id="' + esc(item.id) + '" title="Duplicar">' + icon("copy") + '</button><button class="icon-button icon-button--danger" data-action="delete-page" data-id="' + esc(item.id) + '" title="Excluir">' + icon("trash-2") + "</button></div></article>";
-      }).join("") + '</div></section>',
+      result.items.length ? '<div class="page-list">' + result.items.map(function (item) {
+        return '<article class="page-row' + (view.selected.has(item.id) ? " is-selected" : "") + '"><label class="crud-checkbox" title="Selecionar pagina"><input type="checkbox" data-crud-select="pages" data-id="' + esc(item.id) + '"' + (view.selected.has(item.id) ? " checked" : "") + '><span></span></label><span class="page-row__icon">' + icon("file-text") + '</span><div class="page-row__main"><div><strong>' + esc(item.title) + '</strong><span class="status-badge ' + (item.status === "published" ? "status-badge--success" : "") + '">' + (item.status === "published" ? "Publicada" : "Rascunho") + '</span></div><p>/' + esc(item.slug) + '</p><small>' + item.blocks.length + ' blocos &middot; atualizada em ' + esc(item.updatedAt) + '</small></div><div class="row-actions"><button class="button button--ghost" data-action="open-page" data-id="' + esc(item.id) + '">' + icon("external-link") + ' Visualizar</button><button class="icon-button" data-action="edit-page" data-id="' + esc(item.id) + '" title="Abrir construtor">' + icon("panels-top-left") + '</button><button class="icon-button" data-action="page-settings" data-id="' + esc(item.id) + '" title="Configuracoes">' + icon("settings-2") + '</button><button class="icon-button" data-action="duplicate-page" data-id="' + esc(item.id) + '" title="Duplicar">' + icon("copy") + '</button><button class="icon-button icon-button--danger" data-action="delete-page" data-id="' + esc(item.id) + '" title="Excluir">' + icon("trash-2") + "</button></div></article>";
+      }).join("") + '</div>' : FLAdmin.emptyState({ icon: "files", title: view.search || view.status !== "all" ? "Nenhuma pagina encontrada" : "Nenhuma pagina criada", description: view.search || view.status !== "all" ? "Revise a busca ou o filtro para encontrar outras paginas." : "Crie uma pagina institucional, juridica ou de campanha.", action: state.pages.length ? "clear-pages-filters" : "new-page", actionLabel: state.pages.length ? "Limpar filtros" : "Nova pagina" }) + '</section>',
+      FLAdmin.pagination(result, "pages"),
     ].join("");
   }
 
@@ -558,12 +605,16 @@
       '<div class="settings-inline">' + toggle("Rotacao automatica", "slider.autoplay", "Troca os slides sem interacao") + toggle("Pausar ao passar o mouse", "slider.pauseOnHover", "Facilita a leitura") + field("Intervalo", "slider.interval", { type: "number", help: "Milissegundos, minimo 3500" }) + "</div></section>",
       '<section class="content-list"><div class="list-header"><div><strong>' + state.banners.length + ' slides</strong><span>' + state.banners.filter(function (item) { return item.active; }).length + ' ativos no site</span></div></div>',
       '<div class="banner-list">' + state.banners.map(function (banner, index) {
-        return '<article class="banner-row"><div class="banner-thumb"><img src="' + esc(banner.image) + '" alt=""><span>0' + (index + 1) + '</span></div><div class="banner-info"><div><span class="status-badge ' + (banner.active ? "status-badge--success" : "") + '">' + (banner.active ? "Ativo" : "Pausado") + '</span><small>' + esc(banner.badge) + '</small></div><h3>' + esc(banner.name) + '</h3><p>' + esc(banner.title) + '</p></div><div class="banner-meta"><span><i data-lucide="mouse-pointer-click"></i>' + esc(banner.primaryLabel) + '</span><span><i data-lucide="layers-2"></i>Camada ' + banner.overlay + '%</span></div><div class="row-actions"><button class="icon-button" data-action="toggle-banner" data-id="' + esc(banner.id) + '" title="' + (banner.active ? "Pausar" : "Ativar") + '">' + icon(banner.active ? "pause" : "play") + '</button><button class="icon-button" data-action="edit-banner" data-id="' + esc(banner.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button" data-action="duplicate-banner" data-id="' + esc(banner.id) + '" title="Duplicar">' + icon("copy") + '</button><button class="icon-button icon-button--danger" data-action="delete-banner" data-id="' + esc(banner.id) + '" title="Excluir">' + icon("trash-2") + "</button></div></article>";
+        return '<article class="banner-row"><div class="banner-thumb"><img src="' + esc(FL.safeImageUrl(banner.image, "./assets/img/hero-family-fiber.jpg")) + '" alt=""><span>0' + (index + 1) + '</span></div><div class="banner-info"><div><span class="status-badge ' + (banner.active ? "status-badge--success" : "") + '">' + (banner.active ? "Ativo" : "Pausado") + '</span><small>' + esc(banner.badge) + '</small></div><h3>' + esc(banner.name) + '</h3><p>' + esc(banner.title) + '</p></div><div class="banner-meta"><span><i data-lucide="mouse-pointer-click"></i>' + esc(banner.primaryLabel) + '</span><span><i data-lucide="layers-2"></i>Camada ' + banner.overlay + '%</span></div><div class="row-actions"><button class="icon-button" data-action="toggle-banner" data-id="' + esc(banner.id) + '" title="' + (banner.active ? "Pausar" : "Ativar") + '">' + icon(banner.active ? "pause" : "play") + '</button><button class="icon-button" data-action="edit-banner" data-id="' + esc(banner.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button" data-action="duplicate-banner" data-id="' + esc(banner.id) + '" title="Duplicar">' + icon("copy") + '</button><button class="icon-button icon-button--danger" data-action="delete-banner" data-id="' + esc(banner.id) + '" title="Excluir">' + icon("trash-2") + "</button></div></article>";
       }).join("") + "</div></section>",
     ].join("");
   }
 
   function renderMedia() {
+    const view = crudState.media;
+    const usages = Array.from(new Set(state.mediaLibrary.map(function (item) { return item.usage || "Biblioteca"; }))).sort();
+    const result = FLAdmin.collection(state.mediaLibrary, { search: view.search, page: view.page, pageSize: view.pageSize, searchText: function (item) { return [item.name, item.type, item.usage, item.width + "x" + item.height].join(" "); }, predicate: function (item) { return view.usage === "all" || (item.usage || "Biblioteca") === view.usage; }, sort: function (a, b) { if (view.sort === "name") return String(a.name).localeCompare(String(b.name), "pt-BR"); if (view.sort === "size") return Number(b.bytes) - Number(a.bytes); return String(b.createdAt).localeCompare(String(a.createdAt)); } });
+    view.page = result.page;
     const totalBytes = state.mediaLibrary.reduce(function (sum, item) { return sum + Number(item.bytes || 0); }, 0);
     const optimized = state.mediaLibrary.filter(function (item) { return Number(item.originalBytes || 0) > Number(item.bytes || 0); }).length;
     return [
@@ -572,10 +623,10 @@
       '<section class="admin-card media-optimizer">',
       cardTitle("Otimizador automatico", "As configuracoes abaixo tambem valem para banners, paginas e logos.", '<span class="status-badge status-badge--success">Ativo</span>'),
       '<div class="media-optimizer__layout"><label class="media-dropzone" id="media-dropzone"><input id="media-drop-input" type="file" accept="image/jpeg,image/png,image/webp" multiple><span>' + icon("image-down") + '</span><strong>Arraste imagens para converter</strong><p>JPEG, PNG ou WebP. O arquivo e redimensionado antes de entrar no site.</p><em>Selecionar arquivos</em></label><div class="media-options"><div class="form-grid">' + field("Formato final", "mediaSettings.format", { type: "select", options: [{ value: "image/webp", label: "WebP (recomendado)" }, { value: "image/jpeg", label: "JPEG" }, { value: "image/png", label: "PNG" }] }) + field("Largura maxima", "mediaSettings.maxWidth", { type: "number", help: "Pixels; imagens menores nao sao ampliadas" }) + field("Qualidade", "mediaSettings.quality", { type: "number", help: "Entre 45 e 95" }) + field("Arquivo original", "mediaSettings.maxFileMb", { type: "number", help: "Limite em MB por upload" }) + '</div><div class="optimizer-note">' + icon("zap") + '<div><strong>Preset recomendado para provedores</strong><p>WebP em 82%, ate 1920 px. Equilibra nitidez de banners e carregamento no 4G.</p></div></div></div></div></section>',
-      '<section class="media-library"><div class="list-header"><div><strong>Biblioteca</strong><span>Clique em uma imagem para copiar seu endereco</span></div><span>' + formatBytes(stateSize()) + ' usados no armazenamento local</span></div><div class="media-grid">' + state.mediaLibrary.map(function (item) {
+      '<section class="media-library"><div class="list-header"><div><strong>Biblioteca</strong><span>Clique em uma imagem para copiar seu endereco</span></div><span>' + formatBytes(stateSize()) + ' usados no armazenamento local</span></div>' + FLAdmin.toolbar({ key: "media", search: view.search, placeholder: "Buscar arquivo, formato ou uso", count: result.filteredTotal, singular: "arquivo", plural: "arquivos", filters: [{ name: "usage", label: "Uso", value: view.usage, options: [{ value: "all", label: "Todos os usos" }].concat(usages.map(function (usage) { return { value: usage, label: usage }; })) }], sortValue: view.sort, sortOptions: [{ value: "recent", label: "Mais recentes" }, { value: "name", label: "Nome A-Z" }, { value: "size", label: "Maior arquivo" }] }) + (result.items.length ? '<div class="media-grid">' + result.items.map(function (item) {
         const saving = Number(item.originalBytes || 0) > Number(item.bytes || 0) ? Math.round((1 - Number(item.bytes) / Number(item.originalBytes)) * 100) : 0;
-        return '<article class="media-card"><button class="media-card__preview" data-action="copy-media" data-id="' + esc(item.id) + '" title="Copiar endereco"><img src="' + esc(item.url) + '" alt=""></button><div class="media-card__body"><div><strong>' + esc(item.name) + '</strong><span class="status-badge ' + (saving ? "status-badge--success" : "") + '">' + (saving ? "-" + saving + "%" : esc(item.usage || "Original")) + '</span></div><p>' + item.width + ' x ' + item.height + ' px &middot; ' + formatBytes(item.bytes) + '</p><small>' + esc((item.type || "imagem").replace("image/", "").toUpperCase()) + ' &middot; ' + esc(item.usage || "Biblioteca") + '</small></div><div class="media-card__actions"><button class="icon-button" data-action="copy-media" data-id="' + esc(item.id) + '" title="Copiar endereco">' + icon("copy") + '</button><button class="icon-button" data-action="download-media" data-id="' + esc(item.id) + '" title="Baixar">' + icon("download") + '</button><button class="icon-button icon-button--danger" data-action="delete-media" data-id="' + esc(item.id) + '" title="Remover">' + icon("trash-2") + '</button></div></article>';
-      }).join("") + '</div></section>',
+        return '<article class="media-card"><button class="media-card__preview" data-action="copy-media" data-id="' + esc(item.id) + '" title="Copiar endereco"><img src="' + esc(FL.safeImageUrl(item.url, "./assets/img/hero-family-fiber.jpg")) + '" alt=""></button><div class="media-card__body"><div><strong>' + esc(item.name) + '</strong><span class="status-badge ' + (saving ? "status-badge--success" : "") + '">' + (saving ? "-" + saving + "%" : esc(item.usage || "Original")) + '</span></div><p>' + item.width + ' x ' + item.height + ' px &middot; ' + formatBytes(item.bytes) + '</p><small>' + esc((item.type || "imagem").replace("image/", "").toUpperCase()) + ' &middot; ' + esc(item.usage || "Biblioteca") + '</small></div><div class="media-card__actions"><button class="icon-button" data-action="copy-media" data-id="' + esc(item.id) + '" title="Copiar endereco">' + icon("copy") + '</button><button class="icon-button" data-action="download-media" data-id="' + esc(item.id) + '" title="Baixar">' + icon("download") + '</button><button class="icon-button icon-button--danger" data-action="delete-media" data-id="' + esc(item.id) + '" title="Remover">' + icon("trash-2") + '</button></div></article>';
+      }).join("") + '</div>' : FLAdmin.emptyState({ icon: "images", title: "Nenhuma imagem encontrada", description: "Revise a busca ou o filtro para localizar outros arquivos.", action: "clear-media-filters", actionLabel: "Limpar filtros" })) + FLAdmin.pagination(result, "media") + '</section>',
     ].join("");
   }
 
@@ -601,26 +652,56 @@
     ].join("");
   }
 
+  function collectPlans(view) {
+    return FLAdmin.collection(state.plans, {
+      search: view.search,
+      page: view.page,
+      pageSize: view.pageSize,
+      searchText: function (item) { return [item.title, item.speed, item.badge, FL.categoryName(state, item.categoryId)].join(" "); },
+      predicate: function (item) {
+        return (view.category === "all" || item.categoryId === view.category) &&
+          (view.status === "all" || (view.status === "active" ? item.active : !item.active));
+      },
+      sort: function (a, b) {
+        if (view.sort === "price-asc") return Number(a.price) - Number(b.price);
+        if (view.sort === "price-desc") return Number(b.price) - Number(a.price);
+        if (view.sort === "name") return String(a.title).localeCompare(String(b.title), "pt-BR");
+        return Number(b.featured) - Number(a.featured) || Number(b.active) - Number(a.active) || Number(a.price) - Number(b.price);
+      },
+    });
+  }
+
   function renderPlans() {
-    const plans = state.plans.filter(function (item) { return planFilter === "all" || item.categoryId === planFilter; });
+    const view = crudState.plans;
+    const result = collectPlans(view);
+    view.page = result.page;
+    const selectedCount = view.selected.size;
+    const pageSelected = result.items.length && result.items.every(function (item) { return view.selected.has(item.id); });
     return [
-      panelHeader("Planos e combos", "Gerencie ofertas, beneficios, precos e mensagens comerciais.", '<div class="heading-actions"><button class="button button--ghost" data-action="manage-categories">' + icon("tags") + ' Categorias</button><button class="button button--primary" data-action="new-plan">' + icon("plus") + " Novo plano</button></div>"),
+      panelHeader("Planos e ofertas", "Gerencie precos, beneficios, categorias e disponibilidade comercial.", '<div class="heading-actions"><button class="button button--ghost" data-action="manage-categories">' + icon("tags") + ' Categorias</button><button class="button button--primary" data-action="new-plan">' + icon("plus") + " Novo plano</button></div>"),
       '<section class="quick-stats"><article><span>' + icon("badge-dollar-sign") + '</span><div><strong>' + state.plans.length + '</strong><small>planos cadastrados</small></div></article><article><span>' + icon("circle-check") + '</span><div><strong>' + state.plans.filter(function (item) { return item.active; }).length + '</strong><small>ofertas ativas</small></div></article><article><span>' + icon("star") + '</span><div><strong>' + state.plans.filter(function (item) { return item.featured; }).length + '</strong><small>planos destacados</small></div></article><article><span>' + icon("wallet-cards") + '</span><div><strong>' + FL.formatCurrency(Math.min.apply(null, state.plans.map(function (item) { return item.price; }))) + '</strong><small>menor mensalidade</small></div></article></section>',
-      '<section class="content-toolbar"><div class="search-field">' + icon("search") + '<input id="plan-search" type="search" placeholder="Buscar por nome ou velocidade"></div><select id="plan-category-filter"><option value="all">Todas as categorias</option>' + state.categories.map(function (category) { return '<option value="' + esc(category.id) + '"' + (planFilter === category.id ? " selected" : "") + ">" + esc(category.name) + "</option>"; }).join("") + '</select><span>' + plans.length + " resultados</span></section>",
-      '<section class="plan-admin-grid" id="plan-admin-grid">' + plans.map(function (item) {
-        return '<article class="plan-admin-card" data-search="' + esc((item.title + " " + item.speed).toLowerCase()) + '"><div class="plan-admin-card__head"><span class="status-badge ' + (item.active ? "status-badge--success" : "") + '">' + (item.active ? "Ativo" : "Inativo") + '</span><div class="row-actions"><button class="icon-button" data-action="edit-plan" data-id="' + esc(item.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-plan" data-id="' + esc(item.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div><small>' + esc(FL.categoryName(state, item.categoryId)) + '</small><h3>' + esc(item.speed) + '</h3><p>' + esc(item.title) + '</p><strong>' + FL.formatCurrency(item.price) + '<span>/' + esc(item.period) + '</span></strong><ul>' + item.features.slice(0, 3).map(function (feature) { return "<li>" + icon("check") + esc(feature) + "</li>"; }).join("") + '</ul><div class="plan-admin-card__footer"><button data-action="toggle-plan" data-id="' + esc(item.id) + '">' + icon(item.active ? "pause" : "play") + (item.active ? "Pausar" : "Ativar") + '</button><button data-action="duplicate-plan" data-id="' + esc(item.id) + '">' + icon("copy") + "Duplicar</button></div></article>";
-      }).join("") + "</section>",
+      FLAdmin.toolbar({ key: "plans", search: view.search, placeholder: "Buscar por nome, velocidade ou categoria", count: result.filteredTotal, singular: "plano", plural: "planos", filters: [{ name: "category", label: "Categoria", value: view.category, options: [{ value: "all", label: "Todas as categorias" }].concat(state.categories.map(function (category) { return { value: category.id, label: category.name }; })) }, { name: "status", label: "Status", value: view.status, options: [{ value: "all", label: "Todos os status" }, { value: "active", label: "Ativos" }, { value: "inactive", label: "Inativos" }] }], sortValue: view.sort, sortOptions: [{ value: "featured", label: "Destaques primeiro" }, { value: "price-asc", label: "Menor preco" }, { value: "price-desc", label: "Maior preco" }, { value: "name", label: "Nome A-Z" }] }),
+      FLAdmin.bulkBar({ key: "plans", count: selectedCount, actions: [{ id: "activate", label: "Ativar", icon: "play" }, { id: "deactivate", label: "Pausar", icon: "pause" }, { id: "delete", label: "Excluir", icon: "trash-2", danger: true }] }),
+      result.items.length ? '<div class="crud-selection-row"><label><input type="checkbox" data-crud-select-page="plans"' + (pageSelected ? " checked" : "") + '> Selecionar esta pagina</label><span>' + result.start + '-' + result.end + ' de ' + result.filteredTotal + '</span></div><section class="plan-admin-grid" id="plan-admin-grid">' + result.items.map(function (item) {
+        return '<article class="plan-admin-card' + (view.selected.has(item.id) ? " is-selected" : "") + '"><div class="plan-admin-card__head"><div class="card-select-status"><label class="crud-checkbox" title="Selecionar plano"><input type="checkbox" data-crud-select="plans" data-id="' + esc(item.id) + '"' + (view.selected.has(item.id) ? " checked" : "") + '><span></span></label><span class="status-badge ' + (item.active ? "status-badge--success" : "") + '">' + (item.active ? "Ativo" : "Inativo") + '</span></div><div class="row-actions"><button class="icon-button" data-action="edit-plan" data-id="' + esc(item.id) + '" title="Editar" aria-label="Editar ' + esc(item.title) + '">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-plan" data-id="' + esc(item.id) + '" title="Excluir" aria-label="Excluir ' + esc(item.title) + '">' + icon("trash-2") + '</button></div></div><small>' + esc(FL.categoryName(state, item.categoryId)) + '</small><h3>' + esc(item.speed) + '</h3><p>' + esc(item.title) + '</p><strong>' + FL.formatCurrency(item.price) + '<span>/' + esc(item.period) + '</span></strong><ul>' + item.features.slice(0, 3).map(function (feature) { return "<li>" + icon("check") + esc(feature) + "</li>"; }).join("") + '</ul><div class="plan-admin-card__footer"><button data-action="toggle-plan" data-id="' + esc(item.id) + '">' + icon(item.active ? "pause" : "play") + (item.active ? "Pausar" : "Ativar") + '</button><button data-action="duplicate-plan" data-id="' + esc(item.id) + '">' + icon("copy") + "Duplicar</button></div></article>";
+      }).join("") + "</section>" : FLAdmin.emptyState({ icon: "search-x", title: view.search || view.category !== "all" || view.status !== "all" ? "Nenhum plano encontrado" : "Nenhum plano cadastrado", description: view.search || view.category !== "all" || view.status !== "all" ? "Revise a busca ou limpe os filtros para ver outras ofertas." : "Cadastre a primeira oferta comercial para exibi-la no site.", action: state.plans.length ? "clear-plans-filters" : "new-plan", actionLabel: state.plans.length ? "Limpar filtros" : "Novo plano" }),
+      FLAdmin.pagination(result, "plans"),
     ].join("");
   }
 
   function renderCatalog() {
+    const view = crudState.apps;
+    const categories = Array.from(new Set(state.apps.map(function (item) { return item.category; }))).sort();
+    const result = FLAdmin.collection(state.apps, { search: view.search, page: view.page, pageSize: view.pageSize, searchText: function (item) { return [item.name, item.category].join(" "); }, predicate: function (item) { return view.category === "all" || item.category === view.category; }, sort: function (a, b) { return view.sort === "category" ? String(a.category).localeCompare(String(b.category), "pt-BR") || String(a.name).localeCompare(String(b.name), "pt-BR") : String(a.name).localeCompare(String(b.name), "pt-BR"); } });
+    view.page = result.page;
     return [
-      panelHeader("Apps e beneficios", "Organize o valor percebido dos planos e os servicos parceiros.", '<button class="button button--primary" data-action="save-content">' + icon("save") + " Salvar conteudo</button>"),
-      '<section class="two-column-layout"><article class="admin-card">' + cardTitle("Apps e entretenimento", state.apps.length + " itens exibidos nos combos.", '<button class="button button--ghost" data-action="add-app">' + icon("plus") + " Adicionar</button>") + '<div class="catalog-list">' + state.apps.map(function (item) {
-        const logo = item.logo ? '<img src="' + esc(item.logo) + '" alt="">' : esc(item.name.slice(0, 2));
+      panelHeader("Apps e beneficios", "Organize servicos parceiros e diferenciais usados nas ofertas.", '<button class="button button--primary" data-action="add-app">' + icon("plus") + " Novo aplicativo</button>"),
+      '<section class="catalog-workspace"><article class="admin-card catalog-apps">' + cardTitle("Apps e entretenimento", state.apps.length + " itens cadastrados para os combos.", "") + FLAdmin.toolbar({ key: "apps", search: view.search, placeholder: "Buscar aplicativo ou categoria", count: result.filteredTotal, singular: "aplicativo", plural: "aplicativos", filters: [{ name: "category", label: "Categoria", value: view.category, options: [{ value: "all", label: "Todas as categorias" }].concat(categories.map(function (category) { return { value: category, label: category }; })) }], sortValue: view.sort, sortOptions: [{ value: "name", label: "Nome A-Z" }, { value: "category", label: "Categoria" }] }) + (result.items.length ? '<div class="catalog-list">' + result.items.map(function (item) {
+        const logoUrl = FL.safeImageUrl(item.logo, "");
+        const logo = logoUrl ? '<img src="' + esc(logoUrl) + '" alt="">' : esc(item.name.slice(0, 2));
         return '<div><span class="catalog-logo">' + logo + '</span><div><strong>' + esc(item.name) + '</strong><small>' + esc(item.category) + '</small></div><button class="icon-button" data-action="edit-app" data-id="' + esc(item.id) + '">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-app" data-id="' + esc(item.id) + '">' + icon("trash-2") + "</button></div>";
-      }).join("") + '</div></article><article class="admin-card">' + cardTitle("Diferenciais da marca", "Beneficios apresentados logo apos os planos.", '<button class="button button--ghost" data-action="add-benefit">' + icon("plus") + " Adicionar</button>") + '<div class="benefit-admin-list">' + state.benefits.map(function (item) {
-        return '<div><span>' + icon(item.icon) + '</span><div><strong>' + esc(item.title) + '</strong><p>' + esc(item.text) + '</p></div><button class="icon-button" data-action="edit-benefit" data-id="' + esc(item.id) + '">' + icon("pencil") + "</button></div>";
+      }).join("") + '</div>' : FLAdmin.emptyState({ icon: "shapes", title: "Nenhum aplicativo encontrado", description: "Revise a busca ou o filtro para encontrar outros servicos.", action: "clear-apps-filters", actionLabel: "Limpar filtros" })) + FLAdmin.pagination(result, "apps") + '</article><article class="admin-card">' + cardTitle("Diferenciais da marca", "Beneficios apresentados logo apos os planos.", '<button class="button button--ghost" data-action="add-benefit">' + icon("plus") + " Adicionar</button>") + '<div class="benefit-admin-list">' + state.benefits.map(function (item) {
+        return '<div><span>' + icon(item.icon) + '</span><div><strong>' + esc(item.title) + '</strong><p>' + esc(item.text) + '</p></div><button class="icon-button" data-action="edit-benefit" data-id="' + esc(item.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-benefit" data-id="' + esc(item.id) + '" title="Excluir">' + icon("trash-2") + "</button></div>";
       }).join("") + "</div></article></section>",
     ].join("");
   }
@@ -691,6 +772,7 @@
     const limit = Math.max(1, Number(state.coverageSettings.maxImportMb || 5)) * 1024 * 1024;
     if (!["kml", "kmz"].includes(extension)) { toast("Envie um arquivo KML ou KMZ do Google Earth.", "error"); return; }
     if (file.size > limit) { toast("O arquivo ultrapassa o limite de " + state.coverageSettings.maxImportMb + " MB.", "error"); return; }
+    setSaveStatus("saving");
     try {
       let kmlText;
       if (extension === "kmz") {
@@ -706,20 +788,32 @@
       }
       const parsed = parseKmlDocument(kmlText);
       state.coverageFiles.unshift({ id: FL.uid("coverage"), name: file.name.replace(/\.(kml|kmz)$/i, ""), fileName: file.name, format: extension.toUpperCase(), bytes: file.size, importedAt: new Date().toISOString(), color: state.theme.mapAccent, active: true, coordinateCount: parsed.coordinateCount, features: parsed.features });
-      saveDraft(parsed.features.length + " areas importadas do Google Earth");
+      saveDraft(parsed.features.length + " areas importadas do Google Earth", { action: "import", resource: "coverage", label: "Cobertura importada", detail: file.name + " - " + parsed.features.length + " geometrias" });
       renderPanel();
-    } catch (error) { toast(error.message || "Nao foi possivel importar a cobertura.", "error"); }
+    } catch (error) { setSaveStatus(state.meta.status === "published" ? "saved" : "draft"); toast(error.message || "Nao foi possivel importar a cobertura.", "error"); }
+  }
+
+  function destroyAdminMap() {
+    if (!adminMap) return;
+    try {
+      adminMap.stop();
+      adminMap.off();
+      adminMap.remove();
+    } catch (error) {
+      console.warn("Nao foi possivel finalizar a instancia anterior do mapa.", error);
+    }
+    adminMap = null;
   }
 
   function initAdminMap() {
     const element = $("#admin-regional-map");
-    if (adminMap) { adminMap.remove(); adminMap = null; }
+    destroyAdminMap();
     if (!element || !window.L) return;
     if (element._leaflet_id) delete element._leaflet_id;
     const regions = state.regions.filter(function (region) { return region.lat !== null && region.lat !== "" && region.lng !== null && region.lng !== "" && Number.isFinite(Number(region.lat)) && Number.isFinite(Number(region.lng)); });
     const importedFiles = state.coverageFiles.filter(function (file) { return file.active; });
     if (!regions.length && !importedFiles.length) { element.innerHTML = '<div class="empty-state"><h3>Cadastre ou importe uma cobertura</h3><p>Use cidade, CEP, KML ou KMZ para exibir a operacao no mapa.</p></div>'; return; }
-    adminMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true }).setView([Number(state.coverageSettings.centerLat), Number(state.coverageSettings.centerLng)], 11);
+    adminMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([Number(state.coverageSettings.centerLat), Number(state.coverageSettings.centerLng)], 11, { animate: false });
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -749,11 +843,15 @@
         }
       });
     });
-    adminMap.fitBounds(bounds, { padding: [34, 34], maxZoom: 11 });
-    setTimeout(function () { if (adminMap) adminMap.invalidateSize(); }, 80);
+    adminMap.fitBounds(bounds, { padding: [34, 34], maxZoom: 11, animate: false });
+    const currentMap = adminMap;
+    setTimeout(function () { if (adminMap === currentMap && currentMap._container) currentMap.invalidateSize(); }, 80);
   }
 
   function renderCoverage() {
+    const view = crudState.regions;
+    const regionResult = FLAdmin.collection(state.regions, { search: view.search, page: view.page, pageSize: view.pageSize, searchText: function (region) { return [region.name, region.city, region.cep, region.status, (region.neighborhoods || []).join(" ")].join(" "); }, predicate: function (region) { return (view.type === "all" || region.type === view.type) && (view.status === "all" || (view.status === "active" ? region.active : !region.active)); }, sort: function (a, b) { if (view.sort === "interest") return Number(b.interest) - Number(a.interest); if (view.sort === "name") return String(a.name).localeCompare(String(b.name), "pt-BR"); return Number(b.priority || 0) - Number(a.priority || 0); } });
+    view.page = regionResult.page;
     const active = state.regions.filter(function (region) { return region.active; }).length;
     const importedFeatures = state.coverageFiles.reduce(function (sum, file) { return sum + (file.active ? file.features.length : 0); }, 0);
     const averageInterest = state.regions.length ? Math.round(state.regions.reduce(function (sum, region) { return sum + Number(region.interest || 0); }, 0) / state.regions.length) : 0;
@@ -765,10 +863,10 @@
       '<section class="admin-card coverage-controls">' + cardTitle("Consulta e integracoes", "Defina como enderecos e regras de viabilidade sao identificados.", '<span class="status-badge status-badge--success">ViaCEP + mapa real</span>') + '<div class="settings-inline coverage-settings">' + field("Estilo do mapa", "coverageSettings.mapStyle", { type: "select", options: [{ value: "brand", label: "Cores da marca" }, { value: "street", label: "Mapa limpo" }, { value: "dark", label: "Contraste escuro" }] }) + field("Geocodificacao", "coverageSettings.geocodingProvider", { type: "select", options: [{ value: "nominatim", label: "Nominatim / OpenStreetMap" }, { value: "google", label: "Google Maps Platform" }] }) + field("Raio padrao", "coverageSettings.defaultRadiusKm", { type: "number", help: "Quilometros" }) + toggle("Consulta por CEP", "coverageSettings.cepLookup", "Preenche cidade e bairro automaticamente") + toggle("Validar dentro do poligono", "coverageSettings.precisePolygonCheck", "Cruza o ponto geocodificado com areas KMZ") + toggle("Mostrar nomes", "coverageSettings.showLabels", "Exibe rotulos fixos no mapa") + toggle("Intensidade de interesse", "coverageSettings.showInterest", "A opacidade representa a procura") + '</div><div class="google-coverage-settings">' + toggle("Google Maps Platform", "coverageSettings.googleMapsEnabled", "Usa a geocodificacao Google quando houver chave configurada") + field("Chave publica restrita", "coverageSettings.googleMapsBrowserKey", { type: "password", placeholder: "AIza...", help: "Restrinja por dominio e somente pelas APIs necessarias. Nao use chave de servidor aqui." }) + field("Map ID opcional", "coverageSettings.googleMapId", { placeholder: "Identificador do estilo do mapa" }) + '</div></section>',
       '<div class="coverage-integration-notice"><span>' + icon("shield-check") + '</span><div><strong>Importacao local e controlada</strong><p>KML e KMZ sao lidos no navegador, limitados a 5 MB e convertidos somente em pontos, linhas e poligonos seguros. O arquivo original nao e enviado para terceiros.</p></div><a href="https://earth.google.com" target="_blank" rel="noopener">Abrir Google Earth ' + icon("external-link") + '</a></div>',
       '<section class="admin-card coverage-file-manager">' + cardTitle("Arquivos do Google Earth", "Camadas operacionais que complementam os raios e cidades cadastrados.", '<span class="status-badge ' + (state.coverageFiles.length ? "status-badge--success" : "") + '">' + state.coverageFiles.length + ' arquivo(s)</span>') + (state.coverageFiles.length ? '<div class="coverage-file-list">' + state.coverageFiles.map(function (file) { return '<article><span>' + icon("map") + '</span><div><strong>' + esc(file.name) + '</strong><p>' + esc(file.fileName) + '</p><small>' + file.features.length + ' geometrias &middot; ' + file.coordinateCount + ' coordenadas &middot; ' + formatBytes(file.bytes) + '</small></div><label class="color-mini" title="Cor da camada"><input type="color" data-coverage-file-color="' + esc(file.id) + '" value="' + esc(file.color || state.theme.mapAccent) + '"></label><button class="icon-button" data-action="toggle-coverage-file" data-id="' + esc(file.id) + '" title="' + (file.active ? "Ocultar" : "Publicar") + '">' + icon(file.active ? "eye" : "eye-off") + '</button><button class="icon-button icon-button--danger" data-action="delete-coverage-file" data-id="' + esc(file.id) + '" title="Remover">' + icon("trash-2") + '</button></article>'; }).join("") + '</div>' : '<div class="empty-state empty-state--compact">' + icon("file-up") + '<h3>Importe o KMZ da operacao</h3><p>Poligonos de bairros, cidades e rotas aparecerao aqui e no mapa publico.</p></div>') + '</section>',
-      '<section class="coverage-admin-layout coverage-admin-layout--pro"><article class="admin-card map-admin-card">' + cardTitle("Mapa de cobertura e interesse", "Raios configurados por area com as cores da marca.", '<span class="live-chip"><i></i> Atualizado agora</span>') + regionHeatMap() + '</article><article class="admin-card region-manager">' + cardTitle("Areas atendidas", "Status, CEP, raio e procura comercial.", "") + '<div class="region-search search-field">' + icon("search") + '<input id="region-search" type="search" placeholder="Buscar cidade, CEP ou status"></div><div class="region-list">' + state.regions.map(function (region) {
+      '<section class="coverage-admin-layout coverage-admin-layout--pro"><article class="admin-card map-admin-card">' + cardTitle("Mapa de cobertura e interesse", "Raios configurados por area com as cores da marca.", '<span class="live-chip"><i></i> Atualizado agora</span>') + regionHeatMap() + '</article><article class="admin-card region-manager">' + cardTitle("Areas atendidas", "Status, CEP, raio e procura comercial.", "") + FLAdmin.toolbar({ key: "regions", search: view.search, placeholder: "Buscar cidade, CEP, bairro ou status", count: regionResult.filteredTotal, singular: "area", plural: "areas", filters: [{ name: "type", label: "Tipo", value: view.type, options: [{ value: "all", label: "Todos os tipos" }, { value: "city", label: "Cidade" }, { value: "neighborhood", label: "Bairros" }, { value: "cep", label: "CEP exato" }, { value: "cep_prefix", label: "Prefixo de CEP" }, { value: "cep_range", label: "Faixa de CEP" }, { value: "radius", label: "Ponto e raio" }, { value: "region", label: "Regiao comercial" }] }, { name: "status", label: "Publicacao", value: view.status, options: [{ value: "all", label: "Todas" }, { value: "active", label: "Publicadas" }, { value: "inactive", label: "Ocultas" }] }], sortValue: view.sort, sortOptions: [{ value: "priority", label: "Maior prioridade" }, { value: "interest", label: "Maior interesse" }, { value: "name", label: "Nome A-Z" }] }) + '<div class="region-list">' + regionResult.items.map(function (region) {
         const typeLabels = { cep: "CEP exato", cep_prefix: "Prefixo CEP", cep_range: "Faixa CEP", city: "Cidade", neighborhood: "Bairros", region: "Regiao", radius: "Raio" };
         return '<div class="region-admin-row" data-region-search="' + esc((region.name + " " + (region.city || "") + " " + (region.cep || "") + " " + region.status).toLowerCase()) + '"><span class="region-heat" style="--level:' + region.interest + ';--region-color:' + esc(region.color || state.theme.mapAccent) + '"></span><div><span><strong>' + esc(region.name) + '</strong><em>' + esc(typeLabels[region.type] || "Area") + '</em></span><small>' + esc(region.city || region.cep || "Regra regional") + ' &middot; prioridade ' + esc(region.priority || 10) + ' &middot; ' + esc(region.status) + '</small></div><div class="region-numbers"><strong>' + region.leads + '</strong><small>leads</small></div><div class="row-actions"><button class="icon-button" data-action="open-region-route" data-id="' + esc(region.id) + '" title="Abrir rota">' + icon("route") + '</button><button class="icon-button" data-action="toggle-region" data-id="' + esc(region.id) + '" title="' + (region.active ? "Ocultar" : "Publicar") + '">' + icon(region.active ? "eye" : "eye-off") + '</button><button class="icon-button" data-action="edit-region" data-id="' + esc(region.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-region" data-id="' + esc(region.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div>';
-      }).join("") + "</div></article></section>",
+      }).join("") + (regionResult.items.length ? "" : FLAdmin.emptyState({ icon: "map-pinned", title: state.regions.length ? "Nenhuma area encontrada" : "Nenhuma area cadastrada", description: state.regions.length ? "Revise a busca ou os filtros da cobertura." : "Cadastre uma cidade, CEP, bairro ou ponto com raio.", action: state.regions.length ? "clear-region-filters" : "add-region", actionLabel: state.regions.length ? "Limpar filtros" : "Nova area" })) + "</div>" + FLAdmin.pagination(regionResult, "regions") + "</article></section>",
     ].join("");
   }
 
@@ -785,18 +883,22 @@
   }
 
   function renderLeadPipeline() {
+    const view = crudState.leads;
     const stages = [
       ["new", "Novos", "sparkles"], ["qualified", "Qualificados", "badge-check"], ["proposal", "Proposta", "file-check-2"], ["won", "Convertidos", "trophy"], ["lost", "Encerrados", "archive"],
     ];
+    const sources = Array.from(new Set(state.leads.map(function (lead) { return lead.source || "Site"; }))).sort();
+    const result = FLAdmin.collection(state.leads, { search: view.search, page: 1, pageSize: Math.max(1, state.leads.length), searchText: function (lead) { const plan = leadPlan(lead); return [lead.name, lead.whatsapp, lead.source, lead.sourceDetail, lead.utmCampaign, lead.region, plan ? plan.title + " " + plan.speed : ""].join(" "); }, predicate: function (lead) { return view.source === "all" || (lead.source || "Site") === view.source; }, sort: function (a, b) { return view.sort === "name" ? String(a.name).localeCompare(String(b.name), "pt-BR") : String(b.createdAt).localeCompare(String(a.createdAt)); } });
+    const visibleLeads = result.all;
     const statusOptions = stages.map(function (stage) { return '<option value="' + stage[0] + '">{label}</option>'; });
-    return '<section class="lead-funnel-toolbar"><div><strong>Funil comercial</strong><small>Atualize a etapa e acompanhe a procedencia de cada oportunidade.</small></div><span class="status-badge status-badge--success">' + state.leads.length + ' oportunidades</span></section><section class="lead-kanban">' + stages.map(function (stage) {
-      const leads = state.leads.filter(function (lead) { return lead.status === stage[0]; });
+    return '<section class="lead-funnel-toolbar"><div><strong>Funil comercial</strong><small>Atualize a etapa e acompanhe a procedencia de cada oportunidade.</small></div><span class="status-badge status-badge--success">' + result.filteredTotal + ' oportunidades</span></section>' + FLAdmin.toolbar({ key: "leads", search: view.search, placeholder: "Buscar nome, WhatsApp, plano ou regiao", count: result.filteredTotal, singular: "lead", plural: "leads", filters: [{ name: "source", label: "Origem", value: view.source, options: [{ value: "all", label: "Todas as origens" }].concat(sources.map(function (source) { return { value: source, label: source }; })) }], sortValue: view.sort, sortOptions: [{ value: "recent", label: "Mais recentes" }, { value: "name", label: "Nome A-Z" }] }) + '<section class="lead-kanban">' + stages.map(function (stage) {
+      const leads = visibleLeads.filter(function (lead) { return lead.status === stage[0]; });
       return '<div class="lead-kanban__column"><header><span>' + icon(stage[2]) + '<strong>' + stage[1] + '</strong></span><b>' + leads.length + '</b></header><div>' + leads.map(function (lead) {
         const plan = leadPlan(lead); const coupon = state.coupons.find(function (item) { return item.id === lead.couponId; });
         const options = statusOptions.map(function (option, index) { return option.replace("{label}", stages[index][1]).replace('value="' + lead.status + '"', 'value="' + lead.status + '" selected'); }).join("");
         return '<article class="lead-kanban-card"><div class="lead-contact"><span>' + esc((lead.name || "L").slice(0, 2).toUpperCase()) + '</span><div><strong>' + esc(lead.name) + '</strong><small>' + esc(formatPhone(lead.whatsapp)) + '</small></div></div><div class="lead-interest"><strong>' + esc(plan ? plan.speed + " - " + plan.title : "Plano removido") + '</strong><small>' + esc(coupon ? FL.couponLabel(coupon) : "Sem cupom") + '</small></div><div class="lead-attribution"><span>' + icon("waypoints") + esc(lead.source || "Site") + '</span><small>' + esc(lead.utmCampaign || lead.sourceDetail || "Acesso direto") + '</small><small>' + esc(lead.region || "Regiao nao informada") + ' &middot; ' + dateLabel(lead.createdAt) + '</small></div><select data-lead-status="' + esc(lead.id) + '">' + options + '</select><footer><button class="button button--primary button--compact" data-action="contact-lead" data-id="' + esc(lead.id) + '">' + icon("message-circle") + ' Preparar mensagem</button><button class="icon-button icon-button--danger" data-action="delete-lead" data-id="' + esc(lead.id) + '" title="Excluir lead">' + icon("trash-2") + '</button></footer></article>';
       }).join("") + (leads.length ? "" : '<div class="kanban-empty">Nenhum lead nesta etapa</div>') + '</div></div>';
-    }).join("") + '</section>' + (state.leads.length ? "" : '<div class="empty-state">' + icon("contact-round") + '<h3>Nenhum lead capturado</h3><p>Os contatos enviados pela escolha de planos aparecerao aqui.</p></div>');
+    }).join("") + '</section>' + (visibleLeads.length ? "" : FLAdmin.emptyState({ icon: "contact-round", title: state.leads.length ? "Nenhum lead encontrado" : "Nenhum lead capturado", description: state.leads.length ? "Revise a busca ou o filtro de origem." : "Os contatos enviados pela escolha de planos aparecerao aqui.", action: state.leads.length ? "clear-lead-filters" : "", actionLabel: state.leads.length ? "Limpar filtros" : "" }));
   }
 
   function normalizeKey(value) {
@@ -815,7 +917,7 @@
   function renderWhatsappCampaigns() {
     return '<section class="manual-campaign-grid">' + state.whatsappCampaigns.map(function (campaign) {
       const eligible = campaignAudience(campaign);
-      return '<article class="admin-card manual-campaign-card"><div class="manual-campaign-card__head"><span>' + icon("message-square-text") + '</span><div><span class="status-badge ' + (campaign.status === "active" ? "status-badge--success" : "") + '">' + (campaign.status === "active" ? "Ativa" : "Rascunho") + '</span><small>' + esc(campaign.type || "followup") + '</small><h3>' + esc(campaign.name) + '</h3></div><button class="icon-button" data-action="edit-whatsapp-campaign" data-id="' + esc(campaign.id) + '" title="Editar">' + icon("pencil") + '</button></div><p>' + esc(campaign.message) + '</p><div class="campaign-filters"><span>' + icon("git-branch") + (campaign.stages.length ? campaign.stages.length + " etapas" : "Todas as etapas") + '</span><span>' + icon("waypoints") + (campaign.sources.length ? campaign.sources.length + " origens" : "Todas as origens") + '</span><span>' + icon("map-pin") + esc(campaign.region || "Todas as regioes") + '</span></div><div class="campaign-audience"><span>' + icon("users") + '<strong>' + eligible.length + '</strong> leads compativeis</span><span>' + icon("send") + '<strong>' + campaign.contactsSent + '</strong> contatos abertos</span></div><div class="manual-lead-queue">' + eligible.slice(0, 4).map(function (lead) { const plan = leadPlan(lead); return '<div><span>' + esc((lead.name || "L").slice(0, 2).toUpperCase()) + '</span><div><strong>' + esc(lead.name) + '</strong><small>' + esc(plan ? plan.speed : "Sem plano") + '</small></div><button class="icon-button" data-action="contact-lead" data-id="' + esc(lead.id) + '" data-campaign-id="' + esc(campaign.id) + '" title="Preparar conversa">' + icon("send") + '</button></div>'; }).join("") + '</div></article>';
+      return '<article class="admin-card manual-campaign-card"><div class="manual-campaign-card__head"><span>' + icon("message-square-text") + '</span><div><span class="status-badge ' + (campaign.status === "active" ? "status-badge--success" : "") + '">' + (campaign.status === "active" ? "Ativa" : "Rascunho") + '</span><small>' + esc(campaign.type || "followup") + '</small><h3>' + esc(campaign.name) + '</h3></div><div class="row-actions"><button class="icon-button" data-action="edit-whatsapp-campaign" data-id="' + esc(campaign.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-whatsapp-campaign" data-id="' + esc(campaign.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div><p>' + esc(campaign.message) + '</p><div class="campaign-filters"><span>' + icon("git-branch") + (campaign.stages.length ? campaign.stages.length + " etapas" : "Todas as etapas") + '</span><span>' + icon("waypoints") + (campaign.sources.length ? campaign.sources.length + " origens" : "Todas as origens") + '</span><span>' + icon("map-pin") + esc(campaign.region || "Todas as regioes") + '</span></div><div class="campaign-audience"><span>' + icon("users") + '<strong>' + eligible.length + '</strong> leads compativeis</span><span>' + icon("send") + '<strong>' + campaign.contactsSent + '</strong> contatos abertos</span></div><div class="manual-lead-queue">' + eligible.slice(0, 4).map(function (lead) { const plan = leadPlan(lead); return '<div><span>' + esc((lead.name || "L").slice(0, 2).toUpperCase()) + '</span><div><strong>' + esc(lead.name) + '</strong><small>' + esc(plan ? plan.speed : "Sem plano") + '</small></div><button class="icon-button" data-action="contact-lead" data-id="' + esc(lead.id) + '" data-campaign-id="' + esc(campaign.id) + '" title="Preparar conversa">' + icon("send") + '</button></div>'; }).join("") + '</div></article>';
     }).join("") + (state.whatsappCampaigns.length ? "" : '<div class="empty-state">' + icon("message-square-text") + '<h3>Nenhuma campanha manual</h3><p>Crie uma mensagem e selecione os planos que definem o publico.</p></div>') + '</section><div class="security-notice">' + icon("shield-check") + '<div><strong>Envio individual e consciente</strong><p>O sistema apenas prepara a mensagem. Cada conversa e aberta manualmente pelo atendente, sem disparo em massa ou automacao nao autorizada.</p></div></div>';
   }
 
@@ -840,18 +942,24 @@
   }
 
   function renderPopupList() {
-    return '<section class="campaign-grid">' + state.popupCampaigns.map(function (item) {
+    const view = crudState.popups;
+    const result = FLAdmin.collection(state.popupCampaigns, { search: view.search, page: view.page, pageSize: view.pageSize, searchText: function (item) { return [item.name, item.title, item.eyebrow, item.trigger].join(" "); }, predicate: function (item) { return view.status === "all" || (view.status === "active" ? item.active : !item.active); }, sort: function (a, b) { return view.sort === "name" ? String(a.name).localeCompare(String(b.name), "pt-BR") : String(b.startsAt || "").localeCompare(String(a.startsAt || "")); } });
+    view.page = result.page;
+    return FLAdmin.toolbar({ key: "popups", search: view.search, placeholder: "Buscar campanha ou chamada", count: result.filteredTotal, singular: "campanha", plural: "campanhas", filters: [{ name: "status", label: "Status", value: view.status, options: [{ value: "all", label: "Todos os status" }, { value: "active", label: "Ativas" }, { value: "inactive", label: "Pausadas" }] }], sortValue: view.sort, sortOptions: [{ value: "recent", label: "Mais recentes" }, { value: "name", label: "Nome A-Z" }] }) + '<section class="campaign-grid">' + result.items.map(function (item) {
       const coupon = state.coupons.find(function (couponItem) { return couponItem.id === item.couponId; });
-      return '<article class="campaign-card"><div class="campaign-card__preview"><img src="' + esc(item.image) + '" alt=""><span class="status-badge ' + (item.active ? "status-badge--success" : "") + '">' + (item.active ? "Ativa" : "Pausada") + '</span></div><div class="campaign-card__body"><small>' + esc(item.eyebrow) + '</small><h3>' + esc(item.name) + '</h3><p>' + esc(item.title) + '</p><div class="campaign-rules"><span>' + icon("timer") + (item.trigger === "delay" ? "Apos " + item.delaySeconds + " segundos" : item.trigger === "scroll" ? "Ao rolar " + item.scrollPercent + "%" : "Intencao de saida") + '</span><span>' + icon("ticket-percent") + esc(coupon ? coupon.code : "Sem cupom") + '</span><span>' + icon("calendar") + esc(item.expiresAt || "Sem prazo") + '</span></div></div><div class="campaign-card__actions"><button class="button button--ghost" data-action="preview-popup" data-id="' + esc(item.id) + '">' + icon("eye") + ' Visualizar</button><button class="icon-button" data-action="edit-popup" data-id="' + esc(item.id) + '">' + icon("pencil") + '</button><button class="icon-button" data-action="toggle-popup" data-id="' + esc(item.id) + '">' + icon(item.active ? "pause" : "play") + "</button></div></article>";
-    }).join("") + (state.popupCampaigns.length ? "" : '<div class="empty-state">' + icon("megaphone") + "<h3>Nenhuma campanha criada</h3><p>Crie um popup para destacar uma oferta ou cupom.</p></div>") + "</section>";
+      return '<article class="campaign-card"><div class="campaign-card__preview"><img src="' + esc(FL.safeImageUrl(item.image, "./assets/img/hero-family-fiber.jpg")) + '" alt=""><span class="status-badge ' + (item.active ? "status-badge--success" : "") + '">' + (item.active ? "Ativa" : "Pausada") + '</span></div><div class="campaign-card__body"><small>' + esc(item.eyebrow) + '</small><h3>' + esc(item.name) + '</h3><p>' + esc(item.title) + '</p><div class="campaign-rules"><span>' + icon("timer") + (item.trigger === "delay" ? "Apos " + item.delaySeconds + " segundos" : item.trigger === "scroll" ? "Ao rolar " + item.scrollPercent + "%" : "Intencao de saida") + '</span><span>' + icon("ticket-percent") + esc(coupon ? coupon.code : "Sem cupom") + '</span><span>' + icon("calendar") + esc(item.expiresAt || "Sem prazo") + '</span></div></div><div class="campaign-card__actions"><button class="button button--ghost" data-action="preview-popup" data-id="' + esc(item.id) + '">' + icon("eye") + ' Visualizar</button><button class="icon-button" data-action="edit-popup" data-id="' + esc(item.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button" data-action="toggle-popup" data-id="' + esc(item.id) + '" title="' + (item.active ? "Pausar" : "Ativar") + '">' + icon(item.active ? "pause" : "play") + '</button><button class="icon-button icon-button--danger" data-action="delete-popup" data-id="' + esc(item.id) + '" title="Excluir">' + icon("trash-2") + "</button></div></article>";
+    }).join("") + (result.items.length ? "" : FLAdmin.emptyState({ icon: "megaphone", title: state.popupCampaigns.length ? "Nenhuma campanha encontrada" : "Nenhuma campanha criada", description: state.popupCampaigns.length ? "Revise a busca ou o status selecionado." : "Crie um popup para destacar uma oferta ou cupom.", action: state.popupCampaigns.length ? "clear-popup-filters" : "new-popup", actionLabel: state.popupCampaigns.length ? "Limpar filtros" : "Nova campanha" })) + "</section>" + FLAdmin.pagination(result, "popups");
   }
 
   function renderCouponList() {
-    return '<section class="coupon-grid">' + state.coupons.map(function (item) {
+    const view = crudState.coupons;
+    const result = FLAdmin.collection(state.coupons, { search: view.search, page: view.page, pageSize: view.pageSize, searchText: function (item) { return [item.code, item.title, item.description, item.applicationMode].join(" "); }, predicate: function (item) { return view.status === "all" || (view.status === "active" ? item.active : !item.active); }, sort: function (a, b) { if (view.sort === "code") return String(a.code).localeCompare(String(b.code)); if (view.sort === "usage") return Number(b.used || 0) - Number(a.used || 0); return String(b.startsAt || "").localeCompare(String(a.startsAt || "")); } });
+    view.page = result.page;
+    return FLAdmin.toolbar({ key: "coupons", search: view.search, placeholder: "Buscar codigo, oferta ou descricao", count: result.filteredTotal, singular: "cupom", plural: "cupons", filters: [{ name: "status", label: "Status", value: view.status, options: [{ value: "all", label: "Todos os status" }, { value: "active", label: "Ativos" }, { value: "inactive", label: "Inativos" }] }], sortValue: view.sort, sortOptions: [{ value: "recent", label: "Mais recentes" }, { value: "code", label: "Codigo A-Z" }, { value: "usage", label: "Mais utilizados" }] }) + '<section class="coupon-grid">' + result.items.map(function (item) {
       const percent = Math.min(100, (Number(item.used || 0) / Math.max(1, Number(item.usageLimit || 1))) * 100);
       const modes = { code: "Ativacao por codigo", campaign: "Ativacao por campanha", both: "Codigo ou campanha" };
       return '<article class="coupon-card"><div class="coupon-card__top"><span class="status-badge ' + (item.active ? "status-badge--success" : "") + '">' + (item.active ? "Ativo" : "Inativo") + '</span><div class="row-actions"><button class="icon-button" data-action="edit-coupon" data-id="' + esc(item.id) + '">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-coupon" data-id="' + esc(item.id) + '">' + icon("trash-2") + '</button></div></div><small>' + esc(item.title) + '</small><button class="coupon-big-code" data-action="copy-code" data-code="' + esc(item.code) + '">' + esc(item.code) + icon("copy") + '</button><strong>' + esc(FL.couponLabel(item)) + '</strong><p>' + esc(item.description) + '</p><span class="coupon-mode">' + icon("mouse-pointer-click") + esc(modes[item.applicationMode] || modes.code) + '</span><div class="coupon-progress"><span><b>' + item.used + '</b> de ' + item.usageLimit + ' usos</span><div><i style="width:' + percent + '%"></i></div></div><footer><span>' + icon("calendar") + " Valido ate " + esc(item.expiresAt || "sem prazo") + '</span><button data-action="toggle-coupon" data-id="' + esc(item.id) + '">' + (item.active ? "Pausar" : "Ativar") + "</button></footer></article>";
-    }).join("") + "</section>";
+    }).join("") + (result.items.length ? "" : FLAdmin.emptyState({ icon: "ticket-percent", title: state.coupons.length ? "Nenhum cupom encontrado" : "Nenhum cupom criado", description: state.coupons.length ? "Revise a busca ou o status selecionado." : "Crie um codigo promocional para uma campanha.", action: state.coupons.length ? "clear-coupon-filters" : "new-coupon", actionLabel: state.coupons.length ? "Limpar filtros" : "Novo cupom" })) + "</section>" + FLAdmin.pagination(result, "coupons");
   }
 
   function renderSeo() {
@@ -885,7 +993,7 @@
     const sources = Object.entries(groupByPayload(data.events, "source")).sort(function (a, b) { return b[1] - a[1]; });
     const regions = Object.entries(groupByPayload(data.events, "region")).sort(function (a, b) { return b[1] - a[1]; });
     return [
-      panelHeader("Desempenho", "Entenda canais, dispositivos, conversoes e oportunidades comerciais.", '<div class="heading-actions"><select class="compact-select"><option>28 dias</option><option>7 dias</option><option>Hoje</option></select><button class="button button--ghost" data-action="export-report">' + icon("download") + " Exportar CSV</button></div>"),
+      panelHeader("Desempenho", "Entenda canais, dispositivos, conversoes e oportunidades comerciais.", '<div class="heading-actions"><select class="compact-select" data-analytics-period aria-label="Periodo das metricas"><option value="28"' + (analyticsPeriod === 28 ? " selected" : "") + '>28 dias</option><option value="7"' + (analyticsPeriod === 7 ? " selected" : "") + '>7 dias</option><option value="1"' + (analyticsPeriod === 1 ? " selected" : "") + '>Hoje</option></select><button class="button button--ghost" data-action="export-report">' + icon("download") + " Exportar CSV</button></div>"),
       '<section class="metrics-grid">' + metricCard("Visitantes", data.views, "+12,8%", "comparado ao periodo anterior", "users", "blue") + metricCard("CTR dos planos", (data.views ? (data.planClicks / data.views) * 100 : 0).toFixed(1).replace(".", ",") + "%", "+3,1%", "cliques sobre visitas", "mouse-pointer-click", "violet") + metricCard("Conversao em lead", data.conversion.toFixed(1).replace(".", ",") + "%", "+1,4%", "formularios sobre visitas", "contact-round", "green") + metricCard("Cobertura consultada", data.coverage, "+6,7%", "buscas no periodo", "map-pin-check", "orange") + '</section>',
       '<section class="analytics-layout"><article class="admin-card">' + cardTitle("Canais de aquisicao", "Participacao por origem de trafego.", "") + '<div class="donut-layout"><div class="donut-chart" style="--a:37%;--b:64%;--c:82%"><strong>' + data.views + '<small>visitas</small></strong></div><div class="donut-legend">' + sources.slice(0, 5).map(function (entry, index) { return '<div><i class="dot-' + (index + 1) + '"></i><span>' + esc(entry[0]) + '</span><strong>' + entry[1] + "</strong></div>"; }).join("") + '</div></div></article><article class="admin-card">' + cardTitle("Demanda por regiao", "Interacoes identificadas por cidade.", "") + '<div class="horizontal-bars">' + regions.map(function (entry, index) { const max = regions[0] ? regions[0][1] : 1; return '<div><span>' + esc(entry[0]) + '</span><div><i style="width:' + (entry[1] / max) * 100 + '%"></i></div><strong>' + entry[1] + "</strong></div>"; }).join("") + '</div></article><article class="admin-card device-card">' + cardTitle("Dispositivos", "Distribuicao estimada por viewport.", "") + '<div class="device-bars"><div><span>' + icon("smartphone") + ' Celular</span><strong>68%</strong><i><b style="width:68%"></b></i></div><div><span>' + icon("monitor") + ' Desktop</span><strong>27%</strong><i><b style="width:27%"></b></i></div><div><span>' + icon("tablet") + ' Tablet</span><strong>5%</strong><i><b style="width:5%"></b></i></div></div></article></section>',
     ].join("");
@@ -893,19 +1001,44 @@
 
   function renderHeatmap() {
     const sorted = state.regions.slice().sort(function (a, b) { return b.interest - a.interest; });
+    const priorityNames = sorted.slice(0, 2).map(function (region) { return region.name; }).join(" e ") || "As regioes prioritarias";
+    const featuredPlan = state.plans.find(function (plan) { return plan.featured && plan.active; }) || state.plans.find(function (plan) { return plan.active; });
     return [
       panelHeader("Mapa de interesse", "Cruze consultas, cliques e leads para orientar expansao e anuncios regionais.", '<button class="button button--ghost" data-action="export-report">' + icon("download") + " Exportar dados</button>"),
       '<section class="heatmap-layout"><article class="admin-card map-admin-card">' + cardTitle("Intensidade regional", "Quanto mais brilhante, maior o interesse comercial.", '<select class="compact-select"><option>Todos os eventos</option><option>Leads WhatsApp</option><option>Consultas</option></select>') + regionHeatMap() + '</article><aside class="admin-card">' + cardTitle("Prioridades comerciais", "Regioes ordenadas por potencial.", "") + '<div class="priority-list">' + sorted.map(function (region, index) {
         const status = region.interest >= 75 ? "Alta prioridade" : region.interest >= 50 ? "Monitorar" : "Em observacao";
         return '<div><span class="rank">0' + (index + 1) + '</span><div><strong>' + esc(region.name) + '</strong><small>' + status + '</small><i><b style="width:' + region.interest + '%"></b></i></div><em>' + region.interest + "%</em></div>";
-      }).join("") + '</div></aside></section><section class="admin-card insight-banner">' + icon("lightbulb") + '<div><strong>Oportunidade identificada</strong><p>Sumare e Hortolandia concentram a maior parte do interesse. Campanhas de 600 Mega nessas regioes tendem a ter melhor retorno.</p></div><button class="button button--ghost" data-goto="campaigns">Criar campanha</button></section>',
+      }).join("") + '</div></aside></section><section class="admin-card insight-banner">' + icon("lightbulb") + '<div><strong>Oportunidade identificada</strong><p>' + esc(priorityNames) + ' concentram a maior parte do interesse. Campanhas de ' + esc(featuredPlan ? featuredPlan.speed : "planos em destaque") + ' nessas regioes tendem a ter melhor retorno.</p></div><button class="button button--ghost" data-goto="campaigns">Criar campanha</button></section>',
+    ].join("");
+  }
+
+  function renderActivity() {
+    const view = crudState.activity;
+    const resources = Array.from(new Set(state.auditLog.map(function (entry) { return entry.resource; }))).sort();
+    const result = FLAdmin.collection(state.auditLog, {
+      search: view.search,
+      page: view.page,
+      pageSize: view.pageSize,
+      searchText: function (entry) { return [entry.label, entry.detail, entry.resource, entry.actor, auditLabel(entry.action)].join(" "); },
+      predicate: function (entry) { return view.resource === "all" || entry.resource === view.resource; },
+      sort: function (a, b) { return view.sort === "oldest" ? String(a.createdAt).localeCompare(String(b.createdAt)) : String(b.createdAt).localeCompare(String(a.createdAt)); },
+    });
+    view.page = result.page;
+    const today = state.auditLog.filter(function (entry) { return String(entry.createdAt).slice(0, 10) === new Date().toISOString().slice(0, 10); }).length;
+    return [
+      panelHeader("Atividade", "Acompanhe alteracoes administrativas, publicacoes e importacoes desta demonstracao.", '<button class="button button--ghost" data-action="export-audit">' + icon("download") + ' Exportar atividade</button>'),
+      '<section class="quick-stats activity-stats"><article><span>' + icon("history") + '</span><div><strong>' + state.auditLog.length + '</strong><small>eventos registrados</small></div></article><article><span>' + icon("calendar") + '</span><div><strong>' + today + '</strong><small>alteracoes hoje</small></div></article><article><span>' + icon("rocket") + '</span><div><strong>' + state.auditLog.filter(function (entry) { return entry.action === "publish"; }).length + '</strong><small>publicacoes</small></div></article><article><span>' + icon("shield-check") + '</span><div><strong>Local</strong><small>trilha demonstrativa</small></div></article></section>',
+      FLAdmin.toolbar({ key: "activity", search: view.search, placeholder: "Buscar por acao, recurso ou detalhe", count: result.filteredTotal, singular: "evento", plural: "eventos", filters: [{ name: "resource", label: "Recurso", value: view.resource, options: [{ value: "all", label: "Todos os recursos" }].concat(resources.map(function (resource) { return { value: resource, label: resource.charAt(0).toUpperCase() + resource.slice(1) }; })) }], sortValue: view.sort, sortOptions: [{ value: "recent", label: "Mais recentes" }, { value: "oldest", label: "Mais antigos" }] }),
+      result.items.length ? '<section class="admin-card activity-list"><div class="activity-list__head"><span>Evento</span><span>Recurso</span><span>Responsavel</span><span>Data</span></div>' + result.items.map(function (entry) { return '<article><span class="activity-icon activity-icon--' + esc(entry.action) + '">' + icon(entry.action === "delete" ? "trash-2" : entry.action === "publish" ? "rocket" : entry.action === "import" ? "file-up" : entry.action === "create" ? "plus" : "pencil") + '</span><div><strong>' + esc(entry.label) + '</strong><small>' + esc(entry.detail || auditLabel(entry.action)) + '</small></div><span class="activity-resource">' + esc(entry.resource) + '</span><span class="activity-actor">' + esc(entry.actor || "Administrador") + '</span><time datetime="' + esc(entry.createdAt) + '">' + dateLabel(entry.createdAt) + '</time></article>'; }).join("") + '</section>' : FLAdmin.emptyState({ icon: "history", title: "Nenhuma atividade encontrada", description: "Revise a busca ou o filtro de recurso para consultar outros eventos." }),
+      FLAdmin.pagination(result, "activity"),
+      '<div class="security-notice">' + icon("shield-check") + '<div><strong>Trilha local da demonstracao</strong><p>No SaaS, estes eventos serao imutaveis, vinculados a usuario e tenant e armazenados no servidor. O historico local nao e um controle de seguranca.</p></div></div>',
     ].join("");
   }
 
   function renderSettings() {
     return [
       panelHeader("Configuracoes", "Dados institucionais, links do sistema e manutencao do prototipo.", '<button class="button button--primary" data-action="save-content">' + icon("save") + " Salvar configuracoes</button>"),
-      '<section class="settings-layout"><div class="stack"><article class="admin-card">' + cardTitle("Dados da empresa", "Informacoes do tenant usadas no site e nos dados estruturados.", "") + '<div class="form-grid">' + field("Nome da marca", "brand.name", {}) + field("Identificador do tenant", "brand.slug", {}) + field("Razao social", "brand.legalName", {}) + field("CNPJ", "brand.cnpj", {}) + field("Site principal", "brand.siteUrl", { type: "url" }) + field("E-mail", "brand.email", { type: "email" }) + field("Telefone", "brand.phone", {}) + field("WhatsApp", "brand.whatsapp", {}) + field("Instagram", "brand.instagram", { type: "url" }) + field("Facebook", "brand.facebook", { type: "url" }) + '</div>' + field("Endereco", "brand.address", {}) + field("Resumo da cobertura", "brand.coverageSummary", {}) + '</article><article class="admin-card">' + cardTitle("Area do cliente", "O sistema do assinante continua externo a este produto.", "") + field("URL de acesso", "brand.clientAreaUrl", { type: "url" }) + '<div class="external-system">' + icon("external-link") + '<div><strong>Sistema externo do assinante</strong><p>O link abre em nova aba e nao compartilha credenciais com este painel.</p></div><a href="' + esc(state.brand.clientAreaUrl) + '" target="_blank" rel="noopener">Testar acesso</a></div></article></div><aside class="stack"><article class="admin-card">' + cardTitle("Publicacao", "Estado atual desta configuracao.", "") + '<div class="publication-status"><span>' + icon(state.meta.status === "published" ? "circle-check" : "clock-3") + '</span><div><strong>' + (state.meta.status === "published" ? "Site publicado" : "Alteracoes em rascunho") + '</strong><p>Ultima publicacao em ' + dateLabel(state.meta.publishedAt) + '</p></div></div><button class="button button--primary button--block" data-action="publish">' + icon("rocket") + ' Publicar agora</button></article><article class="admin-card danger-zone">' + cardTitle("Dados do prototipo", "Ferramentas para transferencia e recuperacao.", "") + '<button class="button button--ghost button--block" data-action="export-state">' + icon("download") + ' Exportar configuracao</button><label class="button button--ghost button--block file-action">' + icon("upload") + ' Importar configuracao<input id="import-state-file" type="file" accept="application/json"></label><button class="button button--danger button--block" data-action="reset-state">' + icon("rotate-ccw") + " Restaurar padrao</button></article></aside></section>",
+      '<section class="settings-layout"><div class="stack"><article class="admin-card">' + cardTitle("Dados da empresa", "Informacoes do tenant usadas no site e nos dados estruturados.", "") + '<div class="form-grid">' + field("Nome da marca", "brand.name", {}) + field("Identificador do tenant", "brand.slug", {}) + field("Razao social", "brand.legalName", {}) + field("CNPJ", "brand.cnpj", {}) + field("Site principal", "brand.siteUrl", { type: "url" }) + field("E-mail", "brand.email", { type: "email" }) + field("Telefone", "brand.phone", {}) + field("WhatsApp", "brand.whatsapp", {}) + field("Instagram", "brand.instagram", { type: "url" }) + field("Facebook", "brand.facebook", { type: "url" }) + '</div>' + field("Endereco", "brand.address", {}) + field("Resumo da cobertura", "brand.coverageSummary", {}) + '</article><article class="admin-card">' + cardTitle("Area do cliente", "O sistema do assinante continua externo a este produto.", "") + field("URL de acesso", "brand.clientAreaUrl", { type: "url" }) + '<div class="external-system">' + icon("external-link") + '<div><strong>Sistema externo do assinante</strong><p>O link abre em nova aba e nao compartilha credenciais com este painel.</p></div><a href="' + esc(FL.safeUrl(state.brand.clientAreaUrl, "#")) + '" target="_blank" rel="noopener">Testar acesso</a></div></article></div><aside class="stack"><article class="admin-card">' + cardTitle("Publicacao", "Estado atual desta configuracao.", "") + '<div class="publication-status"><span>' + icon(state.meta.status === "published" ? "circle-check" : "clock-3") + '</span><div><strong>' + (state.meta.status === "published" ? "Site publicado" : "Alteracoes em rascunho") + '</strong><p>Ultima publicacao em ' + dateLabel(state.meta.publishedAt) + '</p></div></div><button class="button button--primary button--block" data-action="publish">' + icon("rocket") + ' Publicar agora</button></article><article class="admin-card danger-zone">' + cardTitle("Dados do prototipo", "Ferramentas para transferencia e recuperacao.", "") + '<button class="button button--ghost button--block" data-action="export-state">' + icon("download") + ' Exportar configuracao</button><label class="button button--ghost button--block file-action">' + icon("upload") + ' Importar configuracao<input id="import-state-file" type="file" accept="application/json"></label><button class="button button--danger button--block" data-action="reset-state">' + icon("rotate-ccw") + " Restaurar padrao</button></article></aside></section>",
     ].join("");
   }
 
@@ -914,9 +1047,16 @@
       dashboard: renderDashboard, builder: renderBuilder, pages: renderPages, banners: renderBanners, media: renderMedia, navigation: renderNavigation,
       appearance: renderAppearance, plans: renderPlans, catalog: renderCatalog, coverage: renderCoverage,
       support: renderSupport, campaigns: renderCampaigns, seo: renderSeo, pixels: renderPixels,
-      analytics: renderAnalytics, heatmap: renderHeatmap, settings: renderSettings,
+      analytics: renderAnalytics, heatmap: renderHeatmap, activity: renderActivity, settings: renderSettings,
     };
-    $("#admin-panel").innerHTML = (renderers[activePanel] || renderDashboard)();
+    const panel = $("#admin-panel");
+    destroyAdminMap();
+    try {
+      panel.innerHTML = (renderers[activePanel] || renderDashboard)();
+    } catch (error) {
+      console.error("Falha ao renderizar o painel", activePanel, error);
+      panel.innerHTML = '<section class="admin-state admin-state--error" role="alert"><span>' + icon("triangle-alert") + '</span><h2>Nao foi possivel carregar esta area</h2><p>Os seus dados continuam preservados. Tente carregar o modulo novamente ou volte ao Dashboard.</p><div><button class="button button--primary" data-action="retry-panel">' + icon("refresh-cw") + ' Tentar novamente</button><button class="button button--ghost" data-goto="dashboard">' + icon("layout-dashboard") + ' Ir ao Dashboard</button></div></section>';
+    }
     const meta = PANEL_META[activePanel] || PANEL_META.dashboard;
     $("#panel-title").textContent = meta[0];
     $("#topbar-section").textContent = meta[1];
@@ -932,6 +1072,18 @@
     if (studioAliases[panel]) { builderStudioTab = studioAliases[panel]; panel = "builder"; }
     if (!PANEL_META[panel]) panel = "dashboard";
     activePanel = panel;
+    const activeButton = $('#admin-nav [data-panel="' + panel + '"]');
+    const activeGroup = activeButton && activeButton.closest("[data-nav-group]");
+    if (activeGroup && activeGroup.classList.contains("is-collapsed")) {
+      activeGroup.classList.remove("is-collapsed");
+      const toggle = $("[data-nav-group-toggle]", activeGroup);
+      if (toggle) {
+        toggle.setAttribute("aria-expanded", "true");
+        const stored = navGroupPreferences();
+        stored[toggle.dataset.navGroupToggle] = false;
+        localStorage.setItem("fl-admin-nav-groups", JSON.stringify(stored));
+      }
+    }
     history.replaceState(null, "", "#" + panel);
     document.body.classList.remove("sidebar-open");
     renderPanel();
@@ -947,21 +1099,28 @@
   }
 
   function openModal(html, wide) {
+    if ($("#admin-modal").hidden) modalReturnFocus = document.activeElement;
     $("#admin-modal-content").innerHTML = html;
-    $("#admin-modal .admin-modal__dialog").classList.toggle("admin-modal__dialog--wide", Boolean(wide));
+    const dialog = $("#admin-modal .admin-modal__dialog");
+    dialog.classList.toggle("admin-modal__dialog--wide", Boolean(wide));
+    dialog.setAttribute("aria-labelledby", "admin-dialog-title");
     $("#admin-modal").hidden = false;
     document.body.classList.add("modal-open");
     bindModalControls();
     refreshIcons();
+    requestAnimationFrame(function () { const focusable = $("input:not([type=hidden]), select, textarea, button, [href]", dialog); if (focusable) focusable.focus(); });
   }
 
   function closeModal() {
     $("#admin-modal").hidden = true;
     document.body.classList.remove("modal-open");
+    pendingConfirmation = null;
+    if (modalReturnFocus && document.contains(modalReturnFocus)) modalReturnFocus.focus();
+    modalReturnFocus = null;
   }
 
   function modalHeader(title, description) {
-    return '<div class="modal-heading"><span class="eyebrow">Fibra Site OS</span><h2>' + esc(title) + '</h2><p>' + esc(description) + "</p></div>";
+    return '<div class="modal-heading"><span class="eyebrow">Fibra Site OS</span><h2 id="admin-dialog-title">' + esc(title) + '</h2><p>' + esc(description) + "</p></div>";
   }
 
   function sectionLibraryModal() {
@@ -1030,7 +1189,8 @@
 
   function appModal(item) {
     const app = item || { id: "", name: "", category: "", logo: "" };
-    const preview = app.logo ? '<img src="' + esc(app.logo) + '" alt="">' : '<span>' + esc((app.name || "APP").slice(0, 2)) + '</span>';
+    const previewLogo = FL.safeImageUrl(app.logo, "");
+    const preview = previewLogo ? '<img src="' + esc(previewLogo) + '" alt="">' : '<span>' + esc((app.name || "APP").slice(0, 2)) + '</span>';
     openModal(modalHeader(item ? "Editar aplicativo" : "Novo aplicativo", "Cadastre o servico e envie uma marca legivel para os combos.") + '<form class="modal-form" data-form-kind="app"><input type="hidden" name="id" value="' + esc(app.id) + '"><div class="app-upload-layout"><div class="app-logo-preview">' + preview + '</div><div class="upload-zone"><input id="app-logo-file" type="file" accept="image/png,image/jpeg,image/webp"><span>' + icon("image-up") + '</span><div><strong>Logo do aplicativo</strong><p>512 x 512 px, PNG ou WebP com fundo transparente. Ate 5 MB.</p></div></div></div><div class="form-grid"><label class="field"><span>Nome</span><input name="name" value="' + esc(app.name) + '" required></label><label class="field"><span>Categoria</span><input name="category" value="' + esc(app.category) + '" placeholder="Filmes e series" required></label></div><label class="field"><span>URL ou imagem atual</span><input name="logo" value="' + esc(app.logo) + '" placeholder="Opcional"></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + " Salvar aplicativo</button></div></form>", true);
   }
 
@@ -1146,7 +1306,7 @@
     const campaign = state.popupCampaigns.find(function (item) { return item.id === id; });
     const coupon = campaign && state.coupons.find(function (item) { return item.id === campaign.couponId; });
     if (!campaign) return;
-    openModal('<div class="popup-admin-preview"><div class="popup-admin-preview__image"><img src="' + esc(campaign.image) + '" alt=""></div><div><span class="eyebrow">' + esc(campaign.eyebrow) + '</span><h2>' + esc(campaign.title) + '</h2><p>' + esc(campaign.description) + '</p>' + (coupon ? '<button class="coupon-big-code">' + esc(coupon.code) + icon("copy") + '</button>' : "") + '<button class="button button--primary">' + esc(campaign.ctaLabel) + " " + icon("arrow-right") + "</button></div></div>", true);
+    openModal('<div class="popup-admin-preview"><div class="popup-admin-preview__image"><img src="' + esc(FL.safeImageUrl(campaign.image, "./assets/img/hero-family-fiber.jpg")) + '" alt=""></div><div><span class="eyebrow">' + esc(campaign.eyebrow) + '</span><h2>' + esc(campaign.title) + '</h2><p>' + esc(campaign.description) + '</p>' + (coupon ? '<button class="coupon-big-code">' + esc(coupon.code) + icon("copy") + '</button>' : "") + '<button class="button button--primary">' + esc(campaign.ctaLabel) + " " + icon("arrow-right") + "</button></div></div>", true);
   }
 
   function optimizeImage(file, overrides) {
@@ -1215,10 +1375,22 @@
     return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   }
 
+  function rejectField(form, name, message) {
+    const fieldElement = form.elements[name];
+    if (!fieldElement) { toast(message, "error"); return true; }
+    fieldElement.setCustomValidity(message);
+    const field = fieldElement.closest(".field") || fieldElement.parentElement;
+    if (field) { field.classList.add("has-error"); const current = $(".field-error", field); if (current) current.textContent = message; else field.insertAdjacentHTML("beforeend", '<small class="field-error" role="alert">' + esc(message) + '</small>'); }
+    fieldElement.reportValidity(); fieldElement.focus();
+    toast("Revise os campos destacados", "error");
+    return true;
+  }
+
   async function handleModalSubmit(form) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     const kind = form.dataset.formKind;
+    const auditEntry = { action: data.id ? "update" : "create", resource: kind, label: (data.id ? "Atualizacao: " : "Criacao: ") + (data.name || data.title || data.code || kind), detail: "Alteracao salva pelo painel administrativo" };
     if (kind === "compose-message") {
       const lead = state.leads.find(function (item) { return item.id === data.leadId; });
       const campaign = state.whatsappCampaigns.find(function (item) { return item.id === data.campaignId; });
@@ -1227,13 +1399,16 @@
       if (lead.status === "new") lead.status = "qualified";
       lead.lastContactAt = new Date().toISOString();
       if (campaign) campaign.contactsSent = Number(campaign.contactsSent || 0) + 1;
-      saveRuntime("Conversa preparada no WhatsApp");
+      saveRuntime("Conversa preparada no WhatsApp", { action: "contact", resource: "lead", label: "Conversa preparada", detail: lead.name + " via WhatsApp" });
       closeModal();
       window.open(FL.whatsappLink(lead.whatsapp, message), "_blank", "noopener");
       renderPanel();
       return;
     }
     if (kind === "banner") {
+      if (!FLAdmin.isSafeImageUrl(data.image)) { rejectField(form, "image", "Informe uma imagem HTTP(S), local ou da biblioteca."); return; }
+      if (data.primaryLink && !FLAdmin.isSafeUrl(data.primaryLink)) { rejectField(form, "primaryLink", "Use um link HTTP(S), ancora ou destino interno valido."); return; }
+      if (data.secondaryLink && !FLAdmin.isSafeUrl(data.secondaryLink)) { rejectField(form, "secondaryLink", "Use um link HTTP(S), ancora ou destino interno valido."); return; }
       const existing = state.banners.find(function (item) { return item.id === data.id; });
       let image = data.image;
       const file = $("#banner-image-file", form).files[0];
@@ -1245,6 +1420,7 @@
       if (existing) Object.assign(existing, item); else state.banners.push(item);
     }
     if (kind === "plan") {
+      if (!Number.isFinite(Number(data.price)) || Number(data.price) <= 0) { rejectField(form, "price", "Informe uma mensalidade maior que zero."); return; }
       const existing = state.plans.find(function (item) { return item.id === data.id; });
       const item = { id: data.id || FL.uid("plan"), categoryId: data.categoryId, title: data.title, speed: data.speed, price: Number(data.price), period: data.period || "mes", badge: data.badge, note: data.note, features: data.features.split("\n").map(function (value) { return value.trim(); }).filter(Boolean), active: form.elements.active.checked, featured: form.elements.featured.checked };
       if (existing) Object.assign(existing, item); else state.plans.push(item);
@@ -1257,6 +1433,7 @@
       if (existing) Object.assign(existing, item); else state.categories.push(item);
     }
     if (kind === "app") {
+      if (data.logo && !FLAdmin.isSafeImageUrl(data.logo)) { rejectField(form, "logo", "Use uma imagem HTTP(S), local ou da biblioteca."); return; }
       const existing = state.apps.find(function (item) { return item.id === data.id; });
       let logo = data.logo || (existing ? existing.logo : "");
       const file = $("#app-logo-file", form).files[0];
@@ -1300,6 +1477,8 @@
       if (existing) Object.assign(existing, item); else state.whatsappTemplates.push(item);
     }
     if (kind === "popup") {
+      if (!FLAdmin.isSafeImageUrl(data.image)) { rejectField(form, "image", "Informe uma imagem HTTP(S), local ou da biblioteca."); return; }
+      if (data.ctaLink && !FLAdmin.isSafeUrl(data.ctaLink)) { rejectField(form, "ctaLink", "Use um link HTTP(S), ancora ou destino interno valido."); return; }
       const existing = state.popupCampaigns.find(function (item) { return item.id === data.id; });
       const item = { id: data.id || FL.uid("popup"), name: data.name, type: "coupon", title: data.title, description: data.description, eyebrow: data.eyebrow, image: data.image, couponId: data.couponId, ctaLabel: data.ctaLabel, ctaLink: data.ctaLink, trigger: data.trigger, delaySeconds: Number(data.delaySeconds), scrollPercent: Number(data.scrollPercent), frequency: data.frequency, startsAt: data.startsAt, expiresAt: data.expiresAt, active: form.elements.active.checked };
       if (existing) Object.assign(existing, item); else state.popupCampaigns.push(item);
@@ -1310,32 +1489,49 @@
       const existing = list.find(function (item) { return item.id === data.id; });
       let item;
       if (kind === "benefit") item = { id: data.id || FL.uid("benefit"), title: data.title, icon: data.icon, text: data.text };
-      if (kind === "region") item = { id: data.id || FL.uid("region"), name: data.name, city: data.city, type: data.type, cep: data.cep, cepStart: data.cepStart, cepEnd: data.cepEnd, cepPrefixes: String(data.cepPrefixes || "").split(/\n|,/).map(function (value) { return value.replace(/\D/g, ""); }).filter(Boolean), neighborhoods: String(data.neighborhoods || "").split(/\n|,/).map(function (value) { return value.trim(); }).filter(Boolean), stateCode: data.stateCode.toUpperCase(), address: data.address, status: data.status, interest: Number(data.interest), leads: Number(data.leads), lat: data.lat === "" ? null : Number(data.lat), lng: data.lng === "" ? null : Number(data.lng), radiusKm: Number(data.radiusKm || state.coverageSettings.defaultRadiusKm), priority: Number(data.priority || 10), color: data.color || state.theme.mapAccent, active: form.elements.active.checked };
-      if (kind === "support") item = { ...existing, id: data.id, title: data.title, text: data.text, label: data.label, url: data.url, icon: data.icon };
+      if (kind === "region") {
+        if ((data.lat === "") !== (data.lng === "")) { rejectField(form, data.lat === "" ? "lat" : "lng", "Latitude e longitude devem ser informadas juntas."); return; }
+        if (data.lat !== "" && (Math.abs(Number(data.lat)) > 90 || Math.abs(Number(data.lng)) > 180)) { rejectField(form, "lat", "Informe coordenadas geograficas validas."); return; }
+        item = { id: data.id || FL.uid("region"), name: data.name, city: data.city, type: data.type, cep: data.cep, cepStart: data.cepStart, cepEnd: data.cepEnd, cepPrefixes: String(data.cepPrefixes || "").split(/\n|,/).map(function (value) { return value.replace(/\D/g, ""); }).filter(Boolean), neighborhoods: String(data.neighborhoods || "").split(/\n|,/).map(function (value) { return value.trim(); }).filter(Boolean), stateCode: data.stateCode.toUpperCase(), address: data.address, status: data.status, interest: Number(data.interest), leads: Number(data.leads), lat: data.lat === "" ? null : Number(data.lat), lng: data.lng === "" ? null : Number(data.lng), radiusKm: Number(data.radiusKm || state.coverageSettings.defaultRadiusKm), priority: Number(data.priority || 10), color: data.color || state.theme.mapAccent, active: form.elements.active.checked };
+      }
+      if (kind === "support") { if (data.url && !FLAdmin.isSafeUrl(data.url)) { rejectField(form, "url", "Use um endereco HTTP(S), interno ou uma ancora valida."); return; } item = { ...existing, id: data.id, title: data.title, text: data.text, label: data.label, url: data.url, icon: data.icon }; }
       if (existing) Object.assign(existing, item); else list.push(item);
     }
-    saveDraft("Alteracoes salvas em rascunho");
+    saveDraft("Alteracoes salvas em rascunho", auditEntry);
     closeModal();
     renderPanel();
   }
 
   function bindModalControls() {
     $$("[data-admin-modal-close]", $("#admin-modal")).forEach(function (button) { button.addEventListener("click", closeModal); });
+    const confirmButton = $("[data-confirm-submit]", $("#admin-modal"));
+    if (confirmButton) confirmButton.addEventListener("click", function () { const callback = pendingConfirmation; pendingConfirmation = null; closeModal(); if (callback) callback(); });
     const form = $(".modal-form", $("#admin-modal"));
-    if (form) form.addEventListener("submit", function (event) { event.preventDefault(); handleModalSubmit(form); });
+    if (form) form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const submit = $('button[type="submit"]', form);
+      form.setAttribute("aria-busy", "true");
+      if (submit) submit.disabled = true;
+      try { await handleModalSubmit(form); }
+      finally { if (document.contains(form)) { form.removeAttribute("aria-busy"); if (submit) submit.disabled = false; } }
+    });
+    if (form) $$("input, textarea, select", form).forEach(function (element) { element.addEventListener("input", function () { element.setCustomValidity(""); const field = element.closest(".field"); if (field) { field.classList.remove("has-error"); const error = $(".field-error", field); if (error) error.remove(); } }); });
     $$("[data-edit-category-modal]", $("#admin-modal")).forEach(function (button) { button.addEventListener("click", function () {
       categoryModal(state.categories.find(function (item) { return item.id === button.dataset.editCategoryModal; }));
     }); });
     $$("[data-delete-category-modal]", $("#admin-modal")).forEach(function (button) { button.addEventListener("click", function () {
       const id = button.dataset.deleteCategoryModal;
       if (state.plans.some(function (plan) { return plan.categoryId === id; })) { toast("Mova os planos desta categoria antes de exclui-la", "error"); return; }
-      if (confirm("Excluir esta categoria?")) { state.categories = state.categories.filter(function (item) { return item.id !== id; }); saveDraft("Categoria excluida"); categoryModal(); }
+      const item = state.categories.find(function (category) { return category.id === id; });
+      requestConfirmation({ title: "Excluir a categoria " + (item ? item.name : "selecionada") + "?", description: "A categoria sera removida das opcoes de cadastro de planos.", impact: "Nenhum plano esta associado a esta categoria.", confirmLabel: "Excluir categoria" }, function () { state.categories = state.categories.filter(function (category) { return category.id !== id; }); saveDraft("Categoria excluida", { action: "delete", resource: "category", label: "Categoria excluida", detail: item ? item.name : id }); categoryModal(); });
     }); });
     const resetCategory = $("[data-category-reset]", $("#admin-modal"));
     if (resetCategory) resetCategory.addEventListener("click", function () { categoryModal(); });
     $$("[data-add-home-section]", $("#admin-modal")).forEach(function (button) { button.addEventListener("click", function () { addHomeSection(button.dataset.addHomeSection); }); });
     $$("[data-apply-home-template]", $("#admin-modal")).forEach(function (button) { button.addEventListener("click", function () {
-      if (confirm("Aplicar este modelo de home? A ordem e a visibilidade das secoes do sistema serao atualizadas.")) applyHomeTemplate(button.dataset.applyHomeTemplate);
+      const templateId = button.dataset.applyHomeTemplate; const template = HOME_TEMPLATES[templateId];
+      requestConfirmation({ icon: "layout-template", title: "Aplicar o modelo " + (template ? template.label : "selecionado") + "?", description: "A ordem e a visibilidade das secoes do sistema serao atualizadas.", impact: "O conteudo dos blocos sera preservado e a alteracao podera ser desfeita no construtor.", confirmLabel: "Aplicar modelo", confirmIcon: "layout-template", danger: false }, function () { applyHomeTemplate(templateId); });
     }); });
     const cepButton = $("#lookup-region-cep", $("#admin-modal"));
     const cepInput = $("#region-cep", $("#admin-modal"));
@@ -1380,6 +1576,7 @@
 
   function handleAction(action, id, element) {
     const find = function (list) { return list.find(function (item) { return item.id === id; }); };
+    if (action === "retry-panel") renderPanel();
     if (action === "publish") publish();
     if (action === "preview-site" || action === "builder-preview") window.open("./index.html?theme=" + state.builderSettings.previewTheme, "_blank", "noopener");
     if (action === "builder-refresh") { const frame = $("#site-preview"); if (frame) frame.src = "./index.html?preview=" + Date.now() + "&theme=" + state.builderSettings.previewTheme; }
@@ -1390,10 +1587,10 @@
     if (action === "builder-add-banner") {
       const source = state.banners[state.banners.length - 1] || { eyebrow: state.brand.tagline, image: state.mediaLibrary[0] ? state.mediaLibrary[0].url : "", primaryLabel: "Conhecer planos", primaryLink: "#planos", secondaryLabel: "Consultar cobertura", secondaryLink: "#cobertura", position: "center", overlay: 65 };
       const banner = { ...FL.clone(source), id: FL.uid("banner"), name: "Novo destaque", title: "Uma nova mensagem para sua marca.", subtitle: "Edite este slide diretamente no construtor visual.", badge: "Novidade", active: false };
-      state.banners.push(banner); selectedBannerId = banner.id; saveDraft("Slide adicionado"); renderPanel();
+      state.banners.push(banner); selectedBannerId = banner.id; saveDraft("Slide adicionado", { action: "create", resource: "banner", label: "Slide criado no Site Studio", detail: banner.name }); renderPanel();
     }
-    if (action === "duplicate-builder-banner") { const source = find(state.banners); if (source) { const banner = FL.clone(source); banner.id = FL.uid("banner"); banner.name += " - copia"; banner.active = false; state.banners.splice(state.banners.indexOf(source) + 1, 0, banner); selectedBannerId = banner.id; saveDraft("Slide duplicado"); renderPanel(); } }
-    if (action === "delete-builder-banner" && state.banners.length > 1 && confirm("Excluir este slide?")) { const index = state.banners.findIndex(function (item) { return item.id === id; }); state.banners.splice(index, 1); selectedBannerId = state.banners[Math.max(0, index - 1)].id; saveDraft("Slide excluido"); renderPanel(); }
+    if (action === "duplicate-builder-banner") { const source = find(state.banners); if (source) { const banner = FL.clone(source); banner.id = FL.uid("banner"); banner.name += " - copia"; banner.active = false; state.banners.splice(state.banners.indexOf(source) + 1, 0, banner); selectedBannerId = banner.id; saveDraft("Slide duplicado", { action: "create", resource: "banner", label: "Slide duplicado", detail: source.name }); renderPanel(); } }
+    if (action === "delete-builder-banner" && state.banners.length > 1) { const item = find(state.banners); requestConfirmation({ title: "Excluir o slide " + (item ? item.name : "selecionado") + "?", description: "O slide deixara de existir no Site Studio e na pagina inicial.", impact: "A exclusao entra no rascunho e so chega ao site publicado depois de Publicar.", confirmLabel: "Excluir slide" }, function () { const index = state.banners.findIndex(function (banner) { return banner.id === id; }); state.banners.splice(index, 1); selectedBannerId = state.banners[Math.max(0, index - 1)].id; saveDraft("Slide excluido", { action: "delete", resource: "banner", label: "Slide excluido", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "move-builder-banner-up" || action === "move-builder-banner-down") { moveInArray(state.banners, id, action.endsWith("up") ? -1 : 1); saveDraft("Ordem dos slides atualizada"); renderPanel(); }
     if (action === "move-block-up" || action === "move-block-down") { recordBuilderHistory(); moveInArray(state.pageBlocks, selectedBlockId, action.endsWith("up") ? -1 : 1); saveDraft(); renderPanel(); }
     if (action === "duplicate-block") {
@@ -1402,7 +1599,7 @@
     }
     if (action === "delete-block") {
       const source = state.pageBlocks.find(function (item) { return item.id === selectedBlockId; });
-      if (source && !source.locked && confirm("Excluir esta secao da pagina inicial?")) { recordBuilderHistory(); const index = state.pageBlocks.indexOf(source); state.pageBlocks.splice(index, 1); selectedBlockId = state.pageBlocks[Math.max(0, index - 1)].id; saveDraft("Secao excluida"); renderPanel(); }
+      if (source && !source.locked) requestConfirmation({ title: "Excluir a secao " + source.label + "?", description: "O bloco e seu conteudo serao removidos da estrutura da pagina inicial.", impact: "Voce ainda podera desfazer esta mudanca durante a sessao do construtor.", confirmLabel: "Excluir secao" }, function () { recordBuilderHistory(); const index = state.pageBlocks.indexOf(source); state.pageBlocks.splice(index, 1); selectedBlockId = state.pageBlocks[Math.max(0, index - 1)].id; saveDraft("Secao excluida", { action: "delete", resource: "section", label: "Secao da home excluida", detail: source.label }); renderPanel(); });
     }
     if (action === "builder-undo" && builderHistory.length) { const current = builderSnapshot(); const previous = builderHistory.pop(); builderFuture.push(current); restoreBuilderSnapshot(previous); toast("Alteracao desfeita"); renderPanel(); }
     if (action === "builder-redo" && builderFuture.length) { const current = builderSnapshot(); const next = builderFuture.pop(); builderHistory.push(current); restoreBuilderSnapshot(next); toast("Alteracao refeita"); renderPanel(); }
@@ -1411,12 +1608,13 @@
     if (action === "edit-banner") bannerModal(find(state.banners));
     if (action === "toggle-banner") { const item = find(state.banners); item.active = !item.active; saveDraft(); renderPanel(); }
     if (action === "duplicate-banner") { const item = FL.clone(find(state.banners)); item.id = FL.uid("banner"); item.name += " - copia"; item.active = false; state.banners.push(item); saveDraft("Slide duplicado"); renderPanel(); }
-    if (action === "delete-banner" && state.banners.length > 1 && confirm("Excluir este slide?")) { state.banners = state.banners.filter(function (item) { return item.id !== id; }); saveDraft("Slide excluido"); renderPanel(); }
+    if (action === "delete-banner" && state.banners.length > 1) { const item = find(state.banners); requestConfirmation({ title: "Excluir o slide " + (item ? item.name : "selecionado") + "?", description: "O destaque sera removido do carrossel da pagina inicial.", impact: "A imagem permanece na Central de midia e pode ser reutilizada.", confirmLabel: "Excluir slide" }, function () { state.banners = state.banners.filter(function (banner) { return banner.id !== id; }); saveDraft("Slide excluido", { action: "delete", resource: "banner", label: "Slide excluido", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "copy-media") {
       const item = find(state.mediaLibrary);
       if (item && navigator.clipboard) navigator.clipboard.writeText(item.url);
       toast("Endereco da imagem copiado");
     }
+    if (action === "clear-media-filters") { crudState.media.search = ""; crudState.media.usage = "all"; crudState.media.sort = "recent"; crudState.media.page = 1; renderPanel(); }
     if (action === "download-media") {
       const item = find(state.mediaLibrary);
       if (item) { const link = document.createElement("a"); link.href = item.url; link.download = slugify(item.name) + "." + (item.type || "image/webp").split("/")[1].replace("jpeg", "jpg"); link.click(); }
@@ -1425,7 +1623,7 @@
       const item = find(state.mediaLibrary);
       const used = item && (state.banners.some(function (banner) { return banner.image === item.url || banner.mobileImage === item.url; }) || state.apps.some(function (app) { return app.logo === item.url; }) || state.popupCampaigns.some(function (campaign) { return campaign.image === item.url; }) || state.pages.some(function (page) { return page.blocks.some(function (block) { return block.url === item.url; }); }));
       if (used) toast("Esta imagem esta em uso. Troque-a no conteudo antes de remover.", "error");
-      else if (item && confirm("Remover esta imagem da biblioteca?")) { state.mediaLibrary = state.mediaLibrary.filter(function (media) { return media.id !== id; }); saveDraft("Imagem removida"); renderPanel(); }
+      else if (item) requestConfirmation({ title: "Remover " + item.name + "?", description: "O arquivo sera excluido da biblioteca local.", impact: "Esta verificacao nao encontrou uso ativo da imagem no site.", confirmLabel: "Remover imagem" }, function () { state.mediaLibrary = state.mediaLibrary.filter(function (media) { return media.id !== id; }); saveDraft("Imagem removida", { action: "delete", resource: "media", label: "Imagem removida", detail: item.name }); renderPanel(); });
     }
     if (action === "save-content") { saveDraft("Alteracoes salvas em rascunho"); renderPanel(); }
     if (action === "apply-theme-preset") {
@@ -1439,45 +1637,55 @@
     if (action === "add-nav-link") { state.navigation.push({ id: FL.uid("nav"), label: "Novo link", href: "#", visible: true }); saveDraft(); renderPanel(); }
     if (action === "new-plan") planModal();
     if (action === "edit-plan") planModal(find(state.plans));
-    if (action === "toggle-plan") { const item = find(state.plans); item.active = !item.active; saveDraft(); renderPanel(); }
-    if (action === "duplicate-plan") { const item = FL.clone(find(state.plans)); item.id = FL.uid("plan"); item.title += " - copia"; item.active = false; state.plans.push(item); saveDraft("Plano duplicado"); renderPanel(); }
-    if (action === "delete-plan" && confirm("Excluir este plano?")) { state.plans = state.plans.filter(function (item) { return item.id !== id; }); saveDraft("Plano excluido"); renderPanel(); }
+    if (action === "toggle-plan") { const item = find(state.plans); item.active = !item.active; saveDraft(item.active ? "Plano ativado" : "Plano pausado", { action: "update", resource: "plan", label: item.active ? "Plano ativado" : "Plano pausado", detail: item.speed + " - " + item.title }); renderPanel(); }
+    if (action === "duplicate-plan") { const source = find(state.plans); const item = FL.clone(source); item.id = FL.uid("plan"); item.title += " - copia"; item.active = false; state.plans.push(item); saveDraft("Plano duplicado", { action: "create", resource: "plan", label: "Plano duplicado", detail: source.speed + " - " + source.title }); renderPanel(); }
+    if (action === "delete-plan") { const item = find(state.plans); const leadCount = state.leads.filter(function (lead) { return lead.planId === id; }).length; requestConfirmation({ title: "Excluir " + (item ? item.speed + " - " + item.title : "este plano") + "?", description: "A oferta sera removida do site, das listagens e dos cupons associados.", impact: leadCount ? leadCount + " lead(s) historico(s) continuarao visiveis como plano removido." : "Nenhum lead historico depende desta oferta.", confirmLabel: "Excluir plano" }, function () { state.plans = state.plans.filter(function (plan) { return plan.id !== id; }); state.coupons.forEach(function (coupon) { coupon.planIds = coupon.planIds.filter(function (planId) { return planId !== id; }); }); crudState.plans.selected.delete(id); saveDraft("Plano excluido", { action: "delete", resource: "plan", label: "Plano excluido", detail: item ? item.speed + " - " + item.title : id }); renderPanel(); }); }
     if (action === "manage-categories") categoryModal();
+    if (action === "clear-plans-filters") { crudState.plans.search = ""; crudState.plans.category = "all"; crudState.plans.status = "all"; crudState.plans.sort = "featured"; crudState.plans.page = 1; renderPanel(); }
     if (action === "add-app") appModal();
+    if (action === "clear-apps-filters") { crudState.apps.search = ""; crudState.apps.category = "all"; crudState.apps.sort = "name"; crudState.apps.page = 1; renderPanel(); }
     if (action === "edit-app") appModal(find(state.apps));
-    if (action === "delete-app" && confirm("Excluir este app?")) { state.apps = state.apps.filter(function (item) { return item.id !== id; }); saveDraft(); renderPanel(); }
+    if (action === "delete-app") { const item = find(state.apps); requestConfirmation({ title: "Excluir " + (item ? item.name : "este aplicativo") + "?", description: "O aplicativo deixara de aparecer nos combos e na vitrine de beneficios.", impact: "A logo enviada permanece na Central de midia.", confirmLabel: "Excluir aplicativo" }, function () { state.apps = state.apps.filter(function (app) { return app.id !== id; }); saveDraft("Aplicativo excluido", { action: "delete", resource: "app", label: "Aplicativo excluido", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "add-benefit") simpleItemModal("benefit");
     if (action === "edit-benefit") simpleItemModal("benefit", find(state.benefits));
+    if (action === "delete-benefit" && state.benefits.length > 1) { const item = find(state.benefits); requestConfirmation({ title: "Excluir o diferencial " + (item ? item.title : "selecionado") + "?", description: "O beneficio deixara de aparecer na pagina inicial.", impact: "Os textos dos planos nao serao alterados.", confirmLabel: "Excluir diferencial" }, function () { state.benefits = state.benefits.filter(function (benefit) { return benefit.id !== id; }); saveDraft("Diferencial excluido", { action: "delete", resource: "benefit", label: "Diferencial excluido", detail: item ? item.title : id }); renderPanel(); }); }
     if (action === "add-region") regionModal();
+    if (action === "clear-region-filters") { crudState.regions.search = ""; crudState.regions.type = "all"; crudState.regions.status = "all"; crudState.regions.sort = "priority"; crudState.regions.page = 1; renderPanel(); }
     if (action === "edit-region") regionModal(find(state.regions));
-    if (action === "toggle-region") { const item = find(state.regions); item.active = !item.active; saveDraft(); renderPanel(); }
-    if (action === "delete-region" && state.regions.length > 1 && confirm("Excluir esta area de cobertura?")) { state.regions = state.regions.filter(function (item) { return item.id !== id; }); saveDraft("Area removida"); renderPanel(); }
+    if (action === "toggle-region") { const item = find(state.regions); item.active = !item.active; saveDraft(item.active ? "Area publicada" : "Area ocultada", { action: "update", resource: "coverage", label: item.active ? "Area publicada" : "Area ocultada", detail: item.name }); renderPanel(); }
+    if (action === "delete-region" && state.regions.length > 1) { const item = find(state.regions); requestConfirmation({ title: "Excluir a area " + (item ? item.name : "selecionada") + "?", description: "A regra deixara de participar das consultas de cobertura e do mapa.", impact: "Camadas importadas por KML/KMZ nao serao alteradas.", confirmLabel: "Excluir area" }, function () { state.regions = state.regions.filter(function (region) { return region.id !== id; }); saveDraft("Area removida", { action: "delete", resource: "coverage", label: "Area de cobertura excluida", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "open-region-route") { const item = find(state.regions); if (item) window.open(googleMapsUrl(item, true), "_blank", "noopener"); }
     if (action === "toggle-coverage-file") { const item = find(state.coverageFiles); if (item) { item.active = !item.active; saveDraft(); renderPanel(); } }
-    if (action === "delete-coverage-file" && confirm("Remover esta camada de cobertura?")) { state.coverageFiles = state.coverageFiles.filter(function (item) { return item.id !== id; }); saveDraft("Camada removida"); renderPanel(); }
+    if (action === "delete-coverage-file") { const item = find(state.coverageFiles); requestConfirmation({ title: "Remover a camada " + (item ? item.name : "selecionada") + "?", description: "Os poligonos, linhas e pontos desta importacao serao removidos do mapa.", impact: item ? item.features.length + " geometrias e " + item.coordinateCount + " coordenadas normalizadas serao descartadas." : "A camada sera removida.", confirmLabel: "Remover camada" }, function () { state.coverageFiles = state.coverageFiles.filter(function (file) { return file.id !== id; }); saveDraft("Camada removida", { action: "delete", resource: "coverage", label: "Camada de cobertura removida", detail: item ? item.fileName : id }); renderPanel(); }); }
     if (action === "edit-support") simpleItemModal("support", find(state.supportCards));
     if (action === "toggle-support") { const item = find(state.supportCards); item.active = !item.active; saveDraft(); renderPanel(); }
     if (action === "new-whatsapp-campaign") whatsappCampaignModal();
     if (action === "edit-whatsapp-campaign") whatsappCampaignModal(find(state.whatsappCampaigns));
+    if (action === "delete-whatsapp-campaign") { const item = find(state.whatsappCampaigns); requestConfirmation({ title: "Excluir a campanha " + (item ? item.name : "selecionada") + "?", description: "A segmentacao e a mensagem serao removidas da fila comercial.", impact: "Leads e historico de contatos permanecem no funil.", confirmLabel: "Excluir campanha" }, function () { state.whatsappCampaigns = state.whatsappCampaigns.filter(function (campaign) { return campaign.id !== id; }); saveDraft("Campanha manual excluida", { action: "delete", resource: "whatsapp-campaign", label: "Campanha manual excluida", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "new-whatsapp-template") whatsappTemplateModal();
     if (action === "edit-whatsapp-template") whatsappTemplateModal(find(state.whatsappTemplates));
-    if (action === "delete-whatsapp-template" && state.whatsappTemplates.length > 1 && confirm("Excluir este template?")) { state.whatsappTemplates = state.whatsappTemplates.filter(function (item) { return item.id !== id; }); saveDraft("Template excluido"); renderPanel(); }
+    if (action === "delete-whatsapp-template" && state.whatsappTemplates.length > 1) { const item = find(state.whatsappTemplates); const campaigns = state.whatsappCampaigns.filter(function (campaign) { return campaign.templateId === id; }).length; requestConfirmation({ title: "Excluir o template " + (item ? item.name : "selecionado") + "?", description: "A mensagem deixara de estar disponivel no compositor do WhatsApp.", impact: campaigns ? campaigns + " campanha(s) usam este template e passarao a manter somente a mensagem salva." : "Nenhuma campanha depende deste template.", confirmLabel: "Excluir template" }, function () { state.whatsappTemplates = state.whatsappTemplates.filter(function (template) { return template.id !== id; }); state.whatsappCampaigns.forEach(function (campaign) { if (campaign.templateId === id) campaign.templateId = ""; }); saveDraft("Template excluido", { action: "delete", resource: "whatsapp-template", label: "Template excluido", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "contact-lead") {
       const lead = find(state.leads); const campaign = element.dataset.campaignId && state.whatsappCampaigns.find(function (item) { return item.id === element.dataset.campaignId; });
       if (lead && lead.whatsapp) messageComposerModal(lead, campaign);
     }
-    if (action === "delete-lead" && confirm("Excluir este lead da demonstracao?")) { state.leads = state.leads.filter(function (item) { return item.id !== id; }); saveRuntime("Lead excluido"); renderPanel(); }
+    if (action === "clear-lead-filters") { crudState.leads.search = ""; crudState.leads.source = "all"; crudState.leads.sort = "recent"; renderPanel(); }
+    if (action === "delete-lead") { const item = find(state.leads); requestConfirmation({ title: "Excluir o contato " + (item ? item.name : "selecionado") + "?", description: "O lead sera removido do funil e das segmentacoes de campanhas manuais.", impact: "Esta acao remove nome, WhatsApp e atribuicao armazenados nesta demonstracao.", confirmLabel: "Excluir contato" }, function () { state.leads = state.leads.filter(function (lead) { return lead.id !== id; }); saveRuntime("Lead excluido", { action: "delete", resource: "lead", label: "Lead excluido", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "export-leads") exportLeads();
     if (action === "new-coupon") couponModal();
+    if (action === "clear-coupon-filters") { crudState.coupons.search = ""; crudState.coupons.status = "all"; crudState.coupons.sort = "recent"; crudState.coupons.page = 1; renderPanel(); }
     if (action === "edit-coupon") couponModal(find(state.coupons));
-    if (action === "toggle-coupon") { const item = find(state.coupons); item.active = !item.active; saveDraft(); renderPanel(); }
-    if (action === "delete-coupon" && confirm("Excluir este cupom?")) { state.coupons = state.coupons.filter(function (item) { return item.id !== id; }); saveDraft(); renderPanel(); }
+    if (action === "toggle-coupon") { const item = find(state.coupons); item.active = !item.active; saveDraft(item.active ? "Cupom ativado" : "Cupom pausado", { action: "update", resource: "coupon", label: item.active ? "Cupom ativado" : "Cupom pausado", detail: item.code }); renderPanel(); }
+    if (action === "delete-coupon") { const item = find(state.coupons); const campaigns = state.popupCampaigns.filter(function (campaign) { return campaign.couponId === id; }).length; requestConfirmation({ title: "Excluir o cupom " + (item ? item.code : "selecionado") + "?", description: "O codigo deixara de ser aceito no site e sera removido dos leads futuros.", impact: campaigns ? campaigns + " campanha(s) serao mantidas sem cupom associado." : "Nenhuma campanha depende deste cupom.", confirmLabel: "Excluir cupom" }, function () { state.coupons = state.coupons.filter(function (coupon) { return coupon.id !== id; }); state.popupCampaigns.forEach(function (campaign) { if (campaign.couponId === id) campaign.couponId = ""; }); saveDraft("Cupom excluido", { action: "delete", resource: "coupon", label: "Cupom excluido", detail: item ? item.code : id }); renderPanel(); }); }
     if (action === "copy-code") { if (navigator.clipboard) navigator.clipboard.writeText(element.dataset.code); toast("Cupom copiado"); }
     if (action === "new-popup") popupModal();
+    if (action === "clear-popup-filters") { crudState.popups.search = ""; crudState.popups.status = "all"; crudState.popups.sort = "recent"; crudState.popups.page = 1; renderPanel(); }
     if (action === "edit-popup") popupModal(find(state.popupCampaigns));
-    if (action === "toggle-popup") { const item = find(state.popupCampaigns); item.active = !item.active; saveDraft(); renderPanel(); }
+    if (action === "toggle-popup") { const item = find(state.popupCampaigns); item.active = !item.active; saveDraft(item.active ? "Campanha ativada" : "Campanha pausada", { action: "update", resource: "campaign", label: item.active ? "Campanha ativada" : "Campanha pausada", detail: item.name }); renderPanel(); }
+    if (action === "delete-popup") { const item = find(state.popupCampaigns); requestConfirmation({ title: "Excluir a campanha " + (item ? item.name : "selecionada") + "?", description: "O popup deixara de existir e nao podera mais ser exibido no site.", impact: "O cupom associado sera preservado para uso por codigo ou em outra campanha.", confirmLabel: "Excluir campanha" }, function () { state.popupCampaigns = state.popupCampaigns.filter(function (campaign) { return campaign.id !== id; }); saveDraft("Campanha excluida", { action: "delete", resource: "campaign", label: "Campanha excluida", detail: item ? item.name : id }); renderPanel(); }); }
     if (action === "preview-popup") previewPopup(id);
     if (action === "new-page") pageModal();
+    if (action === "clear-pages-filters") { crudState.pages.search = ""; crudState.pages.status = "all"; crudState.pages.sort = "updated"; crudState.pages.page = 1; renderPanel(); }
     if (action === "edit-page") { pageEditId = id; const page = currentPage(); selectedPageBlockId = page && page.blocks[0] ? page.blocks[0].id : null; renderPanel(); }
     if (action === "page-settings") pageModal(find(state.pages));
     if (action === "open-page") { const page = find(state.pages); if (page) window.open("./pagina.html?slug=" + encodeURIComponent(page.slug), "_blank", "noopener"); }
@@ -1486,9 +1694,9 @@
       const source = FL.clone(find(state.pages));
       source.id = FL.uid("page"); source.title += " - copia"; source.slug += "-copia"; source.status = "draft"; source.updatedAt = new Date().toISOString().slice(0, 10);
       source.blocks.forEach(function (block) { block.id = FL.uid("block"); });
-      state.pages.push(source); touchPage(source, "Pagina duplicada"); renderPanel();
+      state.pages.push(source); saveDraft("Pagina duplicada", { action: "create", resource: "page", label: "Pagina duplicada", detail: source.title }); renderPanel();
     }
-    if (action === "delete-page" && confirm("Excluir esta pagina?")) { state.pages = state.pages.filter(function (item) { return item.id !== id; }); touchPage(null, "Pagina excluida"); renderPanel(); }
+    if (action === "delete-page") { const item = find(state.pages); const links = state.supportCards.filter(function (card) { return item && String(card.url || "").includes(item.slug); }).length; requestConfirmation({ title: "Excluir a pagina " + (item ? item.title : "selecionada") + "?", description: "A pagina e todos os seus blocos serao removidos do site.", impact: links ? links + " atalho(s) de atendimento podem apontar para esta pagina." : "Nenhum atalho conhecido aponta para esta pagina.", confirmLabel: "Excluir pagina" }, function () { state.pages = state.pages.filter(function (page) { return page.id !== id; }); saveDraft("Pagina excluida", { action: "delete", resource: "page", label: "Pagina excluida", detail: item ? item.title : id }); renderPanel(); }); }
     if (action === "refresh-page-preview") { const frame = $("#page-preview"); const page = currentPage(); if (frame && page) frame.src = "./pagina.html?slug=" + encodeURIComponent(page.slug) + "&preview=" + Date.now(); }
     if (action === "add-page-block") {
       const page = currentPage(); if (!page) return;
@@ -1507,13 +1715,93 @@
     }
     if (action === "move-page-block-up" || action === "move-page-block-down") { const page = currentPage(); if (page) { moveInArray(page.blocks, selectedPageBlockId, action.endsWith("up") ? -1 : 1); touchPage(page); renderPanel(); } }
     if (action === "duplicate-page-block") { const page = currentPage(); const source = page && page.blocks.find(function (item) { return item.id === selectedPageBlockId; }); if (source) { const copy = FL.clone(source); copy.id = FL.uid("block"); copy.title = (copy.title || "Bloco") + " - copia"; page.blocks.splice(page.blocks.indexOf(source) + 1, 0, copy); selectedPageBlockId = copy.id; touchPage(page, "Bloco duplicado"); renderPanel(); } }
-    if (action === "delete-page-block") { const page = currentPage(); if (page && page.blocks.length > 1 && confirm("Excluir este bloco?")) { page.blocks = page.blocks.filter(function (item) { return item.id !== selectedPageBlockId; }); selectedPageBlockId = page.blocks[0].id; touchPage(page, "Bloco excluido"); renderPanel(); } }
+    if (action === "delete-page-block") { const page = currentPage(); const block = page && page.blocks.find(function (item) { return item.id === selectedPageBlockId; }); if (page && block && page.blocks.length > 1) requestConfirmation({ title: "Excluir o bloco " + (block.title || "selecionado") + "?", description: "O conteudo deste bloco sera removido da pagina " + page.title + ".", impact: "Os outros blocos e as configuracoes da pagina serao preservados.", confirmLabel: "Excluir bloco" }, function () { page.blocks = page.blocks.filter(function (item) { return item.id !== selectedPageBlockId; }); selectedPageBlockId = page.blocks[0].id; saveDraft("Bloco excluido", { action: "delete", resource: "page-block", label: "Bloco de pagina excluido", detail: block.title || block.type }); renderPanel(); }); }
     if (action === "export-report") exportCsv();
+    if (action === "export-audit") exportAudit();
     if (action === "export-state") exportState();
-    if (action === "reset-state" && confirm("Restaurar todos os dados padrao do prototipo?")) { state = FL.resetState(); saveDraft("Configuracao restaurada"); renderPanel(); }
+    if (action === "reset-state") requestConfirmation({ title: "Restaurar todos os dados?", description: "Planos, paginas, identidade, campanhas, leads e configuracoes locais voltarao ao estado inicial.", impact: "Esta acao nao pode ser desfeita. Exporte a configuracao antes de continuar.", confirmLabel: "Restaurar padrao" }, function () { state = FL.resetState(); writeAudit("delete", "system", "Configuracao restaurada", "Todos os dados locais voltaram ao padrao"); state = FL.saveState(state, false); Object.keys(crudState).forEach(function (key) { crudState[key].selected.clear(); crudState[key].page = 1; }); toast("Configuracao restaurada"); renderPanel(); });
+  }
+
+  function renderCrudAndFocus(key) {
+    renderPanel();
+    requestAnimationFrame(function () {
+      const input = $('[data-crud-search="' + key + '"]', $("#admin-panel"));
+      if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    });
+  }
+
+  function performBulkAction(key, action) {
+    const view = crudState[key];
+    if (!view || !view.selected.size) return;
+    const ids = Array.from(view.selected);
+    if (key === "pages" && (action === "publish" || action === "draft")) {
+      state.pages.forEach(function (page) { if (view.selected.has(page.id)) { page.status = action === "publish" ? "published" : "draft"; page.updatedAt = new Date().toISOString().slice(0, 10); } });
+      view.selected.clear();
+      saveDraft(ids.length + (ids.length === 1 ? " pagina atualizada" : " paginas atualizadas"), { action: "bulk", resource: "page", label: action === "publish" ? "Paginas publicadas" : "Paginas movidas para rascunho", detail: ids.length + " item(ns) alterados em massa" });
+      renderPanel(); return;
+    }
+    if (key === "pages" && action === "delete") {
+      const linked = state.supportCards.filter(function (card) { return state.pages.some(function (page) { return view.selected.has(page.id) && String(card.url || "").includes(page.slug); }); }).length;
+      requestConfirmation({ title: "Excluir " + ids.length + (ids.length === 1 ? " pagina?" : " paginas?"), description: "As paginas e todos os blocos selecionados serao removidos.", impact: linked ? linked + " atalho(s) de atendimento podem apontar para estas paginas." : "Nenhum atalho conhecido aponta para estas paginas.", confirmLabel: "Excluir selecionadas" }, function () { state.pages = state.pages.filter(function (page) { return !view.selected.has(page.id); }); view.selected.clear(); saveDraft("Paginas excluidas", { action: "delete", resource: "page", label: "Paginas excluidas em massa", detail: ids.length + " pagina(s) removidas" }); renderPanel(); });
+      return;
+    }
+    if (key !== "plans") return;
+    if (action === "activate" || action === "deactivate") {
+      state.plans.forEach(function (plan) { if (view.selected.has(plan.id)) plan.active = action === "activate"; });
+      view.selected.clear();
+      saveDraft(ids.length + (ids.length === 1 ? " plano atualizado" : " planos atualizados"), { action: "bulk", resource: "plan", label: action === "activate" ? "Planos ativados" : "Planos pausados", detail: ids.length + " item(ns) alterados em massa" });
+      renderPanel();
+    }
+    if (action === "delete") {
+      const linkedLeads = state.leads.filter(function (lead) { return view.selected.has(lead.planId); }).length;
+      requestConfirmation({ title: "Excluir " + ids.length + (ids.length === 1 ? " plano?" : " planos?"), description: "Esta acao remove as ofertas selecionadas do site e do painel.", impact: linkedLeads ? linkedLeads + " lead(s) historico(s) continuarao registrados como plano removido." : "Os cupons manterao suas configuracoes, mas deixarao de encontrar estes planos.", confirmLabel: "Excluir selecionados" }, function () {
+        state.plans = state.plans.filter(function (plan) { return !view.selected.has(plan.id); });
+        state.coupons.forEach(function (coupon) { coupon.planIds = coupon.planIds.filter(function (planId) { return !view.selected.has(planId); }); });
+        view.selected.clear();
+        saveDraft("Planos excluidos", { action: "delete", resource: "plan", label: "Planos excluidos em massa", detail: ids.length + " oferta(s) removidas" });
+        renderPanel();
+      });
+    }
+  }
+
+  function bindCrudControls() {
+    $$('[data-crud-search]', $("#admin-panel")).forEach(function (input) {
+      input.addEventListener("input", function () {
+        const key = input.dataset.crudSearch; const view = crudState[key];
+        if (!view) return;
+        view.search = input.value; view.page = 1;
+        clearTimeout(crudSearchTimer);
+        crudSearchTimer = setTimeout(function () { renderCrudAndFocus(key); }, 180);
+      });
+    });
+    $$('[data-crud-filter]', $("#admin-panel")).forEach(function (select) {
+      select.addEventListener("change", function () { const view = crudState[select.dataset.crudFilter]; if (view) { view[select.dataset.filterName] = select.value; view.page = 1; renderPanel(); } });
+    });
+    $$('[data-crud-sort]', $("#admin-panel")).forEach(function (select) {
+      select.addEventListener("change", function () { const view = crudState[select.dataset.crudSort]; if (view) { view.sort = select.value; view.page = 1; renderPanel(); } });
+    });
+    $$('[data-crud-page]', $("#admin-panel")).forEach(function (button) {
+      button.addEventListener("click", function () { const view = crudState[button.dataset.crudPage]; if (view && !button.disabled) { view.page = Number(button.dataset.page); renderPanel(); window.scrollTo({ top: 0, behavior: "smooth" }); } });
+    });
+    $$('[data-crud-select]', $("#admin-panel")).forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () { const view = crudState[checkbox.dataset.crudSelect]; if (!view) return; if (checkbox.checked) view.selected.add(checkbox.dataset.id); else view.selected.delete(checkbox.dataset.id); renderPanel(); });
+    });
+    $$('[data-crud-select-page]', $("#admin-panel")).forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        const key = checkbox.dataset.crudSelectPage; const view = crudState[key];
+        if (!view || key !== "plans") return;
+        const result = collectPlans(view);
+        result.items.forEach(function (item) { if (checkbox.checked) view.selected.add(item.id); else view.selected.delete(item.id); });
+        renderPanel();
+      });
+    });
+    $$('[data-bulk-clear]', $("#admin-panel")).forEach(function (button) { button.addEventListener("click", function () { const view = crudState[button.dataset.bulkClear]; if (view) { view.selected.clear(); renderPanel(); } }); });
+    $$('[data-bulk-action]', $("#admin-panel")).forEach(function (button) { button.addEventListener("click", function () { performBulkAction(button.dataset.bulkKey, button.dataset.bulkAction); }); });
   }
 
   function bindPanelControls() {
+    bindCrudControls();
+    $$('[data-analytics-period]', $("#admin-panel")).forEach(function (select) { select.addEventListener("change", function () { analyticsPeriod = Number(select.value || 28); renderPanel(); }); });
     $$("[data-goto]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { setPanel(element.dataset.goto); }); });
     $$("[data-studio-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { builderStudioTab = element.dataset.studioTab; renderPanel(); }); });
     $$("[data-action]", $("#admin-panel")).forEach(function (element) {
@@ -1583,12 +1871,6 @@
     const pageMedia = $("[data-page-media]", $("#admin-panel"));
     if (pageMedia) pageMedia.addEventListener("change", function () { const page = currentPage(); const block = page && page.blocks.find(function (item) { return item.id === selectedPageBlockId; }); if (block && pageMedia.value) { block.url = pageMedia.value; touchPage(page, "Imagem aplicada"); renderPanel(); } });
     bindPageBuilderDrag();
-    const categoryFilter = $("#plan-category-filter");
-    if (categoryFilter) categoryFilter.addEventListener("change", function () { planFilter = categoryFilter.value; renderPanel(); });
-    const search = $("#plan-search");
-    if (search) search.addEventListener("input", function () { $$(".plan-admin-card").forEach(function (card) { card.hidden = !card.dataset.search.includes(search.value.toLowerCase()); }); });
-    const regionSearch = $("#region-search");
-    if (regionSearch) regionSearch.addEventListener("input", function () { $$("[data-region-search]").forEach(function (row) { row.hidden = !row.dataset.regionSearch.includes(regionSearch.value.toLowerCase()); }); });
     const coverageFileInput = $("#coverage-file-input");
     if (coverageFileInput) coverageFileInput.addEventListener("change", function () { importCoverageFile(coverageFileInput.files[0]); });
     $$("[data-coverage-file-color]", $("#admin-panel")).forEach(function (element) { element.addEventListener("change", function () { const file = state.coverageFiles.find(function (item) { return item.id === element.dataset.coverageFileColor; }); if (file) { file.color = element.value; saveDraft(); renderPanel(); } }); });
@@ -1678,7 +1960,20 @@
       return [lead.createdAt, lead.name, lead.whatsapp, plan ? plan.speed + " - " + plan.title : "", coupon ? coupon.code : "", lead.source || "", lead.sourceDetail || "", lead.utmSource || "", lead.utmMedium || "", lead.utmCampaign || "", lead.region || "", lead.status, lead.consentAt || ""];
     }));
     const csv = rows.map(function (row) { return row.map(function (value) { return '"' + String(value || "").replace(/"/g, '""') + '"'; }).join(","); }).join("\n");
+    writeAudit("export", "lead", "Leads exportados", state.leads.length + " registros incluidos no CSV");
+    state = FL.saveRuntimeState(state);
     downloadBlob(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }), "fibra-lider-leads.csv");
+  }
+
+  function exportAudit() {
+    const rows = [["data", "acao", "recurso", "evento", "detalhe", "responsavel"]].concat(state.auditLog.map(function (entry) {
+      return [entry.createdAt, auditLabel(entry.action), entry.resource, entry.label, entry.detail, entry.actor];
+    }));
+    const csv = rows.map(function (row) { return row.map(function (value) { return '"' + String(value == null ? "" : value).replace(/"/g, '""') + '"'; }).join(","); }).join("\n");
+    writeAudit("export", "audit", "Atividade exportada", state.auditLog.length + " eventos incluidos no CSV");
+    state = FL.saveRuntimeState(state);
+    downloadBlob(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }), "atividade-" + state.brand.slug + ".csv");
+    toast("Historico exportado", "success");
   }
 
   function downloadBlob(blob, name) {
@@ -1691,15 +1986,23 @@
   function importState(event) {
     const file = event.target.files[0];
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast("A configuracao deve ter no maximo 2 MB", "error"); event.target.value = ""; return; }
     const reader = new FileReader();
     reader.onload = function () {
       try {
         const parsed = JSON.parse(reader.result);
-        if (!parsed.brand || !parsed.plans || !parsed.pageBlocks) throw new Error("Estrutura invalida");
-        FL.saveState(parsed, false);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !parsed.brand || !Array.isArray(parsed.plans) || !Array.isArray(parsed.pageBlocks)) throw new Error("Estrutura invalida");
+        const limits = { plans: 500, categories: 100, pages: 200, pageBlocks: 200, banners: 100, regions: 500, coverageFiles: 20, leads: 5000, coupons: 500, popupCampaigns: 200, mediaLibrary: 500 };
+        Object.keys(limits).forEach(function (key) { if (parsed[key] && (!Array.isArray(parsed[key]) || parsed[key].length > limits[key])) throw new Error("Limite excedido em " + key); });
+        const allowed = Object.keys(FL.defaultState);
+        const sanitized = {};
+        allowed.forEach(function (key) { if (Object.prototype.hasOwnProperty.call(parsed, key)) sanitized[key] = parsed[key]; });
+        FL.recordAudit(sanitized, "import", "system", "Configuracao importada", file.name.slice(0, 120));
+        FL.saveState(sanitized, false);
         state = FL.getState();
-        saveDraft("Configuracao importada"); renderPanel();
-      } catch (error) { toast("Arquivo de configuracao invalido", "error"); }
+        toast("Configuracao importada", "success"); renderPanel();
+      } catch (error) { toast("Arquivo de configuracao invalido: " + (error.message || "verifique o conteudo"), "error"); }
+      event.target.value = "";
     };
     reader.readAsText(file);
   }
@@ -1714,13 +2017,14 @@
   function hydrateTenantChrome() {
     const initials = state.brand.name.split(/\s+/).map(function (part) { return part.charAt(0); }).join("").slice(0, 2).toUpperCase();
     const workspaceName = $(".workspace-switch strong"); if (workspaceName) workspaceName.textContent = state.brand.name;
-    const workspaceAvatar = $(".workspace-avatar"); if (workspaceAvatar) workspaceAvatar.textContent = initials;
+    $$(".workspace-avatar").forEach(function (avatar) { avatar.textContent = initials; });
     const topbarPath = $(".topbar-title small"); if (topbarPath) topbarPath.innerHTML = esc(state.brand.name) + ' / <span id="topbar-section">' + esc(PANEL_META[activePanel] ? PANEL_META[activePanel][1] : "Visao geral") + '</span>';
     const accountAvatar = $(".admin-user > span"); if (accountAvatar) accountAvatar.textContent = initials;
     const accountTenant = $(".admin-user small"); if (accountTenant) accountTenant.textContent = state.brand.name;
+    const accountMenuTenant = $(".admin-account-menu small"); if (accountMenuTenant) accountMenuTenant.textContent = state.brand.name;
     const loginCopy = $(".login-form > p"); if (loginCopy) loginCopy.textContent = "Entre para gerenciar a experiencia digital da " + state.brand.name + ".";
-    $$(".admin-login img").forEach(function (image) { image.src = image.closest(".login-form") ? state.brand.logoDark : state.brand.logo; image.alt = state.brand.name; });
-    const sidebarLogo = $(".admin-brand img"); if (sidebarLogo) sidebarLogo.src = state.brand.icon || state.brand.logo;
+    $$(".admin-login img").forEach(function (image) { image.src = FL.safeImageUrl(image.closest(".login-form") ? state.brand.logoDark : state.brand.logo, "./assets/img/fibra-lider-logo.png"); image.alt = state.brand.name; });
+    const sidebarLogo = $(".admin-brand img"); if (sidebarLogo) sidebarLogo.src = FL.safeImageUrl(state.brand.icon || state.brand.logo, "./assets/img/fibra-lider-icon.png");
   }
 
   async function showApp() {
@@ -1750,13 +2054,46 @@
         $("#login-password").select();
       }
     });
-    $("#admin-nav").addEventListener("click", function (event) { const button = event.target.closest("[data-panel]"); if (button) setPanel(button.dataset.panel); });
+    $("#admin-nav").addEventListener("click", function (event) {
+      const groupToggle = event.target.closest("[data-nav-group-toggle]");
+      if (groupToggle) {
+        const group = groupToggle.closest("[data-nav-group]");
+        const collapsed = group.classList.toggle("is-collapsed");
+        groupToggle.setAttribute("aria-expanded", String(!collapsed));
+        const stored = navGroupPreferences();
+        stored[groupToggle.dataset.navGroupToggle] = collapsed;
+        localStorage.setItem("fl-admin-nav-groups", JSON.stringify(stored));
+        return;
+      }
+      const button = event.target.closest("[data-panel]"); if (button) setPanel(button.dataset.panel);
+    });
     $("#sidebar-toggle").addEventListener("click", function () { document.body.classList.toggle("sidebar-open"); });
+    $("#admin-user-button").addEventListener("click", function () { const menu = $("#admin-account-menu"); const open = menu.hidden; menu.hidden = !open; $("#admin-user-button").setAttribute("aria-expanded", String(open)); });
+    $$('[data-account-panel]').forEach(function (button) { button.addEventListener("click", function () { $("#admin-account-menu").hidden = true; $("#admin-user-button").setAttribute("aria-expanded", "false"); setPanel(button.dataset.accountPanel); }); });
+    $("#account-logout").addEventListener("click", function () { sessionStorage.removeItem(FL.SESSION_KEY); location.reload(); });
     $("#publish-button").addEventListener("click", publish);
     $("#logout-button").addEventListener("click", function () { sessionStorage.removeItem(FL.SESSION_KEY); location.reload(); });
     $("#admin-theme-toggle").addEventListener("click", function () { const next = document.documentElement.dataset.adminTheme === "dark" ? "light" : "dark"; localStorage.setItem("fl-admin-theme", next); applyAdminTheme(); if (adminMap) setTimeout(function () { adminMap.invalidateSize(); }, 80); });
     $$("[data-admin-modal-close]").forEach(function (element) { element.addEventListener("click", closeModal); });
-    document.addEventListener("keydown", function (event) { if (event.key === "Escape") closeModal(); });
+    document.addEventListener("keydown", function (event) {
+      const modal = $("#admin-modal");
+      if (!modal.hidden) {
+        if (event.key === "Escape") { event.preventDefault(); closeModal(); return; }
+        if (event.key === "Tab") {
+          const focusable = $$('button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])', modal).filter(function (element) { return element.offsetParent !== null; });
+          if (!focusable.length) return;
+          const first = focusable[0]; const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+        return;
+      }
+      if (event.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+        const search = $("[data-crud-search]", $("#admin-panel"));
+        if (search) { event.preventDefault(); search.focus(); }
+      }
+    });
+    document.addEventListener("click", function (event) { const account = event.target.closest(".admin-account"); if (!account) { const menu = $("#admin-account-menu"); if (menu && !menu.hidden) { menu.hidden = true; $("#admin-user-button").setAttribute("aria-expanded", "false"); } } });
     window.addEventListener("message", function (event) {
       if (event.origin !== location.origin || !event.data || event.data.type !== "fl-builder-select") return;
       if (!state.pageBlocks.some(function (block) { return block.id === event.data.sectionId; })) return;
@@ -1767,6 +2104,8 @@
   async function init() {
     state = FL.getState();
     state = await FL.loadBundledCoverage(state);
+    const navGroups = navGroupPreferences();
+    Object.keys(navGroups).forEach(function (key) { const group = $('[data-nav-group="' + key + '"]'); const toggle = $('[data-nav-group-toggle="' + key + '"]'); if (group && toggle && navGroups[key]) { group.classList.add("is-collapsed"); toggle.setAttribute("aria-expanded", "false"); } });
     hydrateTenantChrome();
     bindGlobalEvents();
     refreshIcons();
