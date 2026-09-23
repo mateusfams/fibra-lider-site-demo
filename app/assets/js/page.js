@@ -39,7 +39,7 @@
   }
 
   function pageUrl(url) {
-    if (url === "whatsapp") return FL.whatsappLink(state.brand.whatsapp, state.whatsapp.floatingMessage);
+    if (url === "whatsapp") return FL.whatsappLink(state.brand.whatsapp, FL.interpolate(state.whatsapp.floatingMessage, { brand: state.brand.name }));
     return url || "#";
   }
 
@@ -71,7 +71,7 @@
     $("#page-header-phone").href = "tel:" + state.brand.phone.replace(/\D/g, "");
     $("#page-header-phone span").textContent = state.brand.phone;
     $("#page-client-area").href = state.brand.clientAreaUrl;
-    $("#page-whatsapp").href = FL.whatsappLink(state.brand.whatsapp, state.whatsapp.floatingMessage);
+    $("#page-whatsapp").href = FL.whatsappLink(state.brand.whatsapp, FL.interpolate(state.whatsapp.floatingMessage, { brand: state.brand.name }));
     $("#page-footer-description").textContent = state.footer.description;
     $("#page-footer-columns").innerHTML = state.footer.columns.map(function (column) { return '<div><h3>' + esc(column.title) + "</h3>" + column.links.map(function (link) { const href = link.href.charAt(0) === "#" ? "./index.html" + link.href : link.href; return '<a href="' + esc(href) + '">' + esc(link.label) + "</a>"; }).join("") + "</div>"; }).join("");
     $("#page-footer-phone").href = "tel:" + state.brand.phone.replace(/\D/g, "");

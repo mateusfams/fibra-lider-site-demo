@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="./assets/css/styles.css">
     <script defer src="./assets/vendor/lucide.min.js"></script>
     <script defer src="./assets/vendor/leaflet.js"></script>
+    <script defer src="./assets/vendor/jszip.min.js"></script>
     <script defer src="./assets/js/data.js"></script>
     <script defer src="./assets/js/app.js"></script>
   </head>
@@ -78,6 +79,11 @@
             <p id="plans-description"></p>
           </div>
           <div class="filter-tabs" id="plan-filters" role="tablist" aria-label="Tipos de plano"></div>
+          <div class="coupon-activation" id="coupon-activation">
+            <div class="coupon-activation__intro"><span><i data-lucide="ticket-percent"></i></span><div><strong>Tem um cupom?</strong><small>Ative o codigo para conferir os planos participantes.</small></div></div>
+            <form id="coupon-form"><label class="sr-only" for="coupon-input">Codigo do cupom</label><input id="coupon-input" name="coupon" autocomplete="off" maxlength="24" placeholder="Digite o codigo"><button class="button button--dark" type="submit">Aplicar</button></form>
+            <div class="coupon-activation__status" id="coupon-status" hidden><span></span><button class="icon-button" id="coupon-clear" type="button" title="Remover cupom" aria-label="Remover cupom"><i data-lucide="x"></i></button></div>
+          </div>
           <div class="plans-grid" id="plans-grid"></div>
           <div class="plans-footer">
             <p>Todos os planos estao sujeitos a consulta de viabilidade e condicoes comerciais.</p>
@@ -253,7 +259,7 @@
           <span class="eyebrow" id="campaign-eyebrow"></span>
           <h2 id="campaign-title"></h2>
           <p id="campaign-description"></p>
-          <button class="coupon-code" id="campaign-coupon" type="button" title="Copiar cupom"><span></span><i data-lucide="copy"></i></button>
+          <button class="coupon-code" id="campaign-coupon" type="button" title="Ativar cupom"><span></span><i data-lucide="check-circle-2"></i></button>
           <a class="button button--primary" id="campaign-cta" href="#planos">Ver oferta <i data-lucide="arrow-right"></i></a>
           <small>Consulte disponibilidade e condicoes com a equipe comercial.</small>
         </div>

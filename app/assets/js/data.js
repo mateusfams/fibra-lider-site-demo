@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "fibra-lider-studio-state-v10";
-  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v9", "fibra-lider-studio-state-v8", "fibra-lider-studio-state-v7"];
+  const STORAGE_KEY = "fibra-lider-studio-state-v11";
+  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v10", "fibra-lider-studio-state-v9", "fibra-lider-studio-state-v8", "fibra-lider-studio-state-v7"];
   const EVENTS_KEY = "fibra-lider-studio-events-v2";
   const SESSION_KEY = "fibra-lider-studio-session-v2";
 
@@ -12,12 +12,13 @@
 
   const defaultState = {
     meta: {
-      version: "1.4.0-mvp",
+      version: "1.5.0-mvp",
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
       status: "published",
     },
     brand: {
+      slug: "fibra-lider",
       name: "Fibra Lider",
       legalName: "FIBRA LIDER TELECOM LTDA",
       cnpj: "40.044.840/0001-70",
@@ -32,6 +33,7 @@
       instagram: "https://www.instagram.com/fibralideroficial/",
       facebook: "https://www.facebook.com/profile.php?id=100085343718942",
       address: "Av. Soma, 869 - Parque Manoel de Vasconcelos, Sumare - SP",
+      siteUrl: "https://fibralider.net.br/",
       clientAreaUrl: "https://sgp.fibralider.net.br/accounts/central/login",
       coverageSummary: "Sumare, Hortolandia, Nova Odessa, Campinas e regiao",
     },
@@ -191,7 +193,12 @@
     coverageSettings: {
       mapStyle: "brand",
       routeProvider: "google",
+      geocodingProvider: "nominatim",
+      googleMapsEnabled: false,
+      googleMapsBrowserKey: "",
+      googleMapId: "",
       cepLookup: true,
+      precisePolygonCheck: true,
       showInterest: true,
       showLabels: true,
       defaultRadiusKm: 5,
@@ -239,32 +246,39 @@
       { id: "support-contract", icon: "file-text", title: "Contratos e documentos", text: "Consulte os documentos publicos da Fibra Lider.", label: "Abrir documentos", type: "internal", url: "./pagina.html?slug=contrato-de-adesao", active: true },
     ],
     coupons: [
-      { id: "coupon-lider10", code: "LIDER10", title: "Primeiro mes mais leve", discount: "10% no primeiro mes", discountType: "percentage", discountValue: 10, durationType: "first_month", durationMonths: 1, autoApply: true, description: "Desconto automatico no primeiro mes para os planos Fibra Familia e Performance.", planIds: ["internet-600", "internet-800"], startsAt: "2026-09-01", expiresAt: "2026-12-31", usageLimit: 100, used: 27, active: true },
-      { id: "coupon-trimestre20", code: "TRIMESTRE20", title: "Trimestre conectado", discount: "20% nos 3 primeiros meses", discountType: "percentage", discountValue: 20, durationType: "months", durationMonths: 3, autoApply: true, description: "Condicao promocional para novos assinantes dos combos selecionados.", planIds: ["max-600", "sky-600", "complete-600"], startsAt: "2026-09-01", expiresAt: "2026-11-30", usageLimit: 80, used: 14, active: true },
-      { id: "coupon-vitalicio15", code: "FIBRA15", title: "Fidelidade premiada", discount: "15% de desconto vitalicio", discountType: "percentage", discountValue: 15, durationType: "lifetime", durationMonths: 0, autoApply: true, description: "Mensalidade promocional enquanto o plano elegivel permanecer ativo.", planIds: ["internet-300"], startsAt: "2026-09-01", expiresAt: "2026-10-31", usageLimit: 40, used: 9, active: true },
+      { id: "coupon-lider10", code: "LIDER10", title: "Primeiro mes mais leve", discount: "10% no primeiro mes", discountType: "percentage", discountValue: 10, durationType: "first_month", durationMonths: 1, applicationMode: "both", description: "Desconto no primeiro mes para os planos Fibra Familia e Performance.", planIds: ["internet-600", "internet-800"], startsAt: "2026-09-01", expiresAt: "2026-12-31", usageLimit: 100, used: 27, active: true },
+      { id: "coupon-trimestre20", code: "TRIMESTRE20", title: "Trimestre conectado", discount: "20% nos 3 primeiros meses", discountType: "percentage", discountValue: 20, durationType: "months", durationMonths: 3, applicationMode: "code", description: "Condicao promocional para novos assinantes dos combos selecionados.", planIds: ["max-600", "sky-600", "complete-600"], startsAt: "2026-09-01", expiresAt: "2026-11-30", usageLimit: 80, used: 14, active: true },
+      { id: "coupon-vitalicio15", code: "FIBRA15", title: "Fidelidade premiada", discount: "15% de desconto vitalicio", discountType: "percentage", discountValue: 15, durationType: "lifetime", durationMonths: 0, applicationMode: "code", description: "Mensalidade promocional enquanto o plano elegivel permanecer ativo.", planIds: ["internet-300"], startsAt: "2026-09-01", expiresAt: "2026-10-31", usageLimit: 40, used: 9, active: true },
     ],
     popupCampaigns: [
       { id: "popup-lider10", name: "Cupom de boas-vindas", type: "coupon", title: "Uma vantagem para comecar bem.", description: "Use o cupom LIDER10 e consulte as condicoes de adesao com nossa equipe.", eyebrow: "Oferta por tempo limitado", image: "./assets/img/hero-family-fiber.jpg", couponId: "coupon-lider10", ctaLabel: "Quero aproveitar", ctaLink: "#planos", trigger: "delay", delaySeconds: 8, scrollPercent: 45, frequency: "session", startsAt: "2026-09-01", expiresAt: "2026-12-31", active: true },
     ],
     whatsapp: {
-      floatingMessage: "Ola Fibra Lider, vim pelo site e preciso de atendimento.",
-      coverageTemplate: "Ola Fibra Lider! Quero consultar cobertura.\n\nCEP: {cep}\nCidade: {city}\nBairro: {neighborhood}",
-      planTemplate: "Oi, sou {name} e visitei o site da Fibra Lider. Tenho interesse neste plano:\n\nPlano: {plan}\nVelocidade: {speed}\nValor anunciado: {price}\nOferta: {offer}\nMeu WhatsApp: {leadWhatsapp}\n\nPode me passar mais informacoes?",
-      businessTemplate: "Ola Fibra Lider, quero saber mais sobre link dedicado para minha empresa ou evento.",
+      floatingMessage: "Ola {brand}, vim pelo site e preciso de atendimento.",
+      coverageTemplate: "Ola {brand}! Quero consultar cobertura.\n\nCEP: {cep}\nCidade: {city}\nBairro: {neighborhood}",
+      planTemplate: "Oi, sou {name} e visitei o site da {brand}. Tenho interesse neste plano:\n\nPlano: {plan}\nVelocidade: {speed}\nValor anunciado: {price}\nOferta: {offer}\nMeu WhatsApp: {leadWhatsapp}\n\nPode me passar mais informacoes?",
+      businessTemplate: "Ola {brand}, quero saber mais sobre link dedicado para minha empresa ou evento.",
     },
     leadSettings: {
       captureEnabled: true,
       requireWhatsapp: true,
-      consentText: "Autorizo o contato da Fibra Lider sobre este plano e ofertas relacionadas.",
+      consentText: "Autorizo o contato da empresa sobre este plano e ofertas relacionadas.",
       retentionDays: 180,
       successTitle: "Tudo certo. Vamos continuar no WhatsApp.",
     },
     leads: [
-      { id: "lead-demo-1", name: "Lead demonstracao 01", whatsapp: "5519000000001", planId: "internet-600", couponId: "coupon-lider10", source: "Plano no site", region: "Sumare", status: "new", createdAt: "2026-09-22T12:10:00.000Z", lastContactAt: "" },
-      { id: "lead-demo-2", name: "Lead demonstracao 02", whatsapp: "5519000000002", planId: "max-600", couponId: "coupon-trimestre20", source: "Campanha comercial", region: "Hortolandia", status: "contacted", createdAt: "2026-09-21T17:45:00.000Z", lastContactAt: "2026-09-21T18:05:00.000Z" },
+      { id: "lead-demo-1", name: "Lead demonstracao 01", whatsapp: "5519000000001", planId: "internet-600", couponId: "coupon-lider10", source: "Site", sourceDetail: "Card de plano", campaignId: "popup-lider10", utmSource: "instagram", utmMedium: "social", utmCampaign: "setembro-fibra", pagePath: "/", region: "Sumare", status: "new", consentAt: "2026-09-22T12:10:00.000Z", createdAt: "2026-09-22T12:10:00.000Z", lastContactAt: "" },
+      { id: "lead-demo-2", name: "Lead demonstracao 02", whatsapp: "5519000000002", planId: "max-600", couponId: "coupon-trimestre20", source: "Google Ads", sourceDetail: "Pesquisa paga", campaignId: "", utmSource: "google", utmMedium: "cpc", utmCampaign: "internet-600", pagePath: "/", region: "Hortolandia", status: "proposal", consentAt: "2026-09-21T17:45:00.000Z", createdAt: "2026-09-21T17:45:00.000Z", lastContactAt: "2026-09-21T18:05:00.000Z" },
+    ],
+    whatsappTemplates: [
+      { id: "wa-template-plan", name: "Primeiro contato", type: "plan", message: "Ola {name}! Aqui e da {brand}. Recebemos seu interesse no plano {plan} de {speed}, por {price}. Posso confirmar a cobertura e tirar suas duvidas?", active: true },
+      { id: "wa-template-followup", name: "Retorno do atendimento", type: "followup", message: "Ola {name}! Tudo bem? Estou retomando seu atendimento sobre o plano {plan}. Ainda posso ajudar com a oferta {offer}?", active: true },
+      { id: "wa-template-coverage", name: "Confirmacao de cobertura", type: "coverage", message: "Ola {name}! Identificamos seu interesse na regiao de {region}. Para confirmar a viabilidade do plano {plan}, pode me enviar o CEP e o numero do endereco?", active: true },
+      { id: "wa-template-proposal", name: "Envio de proposta", type: "proposal", message: "Ola {name}! Preparei as condicoes do plano {plan}: {price} por mes. Oferta atual: {offer}. Posso seguir com a verificacao para instalacao?", active: true },
+      { id: "wa-template-recovery", name: "Recuperacao de interesse", type: "recovery", message: "Ola {name}! Aqui e da {brand}. Surgiu uma nova condicao para o plano {plan}. Quer que eu confira se ela esta disponivel para sua regiao?", active: true }
     ],
     whatsappCampaigns: [
-      { id: "wa-campaign-600", name: "Interesse em 600 Mega", message: "Ola {name}! Aqui e da Fibra Lider. Vimos seu interesse no plano {plan}. Posso confirmar a cobertura e as condicoes da oferta {offer}?", planIds: ["internet-600", "max-600", "sky-600", "complete-600"], status: "active", contactsSent: 1, createdAt: "2026-09-22" },
+      { id: "wa-campaign-600", name: "Interesse em 600 Mega", type: "followup", templateId: "wa-template-followup", message: "Ola {name}! Aqui e da {brand}. Vimos seu interesse no plano {plan}. Posso confirmar a cobertura e as condicoes da oferta {offer}?", planIds: ["internet-600", "max-600", "sky-600", "complete-600"], stages: ["new", "qualified", "proposal"], sources: [], region: "", status: "active", contactsSent: 1, createdAt: "2026-09-22" },
     ],
     seo: {
       title: "Fibra Lider | Internet Fibra Optica em Sumare e Regiao",
@@ -322,6 +336,76 @@
     dashboardTargets: { monthlyVisitors: 4200, monthlyLeads: 260, conversionRate: 7.4, whatsappResponse: "3 min" },
   };
 
+  function bundledKmlElements(root, name) {
+    return Array.from(root.getElementsByTagNameNS ? root.getElementsByTagNameNS("*", name) : root.getElementsByTagName(name));
+  }
+
+  function bundledKmlName(root, name) {
+    const node = Array.from(root.children || []).find(function (child) { return child.localName === name || child.nodeName === name; });
+    return node ? String(node.textContent || "").trim().slice(0, 160) : "";
+  }
+
+  function bundledCoordinates(value, budget) {
+    const points = String(value || "").trim().split(/\s+/).map(function (entry) {
+      const parts = entry.split(","); const lng = Number(parts[0]); const lat = Number(parts[1]);
+      return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? [lat, lng] : null;
+    }).filter(Boolean);
+    const remaining = Math.max(0, budget.max - budget.used);
+    if (!points.length || !remaining) return [];
+    const step = Math.max(1, Math.ceil(points.length / remaining));
+    const sampled = points.filter(function (_, index) { return index % step === 0; }).slice(0, remaining);
+    if (points.length > 1 && sampled.length > 1) sampled[sampled.length - 1] = points[points.length - 1];
+    budget.used += sampled.length;
+    return sampled;
+  }
+
+  function parseBundledKml(kmlText) {
+    const text = String(kmlText || "").replace(/^\uFEFF/, "").trim();
+    if (text.length > 8 * 1024 * 1024 || /<!DOCTYPE|<!ENTITY/i.test(text)) throw new Error("KML de cobertura invalido.");
+    const documentNode = new DOMParser().parseFromString(text, "application/xml");
+    if (bundledKmlElements(documentNode, "parsererror").length) throw new Error("XML de cobertura invalido.");
+    const budget = { used: 0, max: 20000 }; const features = [];
+    bundledKmlElements(documentNode, "Placemark").slice(0, 100).forEach(function (placemark, index) {
+      const name = bundledKmlName(placemark, "name") || "Area " + (index + 1);
+      bundledKmlElements(placemark, "Polygon").forEach(function (polygon) {
+        const outer = bundledKmlElements(polygon, "outerBoundaryIs")[0] || polygon;
+        const node = bundledKmlElements(outer, "coordinates")[0]; const coordinates = bundledCoordinates(node ? node.textContent : "", budget);
+        if (coordinates.length >= 3) features.push({ type: "polygon", name, coordinates });
+      });
+      bundledKmlElements(placemark, "LineString").forEach(function (line) {
+        const node = bundledKmlElements(line, "coordinates")[0]; const coordinates = bundledCoordinates(node ? node.textContent : "", budget);
+        if (coordinates.length >= 2) features.push({ type: "line", name, coordinates });
+      });
+      bundledKmlElements(placemark, "Point").forEach(function (point) {
+        const node = bundledKmlElements(point, "coordinates")[0]; const coordinates = bundledCoordinates(node ? node.textContent : "", budget);
+        if (coordinates[0]) features.push({ type: "point", name, coordinates: coordinates[0] });
+      });
+    });
+    if (!features.length) throw new Error("O KMZ nao contem geometrias validas.");
+    return { features: features.slice(0, 160), coordinateCount: budget.used };
+  }
+
+  async function loadBundledCoverage(state) {
+    if (!state || state.brand.slug !== "fibra-lider" || state.coverageFiles.some(function (file) { return file.id === "coverage-clicknet-base"; })) return state;
+    if (!window.JSZip) return state;
+    try {
+      const response = await fetch("./AREA%20DE%20ATENDIMENTO%20Clicknet.kmz");
+      if (!response.ok) throw new Error("Arquivo KMZ nao encontrado.");
+      const buffer = await response.arrayBuffer();
+      if (buffer.byteLength > Math.max(1, Number(state.coverageSettings.maxImportMb || 5)) * 1024 * 1024) throw new Error("Arquivo KMZ acima do limite.");
+      const zip = await window.JSZip.loadAsync(buffer, { checkCRC32: true });
+      const entries = Object.values(zip.files).filter(function (entry) { return !entry.dir && /\.kml$/i.test(entry.name); });
+      const root = entries.find(function (entry) { return /(^|\/)doc\.kml$/i.test(entry.name); }) || entries[0];
+      if (!root) throw new Error("KML principal nao encontrado.");
+      const parsed = parseBundledKml(await root.async("string"));
+      state.coverageFiles.unshift({ id: "coverage-clicknet-base", name: "Area de atendimento Clicknet", fileName: "AREA DE ATENDIMENTO Clicknet.kmz", format: "KMZ", bytes: buffer.byteLength, importedAt: new Date().toISOString(), color: state.theme.mapAccent, active: true, coordinateCount: parsed.coordinateCount, features: parsed.features, source: "bundled" });
+      return saveRuntimeState(state);
+    } catch (error) {
+      console.warn("Nao foi possivel carregar a cobertura KMZ inicial.", error);
+      return state;
+    }
+  }
+
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function loadJson(key, fallback) {
     try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : clone(fallback); }
@@ -342,18 +426,28 @@
     ["meta", "brand", "theme", "slider", "content", "whatsapp", "leadSettings", "seo", "integrations", "footer", "dashboardTargets", "coverageSettings", "mediaSettings", "builderSettings"].forEach(function (key) {
       next[key] = { ...clone(defaultState[key]), ...(stored[key] || {}) };
     });
-    ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "coverageFiles", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "leads", "whatsappCampaigns", "pageBlocks", "pages", "mediaLibrary"].forEach(function (key) {
+    ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "coverageFiles", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "leads", "whatsappTemplates", "whatsappCampaigns", "pageBlocks", "pages", "mediaLibrary"].forEach(function (key) {
       next[key] = Array.isArray(stored[key]) ? stored[key] : clone(defaultState[key]);
     });
     next.regions = next.regions.map(function (region, index) {
-      return { type: "city", cep: "", stateCode: "SP", address: region.name + " - SP", radiusKm: next.coverageSettings.defaultRadiusKm, color: index === 0 ? next.theme.mapAccent : region.color || next.theme.primary, ...region };
+      return { type: "city", cep: "", cepStart: "", cepEnd: "", cepPrefixes: [], neighborhoods: [], stateCode: "SP", address: region.name + " - SP", radiusKm: next.coverageSettings.defaultRadiusKm, priority: 10, color: index === 0 ? next.theme.mapAccent : region.color || next.theme.primary, ...region };
     });
     next.pageBlocks = next.pageBlocks.map(function (block) {
       return { spacing: "normal", container: "normal", alignment: "left", anchor: "", backgroundImage: "", backgroundPosition: "center", hideMobile: false, hideDesktop: false, content: {}, ...block, content: { ...(block.content || {}) } };
     });
     next.coupons = next.coupons.map(function (coupon) {
       const inferredValue = Number(coupon.discountValue || String(coupon.discount || "").match(/\d+(?:[.,]\d+)?/)?.[0].replace(",", ".") || 0);
-      return { discountType: "percentage", discountValue: inferredValue, durationType: "first_month", durationMonths: 1, autoApply: true, planIds: [], ...coupon };
+      const applicationMode = coupon.applicationMode || (coupon.autoApply ? "both" : "code");
+      return { discountType: "percentage", discountValue: inferredValue, durationType: "first_month", durationMonths: 1, applicationMode, planIds: [], ...coupon, applicationMode };
+    });
+    next.leads = next.leads.map(function (lead) {
+      return { source: "Site", sourceDetail: "Card de plano", campaignId: "", utmSource: "", utmMedium: "", utmCampaign: "", pagePath: "/", region: "", status: "new", consentAt: lead.createdAt || "", lastContactAt: "", ...lead, status: lead.status === "contacted" ? "qualified" : lead.status === "closed" ? "won" : lead.status };
+    });
+    next.whatsappTemplates = next.whatsappTemplates.map(function (template) {
+      return { type: "followup", active: true, ...template };
+    });
+    next.whatsappCampaigns = next.whatsappCampaigns.map(function (campaign) {
+      return { type: "followup", templateId: "", planIds: [], stages: [], sources: [], region: "", contactsSent: 0, ...campaign };
     });
     defaultState.coupons.forEach(function (coupon) { if (!next.coupons.some(function (item) { return item.id === coupon.id; })) next.coupons.push(clone(coupon)); });
     if (!String(next.whatsapp.planTemplate || "").includes("{name}")) next.whatsapp.planTemplate = defaultState.whatsapp.planTemplate;
@@ -404,7 +498,8 @@
   function interpolate(template, values) { return String(template || "").replace(/\{(\w+)\}/g, function (_, key) { return values[key] == null ? "" : String(values[key]); }); }
   function couponIsActive(coupon, date) {
     const today = date || new Date().toISOString().slice(0, 10);
-    return Boolean(coupon && coupon.active && (!coupon.startsAt || coupon.startsAt <= today) && (!coupon.expiresAt || coupon.expiresAt >= today));
+    const hasCapacity = !Number(coupon && coupon.usageLimit) || Number(coupon.used || 0) < Number(coupon.usageLimit);
+    return Boolean(coupon && coupon.active && hasCapacity && (!coupon.startsAt || coupon.startsAt <= today) && (!coupon.expiresAt || coupon.expiresAt >= today));
   }
   function couponAppliesToPlan(coupon, plan) {
     return couponIsActive(coupon) && (!coupon.planIds || !coupon.planIds.length || coupon.planIds.includes(plan.id));
@@ -426,13 +521,25 @@
     const eligible = state.coupons.filter(function (coupon) { return (!automaticOnly || coupon.autoApply) && couponAppliesToPlan(coupon, plan); });
     return eligible.sort(function (a, b) { return couponPrice(plan, a) - couponPrice(plan, b); })[0] || null;
   }
+  function couponAvailableForChannel(coupon, channel) {
+    const mode = coupon && (coupon.applicationMode || (coupon.autoApply ? "both" : "code"));
+    return couponIsActive(coupon) && (mode === "both" || mode === channel);
+  }
+  function couponByCode(state, code, channel) {
+    const normalized = String(code || "").trim().toUpperCase();
+    return state.coupons.find(function (coupon) { return String(coupon.code || "").toUpperCase() === normalized && couponAvailableForChannel(coupon, channel || "code"); }) || null;
+  }
+  function selectedCouponForPlan(state, plan, couponId, channel) {
+    const coupon = state.coupons.find(function (item) { return item.id === couponId; });
+    return coupon && couponAvailableForChannel(coupon, channel || "code") && couponAppliesToPlan(coupon, plan) ? coupon : null;
+  }
   function planMessage(state, item, details) {
     const context = details || {};
-    const coupon = context.coupon || activeCouponForPlan(state, item, true);
-    return interpolate(state.whatsapp.planTemplate, { name: context.name || "visitante do site", leadWhatsapp: context.whatsapp || "nao informado", plan: item.title, speed: item.speed, price: formatCurrency(coupon ? couponPrice(item, coupon) : item.price), category: categoryName(state, item.categoryId), offer: couponLabel(coupon) });
+    const coupon = context.coupon || null;
+    return interpolate(state.whatsapp.planTemplate, { brand: state.brand.name, name: context.name || "visitante do site", leadWhatsapp: context.whatsapp || "nao informado", plan: item.title, speed: item.speed, price: formatCurrency(coupon ? couponPrice(item, coupon) : item.price), category: categoryName(state, item.categoryId), offer: coupon ? couponLabel(coupon) : "sem cupom aplicado", region: context.region || "" });
   }
   function whatsappLink(phone, message) { return "https://wa.me/" + String(phone || "").replace(/\D/g, "") + "?text=" + encodeURIComponent(message || ""); }
   function uid(prefix) { return (prefix || "item") + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-  window.FL = { STORAGE_KEY, EVENTS_KEY, SESSION_KEY, defaultState, clone, getState, saveState, saveRuntimeState, resetState, getEvents, saveEvents, trackEvent, seedEventsIfEmpty, formatCurrency, categoryName, interpolate, couponIsActive, couponAppliesToPlan, couponPrice, couponLabel, activeCouponForPlan, planMessage, whatsappLink, uid };
+  window.FL = { STORAGE_KEY, EVENTS_KEY, SESSION_KEY, defaultState, clone, getState, saveState, saveRuntimeState, loadBundledCoverage, resetState, getEvents, saveEvents, trackEvent, seedEventsIfEmpty, formatCurrency, categoryName, interpolate, couponIsActive, couponAppliesToPlan, couponPrice, couponLabel, activeCouponForPlan, couponAvailableForChannel, couponByCode, selectedCouponForPlan, planMessage, whatsappLink, uid };
 })();

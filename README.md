@@ -7,8 +7,9 @@ Demonstracao navegavel do novo site comercial da Fibra Lider e do painel de gest
 - Home responsiva com banners, planos, combos, beneficios e atendimento.
 - Consulta regional em mapa real com OpenStreetMap.
 - Tema claro e escuro.
-- Captura de interesse antes do WhatsApp, com plano e promocao contextualizados.
-- Descontos automaticos por primeiro mes, periodo inicial ou vigencia vitalicia.
+- Captura de interesse antes do WhatsApp, com origem, plano e promocao contextualizados.
+- Cupons ativados conscientemente por codigo ou campanha, sem desconto automatico no refresh.
+- Cobertura real da Clicknet carregada do arquivo KMZ fornecido para a demonstracao.
 - Paginas internas administraveis, incluindo contrato de adesao.
 - SEO local, dados estruturados e consentimento de metricas.
 
@@ -17,11 +18,11 @@ Demonstracao navegavel do novo site comercial da Fibra Lider e do painel de gest
 Acesse `admin.html` com a senha de demonstracao `lider2026`.
 
 - Dashboard comercial e analytics first-party.
-- Site Studio para home, banners, cabecalho, rodape e identidade visual.
+- Site Studio com selecao pelo canvas e edicao completa de banners no inspector.
 - Construtor de paginas internas e Central de Midia otimizada.
 - Gestao de planos, categorias, aplicativos, beneficios e descontos estruturados.
-- Cobertura regional com CEP, raios e importacao KML/KMZ do Google Earth.
-- Fila de leads e campanhas manuais de WhatsApp por interesse.
+- Cobertura regional por KMZ, CEP exato/prefixo/faixa, cidade, bairro, regiao e raio.
+- Funil de leads, atribuicao comercial, templates e campanhas manuais de WhatsApp.
 - Campanhas popup, SEO, pixels e analytics.
 - Temas claro e escuro.
 
