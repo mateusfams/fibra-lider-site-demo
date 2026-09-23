@@ -138,6 +138,16 @@
   }
 
   function publish() {
+    if (window.FLThemeBuilder) {
+      const workspace = window.FLVisualBuilderEditor && window.FLVisualBuilderEditor.getWorkspace() || window.FLThemeBuilder.storage.loadWorkspace(state).workspace;
+      const validation = window.FLThemeBuilder.validateWorkspace(workspace);
+      if (!validation.valid) {
+        toast("O Theme Builder possui erros que bloqueiam a publicacao", "error");
+        if (activePanel !== "builder") setPanel("builder");
+        return;
+      }
+      window.FLThemeBuilder.storage.publishWorkspace(state, workspace);
+    }
     writeAudit("publish", "site", "Site publicado", "Versao " + state.meta.version + " enviada para o site publico");
     state = FL.saveState(state, true);
     setSaveStatus("saved");
@@ -571,9 +581,8 @@
   }
 
   function renderBuilder() {
-    const views = { layout: renderBuilderLayout, slides: renderStudioSlides, header: renderStudioHeader, footer: renderStudioFooter, brand: renderStudioBrand };
-    const actions = builderStudioTab === "layout" ? '<button class="button button--ghost" data-action="home-templates">' + icon("layout-template") + ' Modelos</button>' : "";
-    return panelHeader("Site Studio", "Edite toda a experiencia do template base em um unico lugar.", '<div class="heading-actions">' + actions + '<button class="button button--ghost" data-action="builder-preview">' + icon("play") + ' Abrir preview</button><button class="button button--primary" data-action="builder-save">' + icon("save") + ' Salvar alteracoes</button></div>') + '<div class="studio-command-bar"><div><span class="live-chip"><i></i> Edicao visual</span><strong>Home principal</strong><small>Rascunho salvo automaticamente</small></div><div><span>' + icon("shield-check") + ' componentes seguros</span><span>' + icon("smartphone") + ' responsivo</span><span>' + icon("history") + ' historico local</span></div></div>' + studioTabs() + (views[builderStudioTab] || renderBuilderLayout)();
+    if (window.FLVisualBuilderEditor) return window.FLVisualBuilderEditor.render(state);
+    return '<section class="admin-state admin-state--error"><h2>Theme Builder indisponivel</h2><p>Recarregue a pagina para inicializar os modulos do editor.</p></section>';
   }
 
   function pageBlockIcon(type) {
@@ -1202,6 +1211,7 @@
       activity: renderActivity, settings: renderSettings,
     };
     const panel = $("#admin-panel");
+    if (window.FLVisualBuilderEditor) window.FLVisualBuilderEditor.unmount();
     destroyAdminMap();
     try {
       panel.innerHTML = (renderers[activePanel] || renderDashboard)();
@@ -1215,6 +1225,23 @@
     $$("#admin-nav [data-panel]").forEach(function (button) { button.classList.toggle("is-active", button.dataset.panel === activePanel); });
     $("#nav-plan-count").textContent = state.plans.filter(function (item) { return item.active; }).length;
     bindPanelControls();
+    if (activePanel === "builder" && window.FLVisualBuilderEditor) {
+      const builderRoot = panel.querySelector("#visual-theme-builder");
+      if (builderRoot) window.FLVisualBuilderEditor.mount(builderRoot, {
+        toast: toast,
+        refreshIcons: refreshIcons,
+        onStateChange: function (nextState, message) {
+          state = FL.saveState(nextState, false);
+          setSaveStatus("draft");
+          if (message) toast(message, "success");
+        },
+        onPublish: function () {
+          writeAudit("publish", "theme", "Tema visual publicado", "Workspace validado e disponibilizado no site publico");
+          state = FL.saveState(state, true);
+          setSaveStatus("saved");
+        },
+      });
+    }
     initAdminMap();
     refreshIcons();
   }

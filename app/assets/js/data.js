@@ -12,7 +12,7 @@
 
   const defaultState = {
     meta: {
-      version: "1.7.0-mvp",
+      version: "1.8.0-mvp",
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
       status: "published",

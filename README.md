@@ -18,7 +18,10 @@ Demonstracao navegavel do novo site comercial da Fibra Lider e do painel de gest
 Acesse `admin.html` com a senha de demonstracao `lider2026`.
 
 - Dashboard executivo com desempenho, funil e mapa de interesse regional.
-- Site Studio com selecao pelo canvas e edicao completa de banners no inspector.
+- Visual Theme Builder com arvore aninhada de componentes, drag and drop, edicao inline e inspector gerado por schema.
+- Workspaces de paginas com Home, paginas internas, header e footer no mesmo modelo versionado.
+- Estilos por breakpoint e estado, tokens globais, biblioteca de midia, secoes salvas, undo/redo e autosave.
+- Rascunho e publicacao separados: o site publico recebe somente documento, renderer e CSS compilado.
 - Construtor de paginas internas e Central de Midia otimizada.
 - Gestao de planos, categorias, aplicativos, beneficios e descontos estruturados.
 - Cobertura em modo automatico, hibrido, manual ou importado por KMZ, CEP, cidade, bairro, regiao e raio.
@@ -30,4 +33,4 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`.
 
 ## Importante
 
-Este repositorio publica um MVP de apresentacao. Os dados usam armazenamento local do navegador e a autenticacao e demonstrativa. Nao insira dados pessoais reais. A versao de producao tera backend, banco de dados, RBAC, auditoria, protecoes LGPD e isolamento multiempresa.
+Este repositorio publica um MVP de apresentacao. Os dados, documentos e releases usam armazenamento local do navegador e a autenticacao e demonstrativa. Nao insira dados pessoais reais. A versao de producao tera backend, banco de dados, storage de objetos, RBAC aplicado no servidor, auditoria, protecoes LGPD e isolamento multiempresa.
