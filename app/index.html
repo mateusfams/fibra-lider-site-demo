@@ -8,6 +8,15 @@
     <meta name="robots" content="index,follow">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Fibra Lider | Internet fibra optica perto de voce">
+    <meta property="og:description" content="Planos de internet 100% fibra optica com atendimento regional.">
+    <meta property="og:image" content="./assets/img/hero-family-fiber.jpg">
+    <meta property="og:url" content="https://fibralider.net.br/">
+    <meta property="og:site_name" content="Fibra Lider">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Fibra Lider | Internet fibra optica perto de voce">
+    <meta name="twitter:description" content="Planos de internet 100% fibra optica com atendimento regional.">
+    <meta name="twitter:image" content="./assets/img/hero-family-fiber.jpg">
     <title>Fibra Lider | Internet Fibra Optica em Sumare e Regiao</title>
     <link rel="canonical" href="https://fibralider.net.br/">
     <link rel="icon" href="./assets/img/fibra-lider-icon.png">
@@ -19,6 +28,7 @@
     <script defer src="./assets/vendor/leaflet.js"></script>
     <script defer src="./assets/vendor/jszip.min.js"></script>
     <script defer src="./assets/js/data.js"></script>
+    <script defer src="./assets/js/coverage-core.js"></script>
     <script defer src="./assets/js/app.js"></script>
   </head>
   <body class="public-site">
@@ -109,7 +119,7 @@
           <div class="entertainment-copy">
             <span class="eyebrow eyebrow--light" id="apps-eyebrow"></span>
             <h2 id="apps-title"></h2>
-            <p>Filmes, series, musica, esportes, leitura e seguranca digital para completar sua experiencia.</p>
+            <p id="apps-description"></p>
             <a class="button button--light" href="#planos">Ver combos <i data-lucide="arrow-right"></i></a>
           </div>
           <div class="app-orbit" id="apps-grid" aria-label="Aplicativos disponiveis"></div>
@@ -122,18 +132,14 @@
             <img src="./assets/img/banner-business-fiber.jpg" alt="Equipe conectada pela Fibra Lider Empresas" loading="lazy">
             <div class="business-signal">
               <span><i data-lucide="activity"></i> Monitoramento</span>
-              <strong>Conexao preparada para seu negocio</strong>
+              <strong id="business-signal"></strong>
             </div>
           </div>
           <div class="business-copy">
             <span class="eyebrow" id="business-eyebrow"></span>
             <h2 id="business-title"></h2>
             <p id="business-description"></p>
-            <ul class="check-list">
-              <li><i data-lucide="circle-check"></i> Link dedicado para empresas e eventos</li>
-              <li><i data-lucide="circle-check"></i> Projeto conforme a necessidade do local</li>
-              <li><i data-lucide="circle-check"></i> Atendimento tecnico regional</li>
-            </ul>
+            <ul class="check-list" id="business-features"></ul>
             <a class="button button--primary" id="business-whatsapp" href="#" target="_blank" rel="noopener">Solicitar proposta <i data-lucide="arrow-up-right"></i></a>
           </div>
         </div>
@@ -166,7 +172,8 @@
           <div class="coverage-map" aria-label="Mapa interativo da cobertura regional">
             <div class="real-map" id="public-coverage-map"></div>
             <div class="map-fallback" id="public-map-fallback" hidden></div>
-            <div class="map-legend"><span></span> Cobertura e interesse por regiao</div>
+            <div class="public-map-hud"><span><i data-lucide="radio-tower"></i></span><div><strong id="public-map-label">Rede Fibra Lider</strong><small id="public-map-summary"></small></div></div>
+            <div class="map-legend"><span></span> Area de atendimento publicada</div>
           </div>
         </div>
       </section>
@@ -186,7 +193,7 @@
           <div class="faq-heading">
             <span class="eyebrow" id="faq-eyebrow"></span>
             <h2 id="faq-title"></h2>
-            <p>Ainda ficou com alguma duvida? Nossa equipe conversa com voce pelo WhatsApp.</p>
+            <p id="faq-description"></p>
             <a class="text-button" id="faq-whatsapp" href="#" target="_blank" rel="noopener">Falar com atendimento <i data-lucide="arrow-up-right"></i></a>
           </div>
           <div class="faq-list" id="faq-list"></div>
@@ -200,7 +207,7 @@
               <span class="eyebrow eyebrow--light" id="support-eyebrow"></span>
               <h2 id="support-title"></h2>
             </div>
-            <p>Encontre rapidamente o canal que voce precisa.</p>
+            <p id="support-description"></p>
           </div>
           <div class="support-grid" id="support-grid"></div>
         </div>
@@ -209,7 +216,7 @@
       <section class="final-cta page-section" data-section="final">
         <div class="shell final-cta__inner">
           <div>
-            <span class="eyebrow eyebrow--light">Fibra Lider</span>
+            <span class="eyebrow eyebrow--light" id="final-eyebrow"></span>
             <h2 id="final-title"></h2>
             <p id="final-description"></p>
           </div>

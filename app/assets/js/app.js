@@ -93,29 +93,58 @@
 
   function applySeo() {
     document.title = state.seo.title;
-    const description = $('meta[name="description"]');
-    if (description) description.content = state.seo.description;
-    const robots = $('meta[name="robots"]');
-    if (robots) robots.content = state.seo.indexSite ? "index,follow" : "noindex,nofollow";
+    const setMeta = function (selector, attribute, value) {
+      let element = $(selector);
+      if (!element) {
+        element = document.createElement("meta");
+        const match = selector.match(/meta\[(name|property)="([^"]+)"\]/);
+        if (!match) return;
+        element.setAttribute(match[1], match[2]);
+        document.head.appendChild(element);
+      }
+      element.content = String(value || "");
+    };
+    setMeta('meta[name="description"]', "name", state.seo.description);
+    setMeta('meta[name="robots"]', "name", state.seo.indexSite ? "index,follow,max-image-preview:large" : "noindex,nofollow");
+    setMeta('meta[property="og:title"]', "property", state.seo.ogTitle || state.seo.title);
+    setMeta('meta[property="og:description"]', "property", state.seo.ogDescription || state.seo.description);
+    setMeta('meta[property="og:image"]', "property", FL.safeImageUrl(state.seo.ogImage, ""));
+    setMeta('meta[property="og:url"]', "property", state.seo.canonicalUrl);
+    setMeta('meta[property="og:site_name"]', "property", state.brand.name);
+    setMeta('meta[name="twitter:card"]', "name", "summary_large_image");
+    setMeta('meta[name="twitter:title"]', "name", state.seo.ogTitle || state.seo.title);
+    setMeta('meta[name="twitter:description"]', "name", state.seo.ogDescription || state.seo.description);
+    setMeta('meta[name="twitter:image"]', "name", FL.safeImageUrl(state.seo.ogImage, ""));
+    if (state.seo.googleSiteVerification) setMeta('meta[name="google-site-verification"]', "name", state.seo.googleSiteVerification);
     const canonical = $('link[rel="canonical"]');
     if (canonical) canonical.href = FL.safeUrl(state.seo.canonicalUrl, location.href);
 
     const oldSchema = $("#local-business-schema");
     if (oldSchema) oldSchema.remove();
+    const allowedTypes = ["InternetServiceProvider", "LocalBusiness", "Organization"];
+    const businessType = allowedTypes.includes(state.seo.localBusinessType) ? state.seo.localBusinessType : "InternetServiceProvider";
+    const areas = window.FLCoverage ? FLCoverage.effectiveAreas(state) : state.regions.filter(function (item) { return item.active; });
+    const graph = [{
+      "@type": businessType,
+      "@id": state.seo.canonicalUrl + "#business",
+      name: state.brand.name,
+      legalName: state.brand.legalName,
+      url: state.seo.canonicalUrl,
+      logo: FL.safeImageUrl(state.brand.logo, ""),
+      image: FL.safeImageUrl(state.seo.ogImage, ""),
+      telephone: state.brand.phone,
+      email: state.brand.email,
+      address: { "@type": "PostalAddress", streetAddress: state.brand.address, addressLocality: state.seo.addressLocality, addressRegion: state.seo.addressRegion, postalCode: state.seo.postalCode, addressCountry: "BR" },
+      openingHours: state.seo.openingHours,
+      areaServed: areas.slice(0, 80).map(function (area) { return { "@type": "AdministrativeArea", name: area.name }; }),
+      sameAs: [state.brand.instagram, state.brand.facebook].filter(Boolean),
+    }, { "@type": "WebSite", "@id": state.seo.canonicalUrl + "#website", url: state.seo.canonicalUrl, name: state.brand.name, inLanguage: "pt-BR", publisher: { "@id": state.seo.canonicalUrl + "#business" } }];
+    if (state.seo.offerCatalogSchema) graph.push({ "@type": "OfferCatalog", name: "Planos de internet", itemListElement: state.plans.filter(function (plan) { return plan.active; }).slice(0, 30).map(function (plan) { return { "@type": "Offer", priceCurrency: "BRL", price: Number(plan.price).toFixed(2), availability: "https://schema.org/InStock", itemOffered: { "@type": "Service", name: plan.title + " " + plan.speed, serviceType: "Internet fibra optica" } }; }) });
+    if (state.seo.faqSchema) graph.push({ "@type": "FAQPage", mainEntity: state.faq.slice(0, 20).map(function (item) { return { "@type": "Question", name: item.question, acceptedAnswer: { "@type": "Answer", text: item.answer } }; }) });
     const schema = document.createElement("script");
     schema.type = "application/ld+json";
     schema.id = "local-business-schema";
-    schema.textContent = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "InternetServiceProvider",
-      name: state.brand.name,
-      url: state.seo.canonicalUrl,
-      telephone: state.brand.phone,
-      email: state.brand.email,
-      address: { "@type": "PostalAddress", streetAddress: state.brand.address, addressRegion: "SP", addressCountry: "BR" },
-      areaServed: state.seo.serviceArea,
-      sameAs: [state.brand.instagram, state.brand.facebook],
-    });
+    schema.textContent = JSON.stringify({ "@context": "https://schema.org", "@graph": graph });
     document.head.appendChild(schema);
   }
 
@@ -351,6 +380,7 @@
   function renderApps() {
     setText("apps-eyebrow", state.content.appsEyebrow);
     setText("apps-title", state.content.appsTitle);
+    setText("apps-description", state.content.appsText);
     $("#apps-grid").innerHTML = state.apps.map(function (item, index) {
       const logoUrl = FL.safeImageUrl(item.logo, "");
       const logo = logoUrl ? '<img src="' + escapeHtml(logoUrl) + '" alt="" loading="lazy">' : escapeHtml(item.name.slice(0, 2));
@@ -362,6 +392,8 @@
     setText("business-eyebrow", state.content.businessEyebrow);
     setText("business-title", state.content.businessTitle);
     setText("business-description", state.content.businessText);
+    setText("business-signal", state.content.businessSignal);
+    $("#business-features").innerHTML = String(state.content.businessFeatures || "").split("\n").filter(Boolean).map(function (item) { return '<li>' + icon("circle-check") + escapeHtml(item.trim()) + '</li>'; }).join("");
     $("#business-whatsapp").href = FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.businessTemplate));
   }
 
@@ -369,10 +401,14 @@
     setText("coverage-eyebrow", state.content.coverageEyebrow);
     setText("coverage-title", state.content.coverageTitle);
     setText("coverage-description", state.content.coverageText);
-    const cities = Array.from(new Set(state.regions.filter(function (region) { return region.active; }).map(function (region) { return region.city || region.name; }).filter(Boolean)));
+    const effectiveAreas = window.FLCoverage ? FLCoverage.effectiveAreas(state) : state.regions.filter(function (region) { return region.active; });
+    const cities = Array.from(new Set(effectiveAreas.map(function (region) { return region.city || region.name; }).filter(Boolean)));
     $("#coverage-city").innerHTML = '<option value="">Selecione sua cidade</option>' + cities.map(function (city) {
       return '<option value="' + escapeHtml(city) + '">' + escapeHtml(city) + "</option>";
     }).join("");
+    setText("public-map-label", state.content.coverageMapLabel || ("Rede " + state.brand.name));
+    const inventory = window.FLCoverage ? FLCoverage.inventory(state) : { effective: effectiveAreas, geometries: 0 };
+    setText("public-map-summary", inventory.effective.length + " areas atendidas / " + inventory.geometries + " geometrias");
     initPublicMap();
   }
 
@@ -389,8 +425,9 @@
     const element = $("#public-coverage-map");
     const fallback = $("#public-map-fallback");
     if (!element) return;
-    const regions = state.regions.filter(function (region) { return region.active && region.lat !== null && region.lat !== "" && region.lng !== null && region.lng !== "" && Number.isFinite(Number(region.lat)) && Number.isFinite(Number(region.lng)); });
-    const importedFiles = state.coverageFiles.filter(function (file) { return file.active; });
+    const mode = state.coverageSettings.areaSourceMode || "auto";
+    const regions = (mode === "imported" ? [] : state.regions).filter(function (region) { return region.active && region.lat !== null && region.lat !== "" && region.lng !== null && region.lng !== "" && Number.isFinite(Number(region.lat)) && Number.isFinite(Number(region.lng)); });
+    const importedFiles = (mode === "manual" ? [] : state.coverageFiles).filter(function (file) { return file.active; });
     if (publicMap) { publicMap.remove(); publicMap = null; }
     if (element._leaflet_id) delete element._leaflet_id;
     if (!window.L || (!regions.length && !importedFiles.length)) {
@@ -404,16 +441,20 @@
     fallback.hidden = true;
     const mapShell = element.closest(".coverage-map");
     if (mapShell) mapShell.className = "coverage-map map-style--" + (state.coverageSettings.mapStyle || "brand");
-    publicMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true, attributionControl: true }).setView([Number(state.coverageSettings.centerLat), Number(state.coverageSettings.centerLng)], 11);
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    publicMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true, attributionControl: true, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([Number(state.coverageSettings.centerLat), Number(state.coverageSettings.centerLng)], 11);
+    window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(publicMap);
+    publicMap.createPane("coverageGlow");
+    publicMap.getPane("coverageGlow").style.zIndex = 390;
+    publicMap.getPane("coverageGlow").style.pointerEvents = "none";
     const bounds = [];
     regions.forEach(function (region) {
       const point = [Number(region.lat), Number(region.lng)];
       bounds.push(point);
       const color = regionColor(region);
+      window.L.circle(point, { pane: "coverageGlow", radius: Math.max(700, Number(region.radiusKm || state.coverageSettings.defaultRadiusKm) * 1180), color, fillColor: color, fillOpacity: 0.1, opacity: 0.24, weight: 12, interactive: false }).addTo(publicMap);
       const circle = window.L.circle(point, {
         radius: Math.max(500, Number(region.radiusKm || state.coverageSettings.defaultRadiusKm) * 1000), color, fillColor: color,
         fillOpacity: state.coverageSettings.showInterest ? 0.14 + Number(region.interest || 0) / 520 : 0.24, weight: 2,
@@ -428,8 +469,9 @@
       const color = file.color || state.theme.mapAccent || state.theme.primary;
       file.features.forEach(function (feature) {
         if (feature.type === "polygon") {
-          const polygon = window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.24), weight: 2 }).addTo(publicMap);
-          polygon.bindTooltip('<strong>' + escapeHtml(feature.name) + '</strong><span>Area atendida pela ' + escapeHtml(state.brand.name) + '</span>', { direction: "top", className: "coverage-tooltip" });
+          window.L.polygon(feature.coordinates, { pane: "coverageGlow", color, fillColor: color, fillOpacity: 0.1, opacity: 0.28, weight: 10, interactive: false }).addTo(publicMap);
+          const polygon = window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.3), weight: 2.5 }).addTo(publicMap);
+          polygon.bindTooltip('<strong>' + escapeHtml(feature.name) + '</strong><span>Area atendida pela ' + escapeHtml(state.brand.name) + '</span>', { direction: "top", className: "coverage-tooltip", permanent: Boolean(state.coverageSettings.showImportedLabels) });
           bounds.push.apply(bounds, feature.coordinates);
         } else if (feature.type === "line") {
           window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(publicMap).bindTooltip(escapeHtml(feature.name));
@@ -455,6 +497,7 @@
   function renderFaq() {
     setText("faq-eyebrow", state.content.faqEyebrow);
     setText("faq-title", state.content.faqTitle);
+    setText("faq-description", state.content.faqText);
     $("#faq-whatsapp").href = FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.floatingMessage));
     $("#faq-list").innerHTML = state.faq.map(function (item, index) {
       return '<article class="faq-item' + (index === 0 ? " is-open" : "") + '"><button type="button" aria-expanded="' + (index === 0) + '"><span>' + escapeHtml(item.question) + "</span>" + icon("plus") + '</button><div class="faq-answer"><p>' + escapeHtml(item.answer) + "</p></div></article>";
@@ -468,6 +511,7 @@
   function renderSupport() {
     setText("support-eyebrow", state.content.supportEyebrow);
     setText("support-title", state.content.supportTitle);
+    setText("support-description", state.content.supportText);
     $("#support-grid").innerHTML = state.supportCards.filter(function (item) { return item.active; }).map(function (item) {
       const url = supportUrl(item);
       const external = /^https?:/.test(url) || item.type === "whatsapp" ? ' target="_blank" rel="noopener"' : "";
@@ -476,6 +520,7 @@
   }
 
   function renderFinalAndFooter() {
+    setText("final-eyebrow", state.content.finalEyebrow);
     setText("final-title", state.content.finalTitle);
     setText("final-description", state.content.finalText);
     const whatsappUrl = FL.whatsappLink(state.brand.whatsapp, siteMessage(state.whatsapp.floatingMessage));
@@ -735,6 +780,10 @@
       return regionCity === normalizedCity || normalizeText(region.name) === normalizedCity;
     });
     if (match) return { region: match, matchType: match.type || "city" };
+    if (window.FLCoverage) {
+      const importedMatch = FLCoverage.effectiveAreas(state).find(function (area) { return area.source === "kmz" && normalizeText(area.name) === normalizedCity; });
+      if (importedMatch) return { region: importedMatch, matchType: "kmz" };
+    }
     if (coverageLookupPoint && state.coverageSettings.precisePolygonCheck) {
       for (const file of state.coverageFiles.filter(function (item) { return item.active; })) {
         const feature = file.features.find(function (item) { return item.type === "polygon" && pointInPolygon(coverageLookupPoint, item.coordinates); });

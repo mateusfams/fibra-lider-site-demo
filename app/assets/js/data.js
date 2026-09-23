@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "fibra-lider-studio-state-v12";
-  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v11", "fibra-lider-studio-state-v10", "fibra-lider-studio-state-v9", "fibra-lider-studio-state-v8", "fibra-lider-studio-state-v7"];
+  const STORAGE_KEY = "fibra-lider-studio-state-v13";
+  const LEGACY_STORAGE_KEYS = ["fibra-lider-studio-state-v12", "fibra-lider-studio-state-v11", "fibra-lider-studio-state-v10", "fibra-lider-studio-state-v9", "fibra-lider-studio-state-v8", "fibra-lider-studio-state-v7"];
   const EVENTS_KEY = "fibra-lider-studio-events-v2";
   const SESSION_KEY = "fibra-lider-studio-session-v2";
 
@@ -12,7 +12,7 @@
 
   const defaultState = {
     meta: {
-      version: "1.6.0-mvp",
+      version: "1.7.0-mvp",
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
       status: "published",
@@ -128,9 +128,11 @@
       benefitsText: "Da primeira reuniao da manha ao ultimo episodio da noite, sua casa continua conectada.",
       appsEyebrow: "Conteudo para todos",
       appsTitle: "Internet e entretenimento em um so plano.",
+      appsText: "Filmes, series, musica, esportes, leitura e seguranca digital para completar sua experiencia.",
       businessEyebrow: "Fibra Lider Empresas",
       businessTitle: "Conectividade para sua empresa nao parar.",
       businessText: "Link dedicado para empresas e eventos, projetos sob medida e atendimento tecnico regional.",
+      businessSignal: "Conexao preparada para seu negocio",
       coverageEyebrow: "Onde atendemos",
       coverageTitle: "Consulte a disponibilidade no seu endereco.",
       coverageText: "Nossa rede esta em expansao na Regiao Metropolitana de Campinas.",
@@ -140,6 +142,11 @@
       faqTitle: "Respostas rapidas antes de contratar.",
       supportEyebrow: "Central Fibra Lider",
       supportTitle: "Resolva tudo pelo canal certo.",
+      supportText: "Atendimento comercial, area do cliente e suporte em canais diretos.",
+      faqText: "Encontre respostas sobre instalacao, cobertura, equipamentos e contratacao.",
+      businessFeatures: "Link dedicado e projetos sob medida\nAtendimento tecnico regional\nConectividade para empresas e eventos",
+      coverageMapLabel: "Rede Fibra Lider",
+      finalEyebrow: "Internet regional de verdade",
       finalTitle: "Pronto para navegar sem limites?",
       finalText: "Consulte a cobertura e encontre o melhor plano para sua casa ou empresa.",
     },
@@ -191,6 +198,7 @@
       { id: "paulinia", name: "Paulinia", type: "city", cep: "13140-001", stateCode: "SP", address: "Paulinia - SP", status: "Expansao futura", interest: 34, leads: 18, lat: -22.7630391, lng: -47.1532213, radiusKm: 4, color: "#db7b20", active: true },
     ],
     coverageSettings: {
+      areaSourceMode: "auto",
       mapStyle: "brand",
       routeProvider: "google",
       geocodingProvider: "nominatim",
@@ -201,11 +209,12 @@
       precisePolygonCheck: true,
       showInterest: true,
       showLabels: true,
+      showImportedLabels: false,
       defaultRadiusKm: 5,
       defaultState: "SP",
       centerLat: -22.835,
       centerLng: -47.19,
-      importedAreaOpacity: 0.24,
+      importedAreaOpacity: 0.3,
       maxImportMb: 5,
     },
     coverageFiles: [],
@@ -285,14 +294,26 @@
       description: "Planos de internet 100% fibra optica em Sumare e regiao. Consulte cobertura e contrate a Fibra Lider pelo WhatsApp.",
       keywords: "internet fibra optica Sumare, provedor de internet Sumare, Fibra Lider, internet Hortolandia, internet residencial",
       canonicalUrl: "https://fibralider.net.br/",
+      ogTitle: "Fibra Lider | Internet fibra optica perto de voce",
+      ogDescription: "Planos de internet 100% fibra optica com atendimento regional.",
       ogImage: "./assets/img/hero-family-fiber.jpg",
       serviceArea: "Sumare, Hortolandia, Nova Odessa, Campinas e Regiao Metropolitana de Campinas",
+      localBusinessType: "InternetServiceProvider",
+      addressLocality: "Sumare",
+      addressRegion: "SP",
+      postalCode: "13170-000",
+      openingHours: "Mo-Fr 08:00-18:00, Sa 08:00-12:00",
+      faqSchema: true,
+      offerCatalogSchema: true,
+      sitemapEnabled: true,
+      cityPagesEnabled: false,
       googleSiteVerification: "",
       indexSite: true,
     },
     integrations: {
       consentBanner: true, ga4Enabled: false, ga4Id: "", googleAdsEnabled: false, googleAdsId: "",
       googleAdsLabel: "", metaPixelEnabled: false, metaPixelId: "", gtmEnabled: false, gtmId: "",
+      whatsappMode: "manual", whatsappApiEnabled: false, whatsappPhoneId: "", webhookUrl: "",
     },
     footer: {
       description: "Internet fibra optica com atendimento regional para residencias e empresas.",

@@ -12,10 +12,13 @@
     plans: ["Planos e ofertas", "Operacao comercial"],
     catalog: ["Apps e beneficios", "Operacao comercial"],
     coverage: ["Cobertura", "Operacao comercial"],
-    support: ["Leads e WhatsApp", "Operacao comercial"],
-    campaigns: ["Campanhas e cupons", "Crescimento"],
+    support: ["Leads", "Operacao comercial"],
+    leads: ["Leads", "Operacao comercial"],
+    whatsapp: ["WhatsApp", "Operacao comercial"],
+    campaigns: ["Campanhas", "Crescimento"],
+    coupons: ["Cupons", "Crescimento"],
     seo: ["SEO local", "Crescimento"],
-    pixels: ["Integracoes", "Crescimento"],
+    pixels: ["Integracoes e APIs", "Crescimento"],
     analytics: ["Desempenho", "Crescimento"],
     heatmap: ["Mapa de interesse", "Crescimento"],
     activity: ["Atividade", "Administracao"],
@@ -31,6 +34,10 @@
   let builderStudioTab = "layout";
   let activeCampaignTab = "popups";
   let leadWorkspaceTab = "leads";
+  let whatsappWorkspaceTab = "campaigns";
+  let coverageWorkspaceTab = "overview";
+  let seoWorkspaceTab = "overview";
+  let integrationWorkspaceTab = "marketing";
   let pageEditId = null;
   let selectedPageBlockId = null;
   let pageBuilderDevice = "desktop";
@@ -180,7 +187,8 @@
       return '<label class="field"><span>' + esc(label) + '</span><span class="color-input"><input type="color" value="' + esc(value) + '" data-bind="' + esc(path) + '"><b>' + esc(value) + "</b></span>" + help + "</label>";
     }
     const type = config.type || "text";
-    return '<label class="field"><span>' + esc(label) + '</span><input type="' + type + '" value="' + esc(value) + '" data-bind="' + esc(path) + '"' + (config.placeholder ? ' placeholder="' + esc(config.placeholder) + '"' : "") + ">" + help + "</label>";
+    const constraints = ["min", "max", "step", "maxlength"].map(function (name) { return config[name] == null ? "" : ' ' + name + '="' + esc(config[name]) + '"'; }).join("");
+    return '<label class="field"><span>' + esc(label) + '</span><input type="' + type + '" value="' + esc(value) + '" data-bind="' + esc(path) + '"' + (config.placeholder ? ' placeholder="' + esc(config.placeholder) + '"' : "") + constraints + ">" + help + "</label>";
   }
 
   function toggle(label, path, description) {
@@ -299,7 +307,7 @@
     return '<article class="metric-card metric-card--' + tone + '"><div class="metric-card__top"><span>' + icon(iconName) + '</span><em>' + esc(trend) + '</em></div><strong>' + esc(value) + '</strong><p>' + esc(label) + '</p><small>' + esc(context) + "</small></article>";
   }
 
-  function renderDashboard() {
+  function renderDashboardLegacy() {
     const data = analyticsData();
     const mobileEvents = data.events.filter(function (event) { return event.viewport && Number(event.viewport.width) < 700; }).length;
     const mobileShare = data.events.length ? Math.round((mobileEvents / data.events.length) * 100) : 0;
@@ -374,13 +382,13 @@
     const map = {
       plans: ["plansEyebrow", "plansTitle", "plansText"],
       benefits: ["benefitsEyebrow", "benefitsTitle", "benefitsText"],
-      apps: ["appsEyebrow", "appsTitle"],
-      business: ["businessEyebrow", "businessTitle", "businessText"],
-      coverage: ["coverageEyebrow", "coverageTitle", "coverageText"],
+      apps: ["appsEyebrow", "appsTitle", "appsText"],
+      business: ["businessEyebrow", "businessTitle", "businessText", "businessFeatures", "businessSignal"],
+      coverage: ["coverageEyebrow", "coverageTitle", "coverageText", "coverageMapLabel"],
       testimonials: ["testimonialEyebrow", "testimonialTitle"],
-      faq: ["faqEyebrow", "faqTitle"],
-      support: ["supportEyebrow", "supportTitle"],
-      final: ["finalTitle", "finalText"],
+      faq: ["faqEyebrow", "faqTitle", "faqText"],
+      support: ["supportEyebrow", "supportTitle", "supportText"],
+      final: ["finalEyebrow", "finalTitle", "finalText"],
     };
     return map[blockId] || [];
   }
@@ -428,6 +436,36 @@
       '<label class="toggle-row"><span><strong>Slide publicado</strong><small>Disponivel no carrossel da home</small></span><input data-banner-field="active" type="checkbox"' + (banner.active ? " checked" : "") + '><i></i></label>';
   }
 
+  function renderDashboard() {
+    const data = analyticsData();
+    const inventory = window.FLCoverage ? FLCoverage.inventory(state) : { manual: state.regions, imported: [], effective: state.regions, geometries: 0 };
+    const eventsBySource = Object.entries(groupByPayload(data.events, "source")).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
+    const sourceMax = eventsBySource[0] ? eventsBySource[0][1] : 1;
+    const planCounts = groupByPayload(data.events.filter(function (event) { return ["plan_click", "whatsapp_click"].includes(event.type); }), "planId");
+    const topPlans = Object.entries(planCounts).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 4);
+    const leadingPlan = state.plans.find(function (plan) { return topPlans[0] && plan.id === topPlans[0][0]; }) || state.plans.find(function (plan) { return plan.featured && plan.active; }) || state.plans[0];
+    const regions = state.regions.slice().sort(function (a, b) { return Number(b.interest || 0) - Number(a.interest || 0); });
+    const days = Array.from({ length: 14 }, function (_, index) {
+      const day = new Date(); day.setDate(day.getDate() - (13 - index));
+      const key = day.toISOString().slice(0, 10);
+      return { label: day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), total: data.events.filter(function (event) { return event.ts.slice(0, 10) === key; }).length };
+    });
+    const maxDay = Math.max.apply(null, days.map(function (day) { return day.total; }).concat([1]));
+    const seoChecks = [state.seo.title, state.seo.description, state.seo.canonicalUrl, state.seo.serviceArea, state.seo.ogImage, state.seo.indexSite];
+    const seoScore = Math.round((seoChecks.filter(Boolean).length / seoChecks.length) * 100);
+    const leadGoal = Math.max(1, Number(state.dashboardTargets.monthlyLeads || 1));
+    const goalPercent = Math.min(100, Math.round((data.leads / leadGoal) * 100));
+    const activeCampaigns = state.popupCampaigns.filter(function (item) { return item.active; }).length;
+    return [
+      panelHeader("Visao geral", "Desempenho, funil e demanda regional em uma unica leitura.", '<div class="heading-actions"><select class="compact-select" data-analytics-period aria-label="Periodo das metricas"><option value="28"' + (analyticsPeriod === 28 ? " selected" : "") + '>Ultimos 28 dias</option><option value="7"' + (analyticsPeriod === 7 ? " selected" : "") + '>Ultimos 7 dias</option><option value="1"' + (analyticsPeriod === 1 ? " selected" : "") + '>Hoje</option></select><button class="button button--ghost" data-action="export-report">' + icon("download") + ' Exportar</button></div>'),
+      '<section class="dashboard-welcome"><div><span><i class="status-dot"></i> Operacao ' + (state.meta.status === "published" ? "publicada" : "em rascunho") + '</span><h3>' + esc(state.brand.name) + ' em movimento.</h3><p>' + esc(leadingPlan ? leadingPlan.speed + " concentra o maior interesse comercial do periodo." : "A jornada comercial esta pronta para receber novos contatos.") + '</p><button class="text-button" data-goto="leads">Abrir fila de leads ' + icon("arrow-right") + '</button></div><div class="welcome-score"><small>Meta mensal de leads</small><strong>' + data.leads + '<span> / ' + leadGoal + '</span></strong><div><i style="width:' + goalPercent + '%"></i></div><p>' + goalPercent + '% da meta</p></div></section>',
+      '<section class="metrics-grid">' + metricCard("Visitantes", String(data.views), "+12,8%", "alcance no periodo", "users", "blue") + metricCard("Interesse em planos", String(data.planClicks), "+18,4%", leadingPlan ? leadingPlan.speed + " lidera" : "ofertas monitoradas", "mouse-pointer-click", "violet") + metricCard("Leads capturados", String(data.leads), "+9,2%", data.conversion.toFixed(1).replace(".", ",") + "% de conversao", "contact-round", "green") + metricCard("Consultas de cobertura", String(data.coverage), "+6,7%", inventory.effective.length + " areas efetivas", "map-pin-check", "orange") + '</section>',
+      '<section class="dashboard-grid dashboard-grid--main"><article class="admin-card chart-card">' + cardTitle("Interacoes no site", "Volume diario de eventos first-party", '<span class="live-chip"><i></i> Atualizado</span>') + '<div class="chart-summary"><strong>' + data.events.length + '</strong><span>Total de interacoes <em>+14,6%</em></span></div><div class="bar-chart">' + days.map(function (day) { return '<div title="' + day.label + ': ' + day.total + '"><i style="height:' + Math.max(8, (day.total / maxDay) * 100) + '%"></i><span>' + day.label.split("/")[0] + '</span></div>'; }).join("") + '</div><div class="chart-legend"><span><i class="legend-dot legend-dot--blue"></i> Eventos registrados</span><small>Periodo selecionado</small></div></article><article class="admin-card sources-card">' + cardTitle("Origem dos acessos", "Canais com maior participacao", "") + '<div class="source-list">' + eventsBySource.map(function (entry, index) { const colors = ["#0874e7", "#e54881", "#29b575", "#f2a41d", "#6259e8"]; return '<div class="source-row"><span><i style="background:' + colors[index] + '"></i>' + esc(entry[0]) + '</span><div><b style="width:' + ((entry[1] / sourceMax) * 100) + '%"></b></div><strong>' + entry[1] + '</strong></div>'; }).join("") + '</div><div class="dashboard-mini-insight"><span>' + icon("smartphone") + '</span><div><strong>68% em dispositivos moveis</strong><small>Experiencia responsiva priorizada</small></div></div></article></section>',
+      '<section class="dashboard-grid dashboard-grid--bottom"><article class="admin-card">' + cardTitle("Funil comercial", "Da visita ao contato no WhatsApp", "") + '<div class="funnel"><div><span>Visitantes</span><strong>' + data.views + '</strong><i style="--w:100%"></i></div><div><span>Interesse em planos</span><strong>' + data.planClicks + '</strong><i style="--w:72%"></i></div><div><span>Consultas de cobertura</span><strong>' + data.coverage + '</strong><i style="--w:48%"></i></div><div><span>Leads capturados</span><strong>' + data.leads + '</strong><i style="--w:35%"></i></div></div></article><article class="admin-card">' + cardTitle("Planos com maior interesse", "Cliques e contatos por oferta", "") + '<div class="ranking-list">' + topPlans.map(function (entry, index) { const plan = state.plans.find(function (item) { return item.id === entry[0]; }); return '<div><span class="rank">0' + (index + 1) + '</span><div><strong>' + esc(plan ? plan.speed : "Plano removido") + '</strong><small>' + esc(plan ? plan.title : entry[0]) + '</small></div><b>' + entry[1] + '</b></div>'; }).join("") + '</div><button class="text-button" data-goto="plans">Gerenciar ofertas ' + icon("arrow-right") + '</button></article><article class="admin-card ops-health">' + cardTitle("Operacao digital", "Pontos essenciais do site", "") + '<div><span>' + icon("search-check") + '</span><p><strong>SEO local</strong><small>' + seoScore + '% configurado</small></p><em>' + seoScore + '%</em></div><div><span>' + icon("map-pinned") + '</span><p><strong>Cobertura</strong><small>' + inventory.geometries + ' geometrias importadas</small></p><em>' + inventory.effective.length + ' areas</em></div><div><span>' + icon("megaphone") + '</span><p><strong>Campanhas</strong><small>Popups comerciais publicados</small></p><em>' + activeCampaigns + ' ativa(s)</em></div></article></section>',
+      '<section class="heatmap-layout dashboard-map-block"><article class="admin-card map-admin-card">' + cardTitle("Mapa de cobertura e interesse", "Malha operacional e demanda regional no mesmo contexto.", '<button class="text-button" data-goto="coverage">Gerenciar cobertura ' + icon("arrow-right") + '</button>') + regionHeatMap() + '</article><aside class="admin-card">' + cardTitle("Prioridades regionais", "Locais ordenados por interesse", "") + '<div class="priority-list">' + regions.slice(0, 5).map(function (region, index) { return '<div><span class="rank">0' + (index + 1) + '</span><div><strong>' + esc(region.name) + '</strong><small>' + esc(region.status) + '</small><i><b style="width:' + Number(region.interest || 0) + '%"></b></i></div><em>' + Number(region.interest || 0) + '%</em></div>'; }).join("") + '</div><button class="button button--ghost button--block" data-goto="campaigns">' + icon("megaphone") + ' Criar campanha regional</button></aside></section>',
+    ].join("");
+  }
+
   function blockInspector(block) {
     const labels = {
       plansEyebrow: "Chamada curta", plansTitle: "Titulo", plansText: "Descricao",
@@ -437,6 +475,8 @@
       coverageTitle: "Titulo", coverageText: "Descricao", testimonialEyebrow: "Chamada curta",
       testimonialTitle: "Titulo", faqEyebrow: "Chamada curta", faqTitle: "Titulo",
       supportEyebrow: "Chamada curta", supportTitle: "Titulo", finalTitle: "Titulo", finalText: "Descricao",
+      appsText: "Descricao", businessFeatures: "Diferenciais (uma linha por item)", businessSignal: "Selo da imagem",
+      coverageMapLabel: "Nome da rede no mapa", faqText: "Texto de apoio", supportText: "Texto de apoio", finalEyebrow: "Chamada curta",
     };
     if (String(block.type).startsWith("custom-")) return customBlockInspector(block);
     if (block.id === "hero") {
@@ -447,7 +487,7 @@
       return '<div class="inspector-callout">' + icon("settings-2") + '<div><strong>Secao estrutural</strong><p>Esta secao usa o conteudo cadastrado nos modulos do painel.</p></div></div>';
     }
     return paths.map(function (key) {
-      return field(labels[key], "content." + key, { type: key.toLowerCase().includes("text") ? "textarea" : "text", rows: 3 });
+      return field(labels[key], "content." + key, { type: key.toLowerCase().includes("text") || key === "businessFeatures" ? "textarea" : "text", rows: key === "businessFeatures" ? 5 : 3 });
     }).join("");
   }
 
@@ -707,7 +747,8 @@
   }
 
   function regionHeatMap() {
-    return '<div class="admin-map-shell map-style--' + esc(state.coverageSettings.mapStyle) + '"><div class="admin-map" id="admin-regional-map"></div><div class="map-scale"><span>Menor procura</span><i style="--map-accent:' + esc(state.theme.mapAccent) + '"></i><span>Maior procura</span></div><a class="map-provider-link" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(state.brand.address) + '" target="_blank" rel="noopener">' + icon("route") + ' Abrir no Google Maps</a></div>';
+    const inventory = window.FLCoverage ? FLCoverage.inventory(state) : { effective: state.regions, geometries: 0, files: [] };
+    return '<div class="admin-map-shell map-style--' + esc(state.coverageSettings.mapStyle) + '"><div class="admin-map" id="admin-regional-map"></div><div class="map-hud"><span>' + icon("radio-tower") + '</span><div><strong>' + esc(state.content.coverageMapLabel || "Rede ativa") + '</strong><small>' + inventory.effective.length + ' areas &middot; ' + inventory.geometries + ' geometrias</small></div></div><div class="map-scale"><span>Menor procura</span><i style="--map-accent:' + esc(state.theme.mapAccent) + '"></i><span>Maior procura</span></div><a class="map-provider-link" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(state.brand.address) + '" target="_blank" rel="noopener">' + icon("route") + ' Abrir no Google Maps</a></div>';
   }
 
   function kmlElements(root, name) {
@@ -788,7 +829,8 @@
       }
       const parsed = parseKmlDocument(kmlText);
       state.coverageFiles.unshift({ id: FL.uid("coverage"), name: file.name.replace(/\.(kml|kmz)$/i, ""), fileName: file.name, format: extension.toUpperCase(), bytes: file.size, importedAt: new Date().toISOString(), color: state.theme.mapAccent, active: true, coordinateCount: parsed.coordinateCount, features: parsed.features });
-      saveDraft(parsed.features.length + " areas importadas do Google Earth", { action: "import", resource: "coverage", label: "Cobertura importada", detail: file.name + " - " + parsed.features.length + " geometrias" });
+      const derived = window.FLCoverage ? FLCoverage.importedAreas(state.coverageFiles.filter(function (item) { return item.id === state.coverageFiles[0].id; })).length : parsed.features.length;
+      saveDraft(derived + " areas reconhecidas no arquivo", { action: "import", resource: "coverage", label: "Cobertura importada", detail: file.name + " - " + parsed.features.length + " geometrias e " + derived + " areas operacionais" });
       renderPanel();
     } catch (error) { setSaveStatus(state.meta.status === "published" ? "saved" : "draft"); toast(error.message || "Nao foi possivel importar a cobertura.", "error"); }
   }
@@ -814,15 +856,19 @@
     const importedFiles = state.coverageFiles.filter(function (file) { return file.active; });
     if (!regions.length && !importedFiles.length) { element.innerHTML = '<div class="empty-state"><h3>Cadastre ou importe uma cobertura</h3><p>Use cidade, CEP, KML ou KMZ para exibir a operacao no mapa.</p></div>'; return; }
     adminMap = window.L.map(element, { scrollWheelZoom: false, zoomControl: true, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([Number(state.coverageSettings.centerLat), Number(state.coverageSettings.centerLng)], 11, { animate: false });
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(adminMap);
+    adminMap.createPane("coverageGlow");
+    adminMap.getPane("coverageGlow").style.zIndex = 390;
+    adminMap.getPane("coverageGlow").style.pointerEvents = "none";
     const bounds = [];
     regions.forEach(function (region) {
       const point = [Number(region.lat), Number(region.lng)];
       const color = region.color || state.theme.mapAccent;
       bounds.push(point);
+      window.L.circle(point, { pane: "coverageGlow", radius: Math.max(700, Number(region.radiusKm || state.coverageSettings.defaultRadiusKm) * 1180), color, fillColor: color, fillOpacity: 0.1, opacity: 0.24, weight: 12, interactive: false }).addTo(adminMap);
       window.L.circle(point, { radius: Math.max(500, Number(region.radiusKm || state.coverageSettings.defaultRadiusKm) * 1000), color, fillColor: color, fillOpacity: state.coverageSettings.showInterest ? 0.16 + (Number(region.interest || 0) / 500) : 0.22, weight: 2 }).addTo(adminMap)
         .bindTooltip('<strong>' + esc(region.name) + '</strong><span>' + esc(region.status) + '</span><small>' + region.interest + '% de interesse &middot; ' + region.leads + ' leads &middot; raio ' + esc(region.radiusKm) + ' km</small>', { direction: "top", className: "coverage-tooltip" });
       window.L.circleMarker(point, { radius: 7, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(adminMap)
@@ -832,7 +878,8 @@
       const color = file.color || state.theme.mapAccent;
       file.features.forEach(function (feature) {
         if (feature.type === "polygon") {
-          window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.24), weight: 2 }).addTo(adminMap).bindTooltip('<strong>' + esc(feature.name) + '</strong><span>Area importada de ' + esc(file.fileName) + '</span>', { className: "coverage-tooltip" });
+          window.L.polygon(feature.coordinates, { pane: "coverageGlow", color, fillColor: color, fillOpacity: 0.1, opacity: 0.28, weight: 10, interactive: false }).addTo(adminMap);
+          window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.3), weight: 2.5 }).addTo(adminMap).bindTooltip('<strong>' + esc(feature.name) + '</strong><span>Area importada de ' + esc(file.fileName) + '</span>', { className: "coverage-tooltip" });
           bounds.push.apply(bounds, feature.coordinates);
         } else if (feature.type === "line") {
           window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(adminMap).bindTooltip(esc(feature.name));
@@ -868,6 +915,56 @@
         return '<div class="region-admin-row" data-region-search="' + esc((region.name + " " + (region.city || "") + " " + (region.cep || "") + " " + region.status).toLowerCase()) + '"><span class="region-heat" style="--level:' + region.interest + ';--region-color:' + esc(region.color || state.theme.mapAccent) + '"></span><div><span><strong>' + esc(region.name) + '</strong><em>' + esc(typeLabels[region.type] || "Area") + '</em></span><small>' + esc(region.city || region.cep || "Regra regional") + ' &middot; prioridade ' + esc(region.priority || 10) + ' &middot; ' + esc(region.status) + '</small></div><div class="region-numbers"><strong>' + region.leads + '</strong><small>leads</small></div><div class="row-actions"><button class="icon-button" data-action="open-region-route" data-id="' + esc(region.id) + '" title="Abrir rota">' + icon("route") + '</button><button class="icon-button" data-action="toggle-region" data-id="' + esc(region.id) + '" title="' + (region.active ? "Ocultar" : "Publicar") + '">' + icon(region.active ? "eye" : "eye-off") + '</button><button class="icon-button" data-action="edit-region" data-id="' + esc(region.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-region" data-id="' + esc(region.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div>';
       }).join("") + (regionResult.items.length ? "" : FLAdmin.emptyState({ icon: "map-pinned", title: state.regions.length ? "Nenhuma area encontrada" : "Nenhuma area cadastrada", description: state.regions.length ? "Revise a busca ou os filtros da cobertura." : "Cadastre uma cidade, CEP, bairro ou ponto com raio.", action: state.regions.length ? "clear-region-filters" : "add-region", actionLabel: state.regions.length ? "Limpar filtros" : "Nova area" })) + "</div>" + FLAdmin.pagination(regionResult, "regions") + "</article></section>",
     ].join("");
+  }
+
+  function coverageTabs() {
+    const tabs = [{ id: "overview", label: "Visao geral" }, { id: "sources", label: "Fontes e KMZ" }, { id: "areas", label: "Areas atendidas" }, { id: "settings", label: "Regras do mapa" }];
+    return '<div class="workspace-tabs">' + tabs.map(function (tab) { return '<button class="' + (coverageWorkspaceTab === tab.id ? "is-active" : "") + '" data-coverage-tab="' + tab.id + '">' + esc(tab.label) + '</button>'; }).join("") + '</div>';
+  }
+
+  function renderCoverageSources(inventory) {
+    return '<section class="coverage-source-workspace"><div class="coverage-dropzone"><span>' + icon("file-up") + '</span><div><h3>Importe a malha do Google Earth</h3><p>Arquivos KML ou KMZ de ate ' + esc(state.coverageSettings.maxImportMb) + ' MB sao processados localmente e viram areas atendidas automaticamente.</p></div><label class="button button--primary file-action">' + icon("upload") + ' Selecionar arquivo<input id="coverage-file-input" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"></label></div><div class="security-notice">' + icon("shield-check") + '<div><strong>Processamento controlado no navegador</strong><p>O leitor bloqueia entidades XML, limita tamanho e quantidade de coordenadas e conserva apenas geometrias necessarias ao mapa.</p></div></div><article class="admin-card coverage-file-manager">' + cardTitle("Camadas importadas", inventory.files.length + " fonte(s) ativa(s) na operacao.", '<a class="text-button" href="https://earth.google.com" target="_blank" rel="noopener">Abrir Google Earth ' + icon("external-link") + '</a>') + (state.coverageFiles.length ? '<div class="coverage-file-list">' + state.coverageFiles.map(function (file) { const areas = window.FLCoverage ? FLCoverage.importedAreas([file]).length : file.features.length; return '<article><span>' + icon("map") + '</span><div><strong>' + esc(file.name) + '</strong><p>' + esc(file.fileName) + '</p><small>' + areas + ' areas &middot; ' + file.features.length + ' geometrias &middot; ' + formatBytes(file.bytes) + '</small></div><label class="color-mini" title="Cor da camada"><input type="color" data-coverage-file-color="' + esc(file.id) + '" value="' + esc(file.color || state.theme.mapAccent) + '"></label><button class="icon-button" data-action="toggle-coverage-file" data-id="' + esc(file.id) + '" title="' + (file.active ? "Ocultar" : "Publicar") + '">' + icon(file.active ? "eye" : "eye-off") + '</button><button class="icon-button icon-button--danger" data-action="delete-coverage-file" data-id="' + esc(file.id) + '" title="Remover">' + icon("trash-2") + '</button></article>'; }).join("") + '</div>' : FLAdmin.emptyState({ icon: "file-up", title: "Nenhuma malha importada", description: "Envie um KML ou KMZ para criar a cobertura operacional." })) + '</article></section>';
+  }
+
+  function renderCoverageAreas(inventory) {
+    const typeLabels = { cep: "CEP exato", cep_prefix: "Prefixo CEP", cep_range: "Faixa CEP", city: "Cidade", neighborhood: "Bairros", region: "Regiao", radius: "Raio" };
+    return '<section class="coverage-area-columns"><article class="admin-card">' + cardTitle("Regras manuais", "CEP, bairro, cidade e raio com prioridade comercial.", '<button class="button button--primary button--compact" data-action="add-region">' + icon("plus") + ' Nova area</button>') + (state.regions.length ? '<div class="region-list region-list--workspace">' + state.regions.map(function (region) { return '<div class="region-admin-row"><span class="region-heat" style="--level:' + Number(region.interest || 0) + ';--region-color:' + esc(region.color || state.theme.mapAccent) + '"></span><div><span><strong>' + esc(region.name) + '</strong><em>' + esc(typeLabels[region.type] || "Area") + '</em></span><small>' + esc(region.city || region.cep || region.status) + ' &middot; prioridade ' + esc(region.priority || 10) + '</small></div><div class="row-actions"><button class="icon-button" data-action="toggle-region" data-id="' + esc(region.id) + '" title="' + (region.active ? "Ocultar" : "Publicar") + '">' + icon(region.active ? "eye" : "eye-off") + '</button><button class="icon-button" data-action="edit-region" data-id="' + esc(region.id) + '" title="Editar">' + icon("pencil") + '</button><button class="icon-button icon-button--danger" data-action="delete-region" data-id="' + esc(region.id) + '" title="Excluir">' + icon("trash-2") + '</button></div></div>'; }).join("") + '</div>' : FLAdmin.emptyState({ icon: "map-pin-plus", title: "Sem regras manuais", description: "No modo automatico, as areas do KMZ assumem a operacao sem exigir cadastro duplicado.", action: "add-region", actionLabel: "Criar primeira regra" })) + '</article><article class="admin-card imported-area-card">' + cardTitle("Areas reconhecidas no KMZ", "Nomes repetidos sao agrupados; poligonos sem nome viram setores independentes.", '<span class="status-badge status-badge--success">' + inventory.imported.length + ' areas</span>') + (inventory.imported.length ? '<div class="imported-area-list">' + inventory.imported.map(function (area) { return '<div><span style="--area-color:' + esc(area.color || state.theme.mapAccent) + '">' + icon("scan") + '</span><div><strong>' + esc(area.name) + '</strong><small>' + esc(area.sourceName) + ' &middot; ' + area.featureCount + ' geometria(s)</small></div><em>Automatica</em></div>'; }).join("") + '</div>' : FLAdmin.emptyState({ icon: "scan-search", title: "Nenhuma area derivada", description: "Ative ou importe uma camada com pontos, linhas ou poligonos." })) + '</article></section>';
+  }
+
+  function renderCoverageSettings() {
+    return '<section class="settings-layout"><div class="stack"><article class="admin-card">' + cardTitle("Origem da cobertura", "Escolha como o site resolve as areas atendidas.", "") + field("Modo de operacao", "coverageSettings.areaSourceMode", { type: "select", options: [{ value: "auto", label: "Automatico: manual ou KMZ" }, { value: "hybrid", label: "Hibrido: combinar tudo" }, { value: "manual", label: "Somente regras manuais" }, { value: "imported", label: "Somente arquivos importados" }], help: "Automatico usa o KMZ quando nao ha area manual ativa." }) + toggle("Validacao precisa no poligono", "coverageSettings.precisePolygonCheck", "Cruza o endereco geocodificado com a malha importada") + toggle("Consulta automatica de CEP", "coverageSettings.cepLookup", "Preenche cidade e bairro pelo ViaCEP") + '</article><article class="admin-card">' + cardTitle("Aparencia cartografica", "Aplique o mapa da marca em todo o site.", "") + field("Estilo", "coverageSettings.mapStyle", { type: "select", options: [{ value: "brand", label: "Cartografia da marca" }, { value: "street", label: "Mapa urbano claro" }, { value: "dark", label: "Contraste escuro" }] }) + '<div class="form-grid">' + field("Raio padrao (km)", "coverageSettings.defaultRadiusKm", { type: "number", min: 1, max: 100, step: 1 }) + field("Opacidade do KMZ", "coverageSettings.importedAreaOpacity", { type: "number", min: 0.1, max: 0.6, step: 0.05, help: "Use de 0.10 a 0.60" }) + '</div>' + toggle("Mostrar nomes manuais", "coverageSettings.showLabels", "Exibe rotulos permanentes para cidades e pontos") + toggle("Mostrar nomes importados", "coverageSettings.showImportedLabels", "Exibe rotulos das areas derivadas do KMZ") + toggle("Representar interesse", "coverageSettings.showInterest", "Usa intensidade visual para a demanda regional") + '</article></div><aside class="stack"><article class="admin-card">' + cardTitle("Centro inicial", "Ponto usado quando ainda nao ha geometria.", "") + '<div class="form-grid">' + field("Latitude", "coverageSettings.centerLat", { type: "number", min: -90, max: 90, step: 0.000001 }) + field("Longitude", "coverageSettings.centerLng", { type: "number", min: -180, max: 180, step: 0.000001 }) + '</div></article><div class="integration-route-card"><span>' + icon("blocks") + '</span><div><strong>APIs e geocodificacao</strong><p>Google Maps Platform, chaves publicas, ViaCEP e Nominatim ficam centralizados em Integracoes.</p></div><button class="button button--ghost" data-goto="pixels">Abrir integracoes</button></div></aside></section>';
+  }
+
+  function renderCoverageWorkspace() {
+    const inventory = window.FLCoverage ? FLCoverage.inventory(state) : { manual: state.regions, imported: [], effective: state.regions, files: state.coverageFiles, geometries: 0 };
+    let content;
+    if (coverageWorkspaceTab === "sources") content = renderCoverageSources(inventory);
+    else if (coverageWorkspaceTab === "areas") content = renderCoverageAreas(inventory);
+    else if (coverageWorkspaceTab === "settings") content = renderCoverageSettings();
+    else content = '<section class="quick-stats coverage-stats"><article><span>' + icon("map-pinned") + '</span><div><strong>' + inventory.effective.length + '</strong><small>areas efetivas no site</small></div></article><article><span>' + icon("map") + '</span><div><strong>' + inventory.imported.length + '</strong><small>areas derivadas do KMZ</small></div></article><article><span>' + icon("shapes") + '</span><div><strong>' + inventory.geometries + '</strong><small>geometrias publicadas</small></div></article><article><span>' + icon("waypoints") + '</span><div><strong>' + inventory.manual.length + '</strong><small>regras manuais ativas</small></div></article></section><section class="coverage-overview-layout"><article class="admin-card map-admin-card">' + cardTitle("Malha completa de atendimento", "Cobertura operacional com identidade da marca.", '<span class="live-chip"><i></i> Sincronizada</span>') + regionHeatMap() + '</article><aside class="admin-card coverage-status-card">' + cardTitle("Como o site esta decidindo", "Leitura da regra ativa agora.", "") + '<div class="coverage-mode-summary"><span>' + icon(state.coverageSettings.areaSourceMode === "imported" ? "map" : "route") + '</span><div><strong>' + esc({ auto: "Modo automatico", hybrid: "Modo hibrido", manual: "Somente manual", imported: "Somente importado" }[state.coverageSettings.areaSourceMode] || "Modo automatico") + '</strong><p>' + (state.coverageSettings.areaSourceMode === "auto" && inventory.manual.length ? "As regras manuais estao ativas; o KMZ continua publicado como malha visual e validacao precisa." : state.coverageSettings.areaSourceMode === "auto" ? "Nao ha regras manuais; o KMZ assumiu automaticamente as areas atendidas." : "A fonte selecionada controla as opcoes e validacoes da home.") + '</p></div></div><div class="coverage-health-list"><div><span>' + icon("circle-check") + '</span><p><strong>Arquivo operacional</strong><small>' + inventory.files.length + ' camada(s) ativa(s)</small></p></div><div><span>' + icon("scan-search") + '</span><p><strong>Consulta precisa</strong><small>' + (state.coverageSettings.precisePolygonCheck ? "Poligono habilitado" : "Validacao simplificada") + '</small></p></div><div><span>' + icon("palette") + '</span><p><strong>Mapa da marca</strong><small>' + esc(state.coverageSettings.mapStyle) + '</small></p></div></div><button class="button button--primary button--block" data-coverage-tab="sources">' + icon("file-up") + ' Gerenciar fontes</button></aside></section>';
+    return panelHeader("Cobertura regional", "Importe a rede, organize regras de viabilidade e publique um mapa coerente com a marca.", '<div class="heading-actions"><button class="button button--ghost" data-goto="pixels">' + icon("blocks") + ' APIs</button><button class="button button--primary" data-action="add-region">' + icon("plus") + ' Nova area manual</button></div>') + coverageTabs() + content;
+  }
+
+  function renderLeads() {
+    const newLeads = state.leads.filter(function (lead) { return lead.status === "new"; }).length;
+    const proposals = state.leads.filter(function (lead) { return lead.status === "proposal"; }).length;
+    const won = state.leads.filter(function (lead) { return lead.status === "won"; }).length;
+    const content = leadWorkspaceTab === "settings" ? '<section class="two-column-layout"><article class="admin-card">' + cardTitle("Captura de interesse", "Dados solicitados antes de abrir o WhatsApp.", "") + toggle("Capturar lead antes do WhatsApp", "leadSettings.captureEnabled", "Solicita nome e numero ao escolher um plano") + toggle("WhatsApp obrigatorio", "leadSettings.requireWhatsapp", "Evita registros sem canal de retorno") + field("Texto de consentimento", "leadSettings.consentText", { type: "textarea", rows: 4 }) + field("Retencao planejada", "leadSettings.retentionDays", { type: "number", help: "Dias; no SaaS sera aplicada por rotina automatica" }) + '</article><article class="admin-card">' + cardTitle("Jornada de origem", "Atribuicao registrada em cada novo contato.", "") + '<div class="event-catalog"><div><span>' + icon("mouse-pointer-click") + '<b>Origem</b><small>Direto, campanha ou referencia</small></span><span>' + icon("tags") + '<b>UTMs</b><small>Fonte, midia e campanha</small></span><span>' + icon("map-pin") + '<b>Regiao</b><small>Contexto da consulta</small></span><span>' + icon("ticket-percent") + '<b>Oferta</b><small>Cupom escolhido pelo visitante</small></span></div></div></article></section>' : renderLeadPipeline();
+    return panelHeader("Leads", "Acompanhe origem, interesse e etapa de cada oportunidade comercial.", '<button class="button button--ghost" data-action="export-leads">' + icon("download") + ' Exportar leads</button>') + '<section class="quick-stats lead-stats"><article><span>' + icon("contact-round") + '</span><div><strong>' + state.leads.length + '</strong><small>leads capturados</small></div></article><article><span>' + icon("sparkles") + '</span><div><strong>' + newLeads + '</strong><small>novos contatos</small></div></article><article><span>' + icon("file-check-2") + '</span><div><strong>' + proposals + '</strong><small>propostas em aberto</small></div></article><article><span>' + icon("trophy") + '</span><div><strong>' + won + '</strong><small>convertidos</small></div></article></section><div class="workspace-tabs"><button class="' + (leadWorkspaceTab === "leads" ? "is-active" : "") + '" data-lead-tab="leads">Funil comercial</button><button class="' + (leadWorkspaceTab === "settings" ? "is-active" : "") + '" data-lead-tab="settings">Captura e origem</button></div>' + content;
+  }
+
+  function renderWhatsapp() {
+    const content = whatsappWorkspaceTab === "templates" ? renderWhatsappTemplates() : whatsappWorkspaceTab === "settings" ? '<section class="two-column-layout"><div class="stack"><article class="admin-card">' + cardTitle("Canais publicos", "Numeros usados nas conversas do site.", "") + '<div class="form-grid">' + field("WhatsApp principal", "brand.whatsapp", { help: "DDI + DDD + numero" }) + field("WhatsApp secundario", "brand.whatsappSecondary", {}) + '</div>' + field("Mensagem do botao flutuante", "whatsapp.floatingMessage", { type: "textarea", rows: 3 }) + field("Mensagem de cobertura", "whatsapp.coverageTemplate", { type: "textarea", rows: 5 }) + '</article><article class="admin-card">' + cardTitle("Mensagem de contratacao", "Contexto enviado depois da captura do lead.", "") + field("Template do plano", "whatsapp.planTemplate", { type: "textarea", rows: 9, help: "Variaveis: {brand}, {name}, {leadWhatsapp}, {plan}, {speed}, {price}, {offer}, {region}" }) + '</article></div><aside class="admin-card">' + cardTitle("Modelo de envio", "Operacao segura para esta etapa do produto.", "") + '<div class="whatsapp-mode-card"><span>' + icon("hand") + '</span><div><strong>Envio manual individual</strong><p>O painel prepara cada conversa e o atendente decide quando abrir o WhatsApp.</p></div></div><div class="security-notice security-notice--compact">' + icon("shield-check") + '<div><strong>Sem disparos em massa</strong><p>A API oficial e webhooks ficam em Integracoes, preparados para a fase SaaS com consentimento e auditoria.</p></div></div><button class="button button--ghost button--block" data-goto="pixels">' + icon("blocks") + ' Configurar integracoes</button></aside></section>' : renderWhatsappCampaigns();
+    return panelHeader("WhatsApp", "Prepare mensagens e campanhas manuais com contexto do funil.", '<button class="button button--primary" data-action="new-whatsapp-campaign">' + icon("plus") + ' Nova campanha manual</button>') + '<div class="workspace-tabs"><button class="' + (whatsappWorkspaceTab === "campaigns" ? "is-active" : "") + '" data-whatsapp-tab="campaigns">Campanhas manuais</button><button class="' + (whatsappWorkspaceTab === "templates" ? "is-active" : "") + '" data-whatsapp-tab="templates">Biblioteca de mensagens</button><button class="' + (whatsappWorkspaceTab === "settings" ? "is-active" : "") + '" data-whatsapp-tab="settings">Canais e envio</button></div>' + content;
+  }
+
+  function renderCampaignWorkspace() {
+    return panelHeader("Campanhas", "Crie popups com periodo, gatilho, frequencia e oferta associada.", '<button class="button button--primary" data-action="new-popup">' + icon("plus") + ' Nova campanha</button>') + '<section class="campaign-overview"><article><span>' + icon("megaphone") + '</span><div><strong>' + state.popupCampaigns.length + '</strong><small>campanhas criadas</small></div></article><article><span>' + icon("radio") + '</span><div><strong>' + state.popupCampaigns.filter(function (item) { return item.active; }).length + '</strong><small>ativas agora</small></div></article><article><span>' + icon("mouse-pointer-click") + '</span><div><strong>8,7%</strong><small>taxa de interacao</small></div></article><article><span>' + icon("ticket-percent") + '</span><div><strong>' + state.popupCampaigns.filter(function (item) { return item.couponId; }).length + '</strong><small>com cupom vinculado</small></div></article></section>' + renderPopupList();
+  }
+
+  function renderCoupons() {
+    const usage = state.coupons.reduce(function (sum, item) { return sum + Number(item.used || 0); }, 0);
+    return panelHeader("Cupons", "Controle regras, elegibilidade, duracao e ativacao das ofertas.", '<button class="button button--primary" data-action="new-coupon">' + icon("plus") + ' Novo cupom</button>') + '<section class="campaign-overview"><article><span>' + icon("ticket-percent") + '</span><div><strong>' + state.coupons.length + '</strong><small>cupons cadastrados</small></div></article><article><span>' + icon("circle-check") + '</span><div><strong>' + state.coupons.filter(function (item) { return item.active; }).length + '</strong><small>disponiveis</small></div></article><article><span>' + icon("copy-check") + '</span><div><strong>' + usage + '</strong><small>ativacoes registradas</small></div></article><article><span>' + icon("mouse-pointer-click") + '</span><div><strong>' + state.coupons.filter(function (item) { return item.applicationMode === "code"; }).length + '</strong><small>somente por escolha</small></div></article></section><div class="coupon-policy-note">' + icon("badge-check") + '<div><strong>Oferta sob escolha do visitante</strong><p>O desconto so entra no plano depois do codigo valido ou de uma campanha elegivel; sair ou recarregar limpa a selecao da sessao.</p></div></div>' + renderCouponList();
   }
 
   function renderSupport() {
@@ -971,6 +1068,41 @@
     ].join("");
   }
 
+  function seoScoreData() {
+    const checks = [
+      { label: "Titulo unico", ok: state.seo.title.length >= 20 && state.seo.title.length <= 60, detail: state.seo.title.length + "/60 caracteres" },
+      { label: "Descricao de busca", ok: state.seo.description.length >= 70 && state.seo.description.length <= 160, detail: state.seo.description.length + "/160 caracteres" },
+      { label: "URL canonica", ok: /^https:\/\//i.test(state.seo.canonicalUrl), detail: "Evita paginas duplicadas" },
+      { label: "Negocio local", ok: Boolean(state.seo.addressLocality && state.seo.addressRegion && state.seo.serviceArea), detail: "Endereco e area de servico" },
+      { label: "Imagem social", ok: Boolean(state.seo.ogImage), detail: "Previa para compartilhamento" },
+      { label: "Dados estruturados", ok: Boolean(state.seo.faqSchema || state.seo.offerCatalogSchema), detail: "FAQ e catalogo de ofertas" },
+      { label: "Indexacao", ok: Boolean(state.seo.indexSite && state.seo.sitemapEnabled), detail: "Robots e sitemap ativos" },
+    ];
+    return { checks, score: Math.round((checks.filter(function (item) { return item.ok; }).length / checks.length) * 100) };
+  }
+
+  function seoTabs() {
+    const tabs = [{ id: "overview", label: "Diagnostico" }, { id: "metadata", label: "Busca" }, { id: "local", label: "SEO local" }, { id: "social", label: "Compartilhamento" }, { id: "indexing", label: "Indexacao" }];
+    return '<div class="workspace-tabs">' + tabs.map(function (tab) { return '<button class="' + (seoWorkspaceTab === tab.id ? "is-active" : "") + '" data-seo-tab="' + tab.id + '">' + tab.label + '</button>'; }).join("") + '</div>';
+  }
+
+  function renderSeoWorkspace() {
+    const audit = seoScoreData();
+    let content;
+    if (seoWorkspaceTab === "metadata") {
+      content = '<section class="seo-layout"><div class="stack"><article class="admin-card">' + cardTitle("Resultado organico", "Conteudo principal exibido nos buscadores.", "") + field("Titulo da pagina", "seo.title", { help: state.seo.title.length + "/60 caracteres" }) + field("Descricao", "seo.description", { type: "textarea", rows: 4, help: state.seo.description.length + "/160 caracteres" }) + field("Termos e temas locais", "seo.keywords", { type: "textarea", rows: 3, help: "Use como planejamento editorial; a tag keywords nao determina ranking." }) + field("URL canonica", "seo.canonicalUrl", { type: "url" }) + '</article></div><aside class="admin-card google-preview">' + cardTitle("Previa de busca", "Aparencia aproximada em um resultado organico.", "") + '<div class="search-snippet"><span>' + esc(tenantHost()) + '</span><h3>' + esc(state.seo.title) + '</h3><p>' + esc(state.seo.description) + '</p></div></aside></section>';
+    } else if (seoWorkspaceTab === "local") {
+      content = '<section class="seo-layout"><div class="stack"><article class="admin-card">' + cardTitle("Entidade da empresa", "Dados consistentes para o schema de negocio local.", "") + field("Tipo do negocio", "seo.localBusinessType", { type: "select", options: [{ value: "InternetServiceProvider", label: "Provedor de internet" }, { value: "LocalBusiness", label: "Empresa local" }, { value: "Organization", label: "Organizacao" }] }) + '<div class="form-grid">' + field("Cidade", "seo.addressLocality", {}) + field("Estado", "seo.addressRegion", {}) + field("CEP institucional", "seo.postalCode", {}) + field("Horario", "seo.openingHours", { placeholder: "Mo-Fr 08:00-18:00" }) + '</div>' + field("Regioes atendidas", "seo.serviceArea", { type: "textarea", rows: 4 }) + '</article><div class="security-notice">' + icon("map-pin-check") + '<div><strong>Consistencia local</strong><p>Nome, endereco, telefone e horario devem coincidir com o Google Business Profile e outros diretorios oficiais da empresa.</p></div></div></div><aside class="admin-card">' + cardTitle("Cobertura publicada", "Areas incorporadas aos dados estruturados.", '<span class="status-badge status-badge--success">JSON-LD</span>') + '<div class="seo-area-cloud">' + (window.FLCoverage ? FLCoverage.effectiveAreas(state) : state.regions).slice(0, 24).map(function (area) { return '<span>' + icon(area.source === "kmz" ? "scan" : "map-pin") + esc(area.name) + '</span>'; }).join("") + '</div><button class="button button--ghost button--block" data-goto="coverage">Gerenciar cobertura</button></aside></section>';
+    } else if (seoWorkspaceTab === "social") {
+      content = '<section class="seo-layout"><article class="admin-card">' + cardTitle("Open Graph e redes sociais", "Controle a previa ao compartilhar o site.", "") + field("Titulo social", "seo.ogTitle", { help: "Pode ser mais comercial que o titulo de busca" }) + field("Descricao social", "seo.ogDescription", { type: "textarea", rows: 4 }) + field("Imagem de compartilhamento", "seo.ogImage", { placeholder: "https://... ou imagem da biblioteca", help: "Recomendado: 1200 x 630 px" }) + '</article><aside class="admin-card social-preview-card"><div class="social-preview-image"><img src="' + esc(FL.safeImageUrl(state.seo.ogImage, "./assets/img/hero-family-fiber.jpg")) + '" alt=""></div><small>' + esc(tenantHost()) + '</small><h3>' + esc(state.seo.ogTitle || state.seo.title) + '</h3><p>' + esc(state.seo.ogDescription || state.seo.description) + '</p></aside></section>';
+    } else if (seoWorkspaceTab === "indexing") {
+      content = '<section class="seo-layout"><div class="stack"><article class="admin-card">' + cardTitle("Rastreamento e indexacao", "Sinais tecnicos entregues aos buscadores.", "") + toggle("Permitir indexacao", "seo.indexSite", "Publica index,follow na home") + toggle("Publicar sitemap", "seo.sitemapEnabled", "Lista home e paginas publicadas") + toggle("Schema de perguntas", "seo.faqSchema", "Inclui as perguntas visiveis em JSON-LD") + toggle("Schema de ofertas", "seo.offerCatalogSchema", "Inclui os planos ativos no catalogo estruturado") + toggle("Paginas por cidade", "seo.cityPagesEnabled", "Planejado para o SaaS; exige conteudo local realmente unico") + field("Google Search Console", "seo.googleSiteVerification", { placeholder: "Codigo de verificacao" }) + '</article></div><aside class="stack"><article class="admin-card indexing-files">' + cardTitle("Arquivos tecnicos", "Recursos publicos para descoberta do site.", "") + '<a href="./robots.txt" target="_blank">' + icon("bot") + '<span><strong>robots.txt</strong><small>Diretivas de rastreamento</small></span>' + icon("external-link") + '</a><a href="./sitemap.xml" target="_blank">' + icon("network") + '<span><strong>sitemap.xml</strong><small>URLs publicas conhecidas</small></span>' + icon("external-link") + '</a></article><div class="security-notice security-notice--compact">' + icon("info") + '<div><strong>SEO e um processo continuo</strong><p>Configuracao tecnica melhora a descoberta, mas nenhum painel pode garantir posicao nos resultados.</p></div></div></aside></section>';
+    } else {
+      content = '<section class="seo-diagnostic"><article class="admin-card seo-score-card"><div class="quality-ring" style="--score:' + audit.score + '"><strong>' + audit.score + '<small>%</small></strong></div><div><span>Saude tecnica</span><h3>' + (audit.score >= 85 ? "Base pronta para indexacao" : "Existem oportunidades importantes") + '</h3><p>Metadados, entidade local, compartilhamento e dados estruturados.</p></div></article><article class="admin-card seo-checklist">' + cardTitle("Checklist de publicacao", "Atualizado com a configuracao atual.", "") + '<ul>' + audit.checks.map(function (item) { return '<li class="' + (item.ok ? "is-ok" : "is-warning") + '">' + icon(item.ok ? "circle-check" : "triangle-alert") + '<span><strong>' + esc(item.label) + '</strong><small>' + esc(item.detail) + '</small></span></li>'; }).join("") + '</ul></article><article class="admin-card google-preview">' + cardTitle("Previa atual", "Resultado organico aproximado.", "") + '<div class="search-snippet"><span>' + esc(tenantHost()) + '</span><h3>' + esc(state.seo.title) + '</h3><p>' + esc(state.seo.description) + '</p></div><button class="button button--ghost button--block" data-seo-tab="metadata">Editar aparencia</button></article></section>';
+    }
+    return panelHeader("SEO local", "Fortaleca a entidade da empresa e entregue sinais tecnicos consistentes aos buscadores.", '<button class="button button--primary" data-action="save-content">' + icon("save") + ' Salvar SEO</button>') + seoTabs() + content;
+  }
+
   function integrationCard(name, description, iconName, enabledPath, idPath, placeholder) {
     return '<article class="integration-card"><div class="integration-card__head"><span>' + icon(iconName) + '</span><div><h3>' + esc(name) + '</h3><p>' + esc(description) + '</p></div><label class="mini-switch"><input type="checkbox" data-bind="' + esc(enabledPath) + '"' + (getPath(enabledPath) ? " checked" : "") + '><i></i></label></div><label class="field"><span>ID da integracao</span><input value="' + esc(getPath(idPath)) + '" data-bind="' + esc(idPath) + '" placeholder="' + esc(placeholder) + '"></label><footer><span class="' + (getPath(enabledPath) && getPath(idPath) ? "connected" : "") + '"><i></i>' + (getPath(enabledPath) && getPath(idPath) ? "Configurado" : "Aguardando configuracao") + "</span></footer></article>";
   }
@@ -986,6 +1118,25 @@
       integrationCard("Google Tag Manager", "Container opcional para tags adicionais.", "tags", "integrations.gtmEnabled", "integrations.gtmId", "GTM-XXXXXXX"),
       '</section><section class="admin-card event-catalog">' + cardTitle("Eventos preparados", "Acoes comerciais enviadas para as integracoes ativas.", "") + '<div><span>' + icon("eye") + '<b>page_view</b><small>Visualizacao da home</small></span><span>' + icon("mouse-pointer-click") + '<b>plan_click</b><small>Interesse em um plano</small></span><span>' + icon("contact-round") + '<b>lead_capture</b><small>Formulario comercial enviado</small></span><span>' + icon("message-circle") + '<b>whatsapp_click</b><small>Inicio de conversa</small></span><span>' + icon("map-pin") + '<b>coverage_search</b><small>Consulta regional</small></span><span>' + icon("ticket-percent") + '<b>coupon_copy</b><small>Copia de cupom</small></span></div></section>',
     ].join("");
+  }
+
+  function integrationTabs() {
+    const tabs = [{ id: "marketing", label: "Marketing" }, { id: "maps", label: "Mapas e enderecos" }, { id: "communications", label: "Comunicacao" }, { id: "commerce", label: "Comercio futuro" }];
+    return '<div class="workspace-tabs">' + tabs.map(function (tab) { return '<button class="' + (integrationWorkspaceTab === tab.id ? "is-active" : "") + '" data-integration-tab="' + tab.id + '">' + tab.label + '</button>'; }).join("") + '</div>';
+  }
+
+  function renderIntegrations() {
+    let content;
+    if (integrationWorkspaceTab === "maps") {
+      content = '<section class="integration-grid integration-grid--settings"><article class="integration-card integration-card--wide"><div class="integration-card__head"><span>' + icon("map") + '</span><div><h3>Google Maps Platform</h3><p>Geocodificacao precisa e base para mapas avancados.</p></div>' + toggle("", "coverageSettings.googleMapsEnabled", "") + '</div>' + field("Chave publica restrita", "coverageSettings.googleMapsBrowserKey", { type: "password", placeholder: "AIza...", help: "Restrinja por dominio e apenas pelas APIs necessarias. Nunca use chave de servidor no navegador." }) + field("Map ID", "coverageSettings.googleMapId", { placeholder: "ID do estilo configurado no Google Cloud" }) + '</article><article class="integration-card integration-card--wide"><div class="integration-card__head"><span>' + icon("search-code") + '</span><div><h3>Geocodificacao e CEP</h3><p>Escolha o provedor usado para localizar enderecos.</p></div></div>' + field("Provedor", "coverageSettings.geocodingProvider", { type: "select", options: [{ value: "nominatim", label: "Nominatim / OpenStreetMap" }, { value: "google", label: "Google Maps Platform" }] }) + toggle("ViaCEP", "coverageSettings.cepLookup", "Consulta publica de CEP para preenchimento de endereco") + '</article></section><div class="security-notice">' + icon("key-round") + '<div><strong>Segredos nao pertencem ao navegador</strong><p>Somente chaves publicas restritas por dominio podem ser configuradas aqui. Tokens privados e chamadas faturaveis sensiveis exigem backend e cofre de segredos no SaaS.</p></div></div>';
+    } else if (integrationWorkspaceTab === "communications") {
+      content = '<section class="integration-grid integration-grid--settings"><article class="integration-card integration-card--wide"><div class="integration-card__head"><span>' + icon("message-circle-more") + '</span><div><h3>WhatsApp</h3><p>Canal manual atual e preparacao para API oficial.</p></div></div>' + field("Modo de operacao", "integrations.whatsappMode", { type: "select", options: [{ value: "manual", label: "Manual individual" }, { value: "cloud_api", label: "Cloud API (requer backend)" }] }) + toggle("Preparar Cloud API", "integrations.whatsappApiEnabled", "Nao envia mensagens nesta demonstracao") + field("Phone Number ID", "integrations.whatsappPhoneId", { placeholder: "Identificador publico da conta" }) + '</article><article class="integration-card integration-card--wide"><div class="integration-card__head"><span>' + icon("webhook") + '</span><div><h3>Webhooks</h3><p>Destino futuro para eventos assinados e auditados.</p></div></div>' + field("URL publica", "integrations.webhookUrl", { type: "url", placeholder: "https://api.exemplo.com/webhooks" }) + '<div class="integration-status-row"><span><i></i> Backend necessario</span><small>Assinatura, repeticao e idempotencia serao obrigatorias.</small></div></article></section>';
+    } else if (integrationWorkspaceTab === "commerce") {
+      content = '<div class="roadmap-banner"><span>' + icon("shopping-bag") + '</span><div><strong>E-commerce de equipamentos</strong><p>Modulo planejado para produtos, clientes, carrinho, checkout e pedidos sem misturar as responsabilidades do site institucional.</p></div><em>Proxima fase</em></div><section class="commerce-roadmap-grid"><article><span>' + icon("wallet-cards") + '</span><h3>Mercado Pago</h3><p>Checkout transparente por adaptador server-side e webhooks assinados.</p><em>Planejado</em></article><article><span>' + icon("credit-card") + '</span><h3>PagSeguro</h3><p>Pix, cartao tokenizado e conciliacao de pedidos no backend.</p><em>Planejado</em></article><article><span>' + icon("badge-dollar-sign") + '</span><h3>Stripe</h3><p>Payment Intents, elementos hospedados e idempotencia por pedido.</p><em>Planejado</em></article><article><span>' + icon("package-check") + '</span><h3>Catalogo e pedidos</h3><p>Produtos, categorias, estoque, carrinho, clientes e acompanhamento.</p><em>Planejado</em></article></section><div class="security-notice">' + icon("shield-check") + '<div><strong>Checkout sera implementado somente com backend</strong><p>O sistema nao armazenara dados de cartao. Precos, estoque, assinaturas de webhook e estados de pagamento serao validados no servidor.</p></div></div>';
+    } else {
+      content = '<div class="security-notice">' + icon("shield-check") + '<div><strong>Consentimento antes de mensuracao</strong><p>Tags de marketing so carregam quando o visitante aceita cookies, e os identificadores passam por validacao de formato.</p></div></div><section class="integration-grid">' + integrationCard("Google Analytics 4", "Visitas, sessoes, eventos e jornadas.", "chart-no-axes-combined", "integrations.ga4Enabled", "integrations.ga4Id", "G-XXXXXXXXXX") + integrationCard("Meta Pixel", "Conversoes para Facebook e Instagram.", "facebook", "integrations.metaPixelEnabled", "integrations.metaPixelId", "123456789012345") + integrationCard("Google Ads", "Conversoes das campanhas de pesquisa.", "badge-dollar-sign", "integrations.googleAdsEnabled", "integrations.googleAdsId", "AW-XXXXXXXXX") + integrationCard("Google Tag Manager", "Container opcional para tags adicionais.", "tags", "integrations.gtmEnabled", "integrations.gtmId", "GTM-XXXXXXX") + '</section><section class="admin-card event-catalog">' + cardTitle("Eventos preparados", "Acoes first-party enviadas as integracoes consentidas.", "") + '<div><span>' + icon("eye") + '<b>page_view</b><small>Visualizacao da home</small></span><span>' + icon("mouse-pointer-click") + '<b>plan_click</b><small>Interesse em plano</small></span><span>' + icon("contact-round") + '<b>lead_capture</b><small>Lead capturado</small></span><span>' + icon("message-circle") + '<b>whatsapp_click</b><small>Conversa iniciada</small></span><span>' + icon("map-pin") + '<b>coverage_search</b><small>Consulta regional</small></span><span>' + icon("ticket-percent") + '<b>coupon_apply</b><small>Oferta escolhida</small></span></div></section>';
+    }
+    return panelHeader("Integracoes e APIs", "Centralize servicos externos, chaves publicas e dependencias de backend.", '<button class="button button--primary" data-action="save-content">' + icon("save") + ' Salvar integracoes</button>') + integrationTabs() + content;
   }
 
   function renderAnalytics() {
@@ -1045,9 +1196,10 @@
   function renderPanel() {
     const renderers = {
       dashboard: renderDashboard, builder: renderBuilder, pages: renderPages, banners: renderBanners, media: renderMedia, navigation: renderNavigation,
-      appearance: renderAppearance, plans: renderPlans, catalog: renderCatalog, coverage: renderCoverage,
-      support: renderSupport, campaigns: renderCampaigns, seo: renderSeo, pixels: renderPixels,
-      analytics: renderAnalytics, heatmap: renderHeatmap, activity: renderActivity, settings: renderSettings,
+      appearance: renderAppearance, plans: renderPlans, catalog: renderCatalog, coverage: renderCoverageWorkspace,
+      support: renderLeads, leads: renderLeads, whatsapp: renderWhatsapp, campaigns: renderCampaignWorkspace, coupons: renderCoupons,
+      seo: renderSeoWorkspace, pixels: renderIntegrations, analytics: renderDashboard, heatmap: renderDashboard,
+      activity: renderActivity, settings: renderSettings,
     };
     const panel = $("#admin-panel");
     destroyAdminMap();
@@ -1070,6 +1222,8 @@
   function setPanel(panel) {
     const studioAliases = { banners: "slides", navigation: "header", appearance: "brand" };
     if (studioAliases[panel]) { builderStudioTab = studioAliases[panel]; panel = "builder"; }
+    if (panel === "support") panel = "leads";
+    if (panel === "analytics" || panel === "heatmap") panel = "dashboard";
     if (!PANEL_META[panel]) panel = "dashboard";
     activePanel = panel;
     const activeButton = $('#admin-nav [data-panel="' + panel + '"]');
@@ -1876,6 +2030,10 @@
     $$("[data-coverage-file-color]", $("#admin-panel")).forEach(function (element) { element.addEventListener("change", function () { const file = state.coverageFiles.find(function (item) { return item.id === element.dataset.coverageFileColor; }); if (file) { file.color = element.value; saveDraft(); renderPanel(); } }); });
     $$("[data-campaign-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { activeCampaignTab = element.dataset.campaignTab; renderPanel(); }); });
     $$("[data-lead-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { leadWorkspaceTab = element.dataset.leadTab; renderPanel(); }); });
+    $$("[data-whatsapp-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { whatsappWorkspaceTab = element.dataset.whatsappTab; renderPanel(); }); });
+    $$("[data-coverage-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { coverageWorkspaceTab = element.dataset.coverageTab; renderPanel(); }); });
+    $$("[data-seo-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { seoWorkspaceTab = element.dataset.seoTab; renderPanel(); }); });
+    $$("[data-integration-tab]", $("#admin-panel")).forEach(function (element) { element.addEventListener("click", function () { integrationWorkspaceTab = element.dataset.integrationTab; renderPanel(); }); });
     $$("[data-lead-status]", $("#admin-panel")).forEach(function (element) { element.addEventListener("change", function () { const lead = state.leads.find(function (item) { return item.id === element.dataset.leadStatus; }); if (lead) { lead.status = element.value; saveRuntime("Status do lead atualizado"); renderPanel(); } }); });
     $$("[data-nav-label]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const item = state.navigation.find(function (nav) { return nav.id === element.dataset.navLabel; }); item.label = element.value; saveDraft(); scheduleBuilderPreview(); }); });
     $$("[data-nav-href]", $("#admin-panel")).forEach(function (element) { element.addEventListener("input", function () { const item = state.navigation.find(function (nav) { return nav.id === element.dataset.navHref; }); item.href = element.value; saveDraft(); scheduleBuilderPreview(); }); });
@@ -2037,6 +2195,8 @@
     activePanel = location.hash.replace("#", "") || "dashboard";
     const studioAliases = { banners: "slides", navigation: "header", appearance: "brand" };
     if (studioAliases[activePanel]) { builderStudioTab = studioAliases[activePanel]; activePanel = "builder"; }
+    if (activePanel === "support") activePanel = "leads";
+    if (activePanel === "analytics" || activePanel === "heatmap") activePanel = "dashboard";
     if (!PANEL_META[activePanel]) activePanel = "dashboard";
     applyAdminTheme();
     setSaveStatus(state.meta.status === "published" ? "saved" : "draft");
