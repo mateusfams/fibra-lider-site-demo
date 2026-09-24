@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="theme-color" content="#0d1724">
+    <title>Editor de tema | Fibra Site OS</title>
+    <link rel="icon" href="./assets/img/fibra-lider-icon.png">
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <link rel="stylesheet" href="./assets/css/theme-builder-runtime.css">
+    <link rel="stylesheet" href="./assets/css/theme-builder-editor.css">
+    <link rel="stylesheet" href="./assets/css/theme-builder-standalone.css">
+    <script defer src="./assets/vendor/lucide.min.js"></script>
+    <script defer src="./assets/js/data.js"></script>
+    <script defer src="./assets/js/coverage-core.js"></script>
+    <script defer src="./assets/js/theme-builder/core.js"></script>
+    <script defer src="./assets/js/theme-builder/components.js"></script>
+    <script defer src="./assets/js/theme-builder/canonical-template.js"></script>
+    <script defer src="./assets/js/theme-builder/renderer.js"></script>
+    <script defer src="./assets/js/theme-builder/editor.js"></script>
+    <script defer src="./assets/js/theme-builder/standalone.js"></script>
+  </head>
+  <body class="theme-studio-body">
+    <div class="theme-studio-shell" id="theme-studio-shell" hidden>
+      <header class="theme-studio-nav">
+        <a class="theme-studio-nav__back" href="./admin.html#dashboard" title="Voltar ao Dashboard"><i data-lucide="arrow-left"></i><span>Dashboard</span></a>
+        <div class="theme-studio-nav__brand"><img id="theme-studio-brand-icon" src="./assets/img/fibra-lider-icon.png" alt=""><div><strong>Editor de tema</strong><small id="theme-studio-tenant">Fibra Lider</small></div></div>
+        <div class="theme-studio-nav__actions">
+          <span class="theme-studio-nav__mode"><i data-lucide="shield-check"></i> Rascunho protegido</span>
+          <button id="theme-studio-theme" type="button" title="Alternar tema do editor" aria-label="Alternar tema do editor"><i data-lucide="moon"></i></button>
+          <a href="./index.html" target="_blank" rel="noopener" title="Abrir site"><i data-lucide="external-link"></i><span>Ver site</span></a>
+        </div>
+      </header>
+      <main class="theme-studio-root" id="theme-studio-root" tabindex="-1"></main>
+    </div>
+    <div class="theme-studio-loading" id="theme-studio-loading"><span></span><strong>Preparando o editor visual</strong></div>
+    <div class="admin-toast theme-studio-toast" id="theme-studio-toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

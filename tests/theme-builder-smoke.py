@@ -42,6 +42,8 @@ try:
     wait.until(EC.presence_of_element_located((By.ID, "visual-theme-builder")))
     wait.until(EC.presence_of_element_located((By.ID, "vb-preview-frame")))
     time.sleep(1.5)
+    check("/studio.html" in driver.current_url, "Theme Builder did not open in its dedicated route")
+    check(not driver.find_elements(By.CSS_SELECTOR, ".admin-sidebar"), "Dashboard chrome leaked into the dedicated editor")
     if CAPTURE_DIR:
         os.makedirs(CAPTURE_DIR, exist_ok=True)
         driver.save_screenshot(os.path.join(CAPTURE_DIR, "theme-builder-desktop.png"))
@@ -87,7 +89,7 @@ try:
     driver.switch_to.default_content()
     check(reordered_ids == list(reversed(slider_order)), "Slider manager did not reorder slides")
     driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
-    time.sleep(0.4)
+    time.sleep(1.1)
     driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
     time.sleep(0.5)
 
@@ -104,10 +106,63 @@ try:
     time.sleep(0.9)
     driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
     inserted_banner = driver.find_elements(By.CSS_SELECTOR, ".vb-banner")[-1]
+    banner_id = inserted_banner.get_attribute("data-vb-node")
     check(len(inserted_banner.find_elements(By.CSS_SELECTOR, "h1,h2,h3")) == 1, "Banner recipe did not create editable content")
     check(len(inserted_banner.find_elements(By.CSS_SELECTOR, "a,button")) >= 1, "Banner recipe did not create its CTA")
     driver.switch_to.default_content()
-    driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="style"]').click()
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-vb-prop-choice="focalPoint"][data-value="left"]'))).click()
+    time.sleep(1.1)
+    banner_focus = driver.execute_script(
+        "var env=FLThemeBuilder.storage.loadWorkspace(FL.getState()),doc=env.workspace.documents[env.workspace.activeDocumentId];"
+        "return doc.nodes[arguments[0]].props.focalPoint;",
+        banner_id,
+    )
+    check(banner_focus == "left", "Banner visual framing control failed")
+    driver.execute_script("document.querySelector('[data-vb-action=undo]').click();document.querySelector('[data-vb-action=undo]').click()")
+    time.sleep(0.6)
+
+    driver.execute_script("document.querySelector('[data-vb-component=\"content.image\"]').click()")
+    time.sleep(0.8)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    image_id = driver.find_element(By.CSS_SELECTOR, ".vb-image.is-vb-selected").get_attribute("data-vb-node")
+    driver.switch_to.default_content()
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="layout"]').click()
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-vb-image-align="center"]'))).click()
+    time.sleep(1.1)
+    image_style = driver.execute_script(
+        "var env=FLThemeBuilder.storage.loadWorkspace(FL.getState()),doc=env.workspace.documents[env.workspace.activeDocumentId];"
+        "return doc.nodes[arguments[0]].styles.base.normal;",
+        image_id,
+    )
+    check(image_style.get("marginLeft") == "auto" and image_style.get("marginRight") == "auto", "Image centering did not update the document")
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="style"]').click()
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-vb-image-focal="0,0"]'))).click()
+    time.sleep(1.1)
+    image_props = driver.execute_script(
+        "var env=FLThemeBuilder.storage.loadWorkspace(FL.getState()),doc=env.workspace.documents[env.workspace.activeDocumentId];"
+        "return doc.nodes[arguments[0]].props;",
+        image_id,
+    )
+    check(image_props.get("focalX") == 0 and image_props.get("focalY") == 0, "Visual focal-point control failed")
+    driver.execute_script("document.querySelector('[data-vb-action=undo]').click();document.querySelector('[data-vb-action=undo]').click();document.querySelector('[data-vb-action=undo]').click()")
+    time.sleep(0.6)
+
+    driver.execute_script("document.querySelector('[data-vb-component=\"content.heading\"]').click()")
+    time.sleep(0.7)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    heading_id = driver.find_element(By.CSS_SELECTOR, ".vb-heading.is-vb-selected").get_attribute("data-vb-node")
+    driver.switch_to.default_content()
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="typography"]').click()
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-vb-style-choice="textAlign"][data-value="center"]'))).click()
+    time.sleep(1.1)
+    heading_align = driver.execute_script(
+        "var env=FLThemeBuilder.storage.loadWorkspace(FL.getState()),doc=env.workspace.documents[env.workspace.activeDocumentId];"
+        "return doc.nodes[arguments[0]].styles.base.normal.textAlign;",
+        heading_id,
+    )
+    check(heading_align == "center", "Text centering control failed")
+    driver.execute_script("document.querySelector('[data-vb-action=undo]').click();document.querySelector('[data-vb-action=undo]').click()")
     time.sleep(0.5)
 
     security = driver.execute_script(

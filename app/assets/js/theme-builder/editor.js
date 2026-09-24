@@ -31,11 +31,27 @@
     marginTop: "Margem superior", marginRight: "Margem direita", marginBottom: "Margem inferior", marginLeft: "Margem esquerda", paddingTop: "Padding superior", paddingRight: "Padding direito", paddingBottom: "Padding inferior", paddingLeft: "Padding esquerdo",
     backgroundColor: "Cor de fundo", backgroundImage: "Imagem de fundo", backgroundPosition: "Posicao do fundo", backgroundSize: "Tamanho do fundo", backgroundRepeat: "Repeticao", borderWidth: "Largura da borda", borderStyle: "Estilo da borda", borderColor: "Cor da borda", borderRadius: "Raio", gradientStart: "Inicio do gradiente", gradientEnd: "Fim do gradiente", gradientAngle: "Angulo",
     fontFamily: "Fonte", fontSize: "Tamanho", fontWeight: "Peso", lineHeight: "Altura da linha", letterSpacing: "Espacamento", textTransform: "Transformacao", textAlign: "Alinhamento", color: "Cor do texto",
-    opacity: "Opacidade", overflow: "Overflow", position: "Posicao", top: "Topo", right: "Direita", bottom: "Base", left: "Esquerda", zIndex: "Camada Z", shadowColor: "Cor da sombra", shadowX: "Sombra X", shadowY: "Sombra Y", shadowBlur: "Desfoque", shadowSpread: "Expansao", transitionProperty: "Transicao", transitionDuration: "Duracao", transform: "Transformacao visual",
+    opacity: "Opacidade", overflow: "Overflow", position: "Posicao", top: "Topo", right: "Direita", bottom: "Base", left: "Esquerda", zIndex: "Camada Z", objectFit: "Ajuste da imagem", objectPosition: "Posicao da imagem", shadowColor: "Cor da sombra", shadowX: "Sombra X", shadowY: "Sombra Y", shadowBlur: "Desfoque", shadowSpread: "Expansao", transitionProperty: "Transicao", transitionDuration: "Duracao", transform: "Transformacao visual",
   };
   const EXTRA_STYLE_FIELDS = {
     gradientStart: { type: "color" }, gradientEnd: { type: "color" }, gradientAngle: { type: "integer" },
     shadowColor: { type: "color" }, shadowX: { type: "length" }, shadowY: { type: "length" }, shadowBlur: { type: "length" }, shadowSpread: { type: "length" },
+  };
+  const STYLE_OPTION_LABELS = {
+    block: "Bloco", flex: "Flexivel", grid: "Grade", "inline-flex": "Flexivel em linha", none: "Oculto",
+    row: "Horizontal", column: "Vertical", "row-reverse": "Horizontal invertido", "column-reverse": "Vertical invertido",
+    nowrap: "Sem quebra", wrap: "Com quebra", stretch: "Esticar", "flex-start": "Inicio", center: "Centro", "flex-end": "Fim",
+    "space-between": "Entre itens", "space-around": "Ao redor", baseline: "Linha de base", left: "Esquerda", right: "Direita", justify: "Justificado",
+    uppercase: "Maiusculas", lowercase: "Minusculas", capitalize: "Iniciais maiusculas", cover: "Preencher", contain: "Conter", auto: "Automatico",
+    "no-repeat": "Nao repetir", repeat: "Repetir", "repeat-x": "Repetir horizontal", "repeat-y": "Repetir vertical",
+    solid: "Solida", dashed: "Tracejada", dotted: "Pontilhada", visible: "Visivel", hidden: "Oculto", scroll: "Rolagem", clip: "Recortar",
+    static: "Normal", relative: "Relativa", absolute: "Absoluta", sticky: "Fixa ao rolar", color: "Cor", "background-color": "Cor de fundo",
+    transform: "Transformacao", opacity: "Opacidade", "box-shadow": "Sombra", fill: "Esticar", scaleDown: "Reduzir",
+  };
+  const SEGMENTED_STYLES = {
+    textAlign: [["left", "align-left", "Esquerda"], ["center", "align-center", "Centro"], ["right", "align-right", "Direita"], ["justify", "align-justify", "Justificado"]],
+    justifyContent: [["flex-start", "align-start-vertical", "Inicio"], ["center", "align-center-vertical", "Centro"], ["flex-end", "align-end-vertical", "Fim"], ["space-between", "align-justify", "Distribuir"]],
+    alignItems: [["flex-start", "align-start-horizontal", "Inicio"], ["center", "align-center-horizontal", "Centro"], ["flex-end", "align-end-horizontal", "Fim"], ["stretch", "unfold-horizontal", "Esticar"]],
   };
 
   const runtime = {
@@ -183,6 +199,10 @@
     const value = node.props && node.props[key];
     const base = ' data-vb-prop="' + esc(key) + '"';
     if (schema.control === "switch" || schema.type === "boolean") return '<label class="vb-switch"><span><strong>' + esc(schema.label) + '</strong></span><input type="checkbox"' + base + (value ? " checked" : "") + '><i></i></label>';
+    if (schema.control === "select" && ["position", "focalPoint"].includes(key) && (schema.options || []).every(function (entry) { return ["left", "center", "right"].includes(typeof entry === "string" ? entry : entry.value); })) {
+      const options = { left: ["align-start-vertical", "Esquerda"], center: ["align-center-vertical", "Centro"], right: ["align-end-vertical", "Direita"] };
+      return '<div class="vb-visual-control"><span>' + esc(schema.label) + '</span><div class="vb-segmented vb-segmented--labels" role="group" aria-label="' + esc(schema.label) + '">' + (schema.options || []).map(function (entry) { const option = typeof entry === "string" ? { value: entry, label: entry } : entry; const visual = options[option.value]; return '<button type="button" class="' + (String(value) === String(option.value) ? "is-active" : "") + '" data-vb-prop-choice="' + esc(key) + '" data-value="' + esc(option.value) + '" title="' + esc(option.label) + '">' + icon(visual[0]) + '<span>' + esc(visual[1]) + '</span></button>'; }).join("") + '</div></div>';
+    }
     if (schema.control === "select") return '<label class="vb-field"><span>' + esc(schema.label) + '</span><select' + base + '>' + (schema.options || []).map(function (entry) { const option = typeof entry === "string" ? { value: entry, label: entry } : entry; return '<option value="' + esc(option.value) + '"' + (String(value) === String(option.value) ? " selected" : "") + '>' + esc(option.label) + '</option>'; }).join("") + '</select></label>';
     if (schema.control === "textarea") return '<label class="vb-field"><span>' + esc(schema.label) + '</span><textarea rows="5"' + base + '>' + esc(value || "") + '</textarea></label>';
     if (schema.control === "asset") return assetFieldMarkup(key, schema, node);
@@ -219,7 +239,10 @@
     const field = TB.STYLE_FIELDS[key] || EXTRA_STYLE_FIELDS[key] || { type: "string" };
     const value = currentStyle(node)[key] || "";
     const attr = ' data-vb-style="' + esc(key) + '"';
-    if (field.type === "enum") return '<label class="vb-field"><span>' + esc(STYLE_LABELS[key] || key) + '</span><select' + attr + '><option value="">Herdar / automatico</option>' + field.options.map(function (option) { return '<option value="' + esc(option) + '"' + (value === option ? " selected" : "") + '>' + esc(option) + '</option>'; }).join("") + '</select></label>';
+    if (field.type === "enum" && SEGMENTED_STYLES[key]) {
+      return '<div class="vb-visual-control"><span>' + esc(STYLE_LABELS[key] || key) + '</span><div class="vb-segmented" role="group" aria-label="' + esc(STYLE_LABELS[key] || key) + '"><button type="button" class="' + (!value ? "is-active" : "") + '" data-vb-style-choice="' + esc(key) + '" data-value="" title="Herdar configuracao">' + icon("undo-dot") + '</button>' + SEGMENTED_STYLES[key].map(function (option) { return '<button type="button" class="' + (value === option[0] ? "is-active" : "") + '" data-vb-style-choice="' + esc(key) + '" data-value="' + esc(option[0]) + '" title="' + esc(option[2]) + '">' + icon(option[1]) + '</button>'; }).join("") + '</div></div>';
+    }
+    if (field.type === "enum") return '<label class="vb-field"><span>' + esc(STYLE_LABELS[key] || key) + '</span><select' + attr + '><option value="">Herdar / automatico</option>' + field.options.map(function (option) { return '<option value="' + esc(option) + '"' + (value === option ? " selected" : "") + '>' + esc(STYLE_OPTION_LABELS[option] || option) + '</option>'; }).join("") + '</select></label>';
     if (field.type === "color") {
       const color = /^#[0-9a-f]{6}$/i.test(value) ? value : "#0874e7";
       return '<label class="vb-color-field"><span>' + esc(STYLE_LABELS[key] || key) + '</span><div><input type="color" value="' + esc(color) + '"' + attr + '><input value="' + esc(value) + '"' + attr + ' placeholder="#000000 ou token.color.primary"></div></label>';
@@ -229,7 +252,8 @@
   }
 
   function styleGroupMarkup(group, node) {
-    const fields = STYLE_GROUPS[group] || [];
+    const fields = (STYLE_GROUPS[group] || []).slice();
+    if (group === "layout" && node.type === "content.image") fields.splice(fields.indexOf("maxHeight") + 1, 0, "objectFit");
     const compactGroups = group === "layout" ? [
       ["Margem", ["marginTop", "marginRight", "marginBottom", "marginLeft"]],
       ["Padding", ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"]],
@@ -237,6 +261,37 @@
     const compactKeys = compactGroups.reduce(function (all, entry) { return all.concat(entry[1]); }, []);
     const regular = fields.filter(function (key) { return !compactKeys.includes(key); }).map(function (key) { return styleControlMarkup(key, node); }).join("");
     return regular + compactGroups.map(function (entry) { return '<fieldset class="vb-box-control"><legend>' + entry[0] + '</legend><div>' + entry[1].map(function (key) { return '<label><span>' + ({ marginTop: "Topo", marginRight: "Dir.", marginBottom: "Base", marginLeft: "Esq.", paddingTop: "Topo", paddingRight: "Dir.", paddingBottom: "Base", paddingLeft: "Esq." }[key]) + '</span><input value="' + esc(currentStyle(node)[key] || "") + '" data-vb-style="' + key + '" placeholder="0"></label>'; }).join("") + '</div></fieldset>'; }).join("");
+  }
+
+  function effectiveStyle(node, key) {
+    const breakpoint = currentBreakpoint();
+    const styles = node.styles || {};
+    const current = styles[breakpoint] && styles[breakpoint][runtime.visualState] || {};
+    const normal = styles[breakpoint] && styles[breakpoint].normal || {};
+    const baseState = styles.base && styles.base[runtime.visualState] || {};
+    const base = styles.base && styles.base.normal || {};
+    return current[key] != null && current[key] !== "" ? current[key] : normal[key] != null && normal[key] !== "" ? normal[key] : baseState[key] != null && baseState[key] !== "" ? baseState[key] : base[key] || "";
+  }
+
+  function alignmentButton(value, current, iconName, label, attribute) {
+    return '<button type="button" class="' + (current === value ? "is-active" : "") + '" ' + attribute + '="' + esc(value) + '" title="' + esc(label) + '">' + icon(iconName) + '<span>' + esc(label) + '</span></button>';
+  }
+
+  function quickLayoutMarkup(node) {
+    if (node.type !== "content.image") return "";
+    const marginLeft = effectiveStyle(node, "marginLeft");
+    const marginRight = effectiveStyle(node, "marginRight");
+    const alignment = marginLeft === "auto" && marginRight === "auto" ? "center" : marginLeft === "auto" && marginRight !== "auto" ? "right" : "left";
+    const width = effectiveStyle(node, "width") || "100%";
+    return '<section class="vb-inspector-section vb-quick-layout"><h3>Posicao e tamanho</h3><div class="vb-visual-control"><span>Alinhar imagem</span><div class="vb-segmented vb-segmented--labels" role="group" aria-label="Alinhar imagem">' + alignmentButton("left", alignment, "align-start-vertical", "Esquerda", "data-vb-image-align") + alignmentButton("center", alignment, "align-center-vertical", "Centro", "data-vb-image-align") + alignmentButton("right", alignment, "align-end-vertical", "Direita", "data-vb-image-align") + '</div></div><div class="vb-visual-control"><span>Largura rapida</span><div class="vb-segmented vb-segmented--text" role="group" aria-label="Largura da imagem">' + ["25%", "50%", "75%", "100%"].map(function (value) { return '<button type="button" class="' + (width === value ? "is-active" : "") + '" data-vb-image-width="' + value + '">' + value.replace("%", "") + '</button>'; }).join("") + '</div></div><small class="vb-section-help">As configuracoes valem para ' + esc(DEVICES[runtime.device].label.toLowerCase()) + ' e podem ser diferentes em cada dispositivo.</small></section>';
+  }
+
+  function imageFocalMarkup(node) {
+    if (node.type !== "content.image") return "";
+    const x = Number(node.props.focalX == null ? 50 : node.props.focalX);
+    const y = Number(node.props.focalY == null ? 50 : node.props.focalY);
+    const points = [[0, 0], [50, 0], [100, 0], [0, 50], [50, 50], [100, 50], [0, 100], [50, 100], [100, 100]];
+    return '<section class="vb-inspector-section"><h3>Enquadramento da imagem</h3><div class="vb-image-focus"><div class="vb-image-focus__grid" role="group" aria-label="Ponto focal">' + points.map(function (point) { return '<button type="button" class="' + (x === point[0] && y === point[1] ? "is-active" : "") + '" data-vb-image-focal="' + point.join(",") + '" title="Foco ' + point[0] + '% / ' + point[1] + '%"><i></i></button>'; }).join("") + '</div><div><strong>Ponto de interesse</strong><small>Mantenha rostos e produtos visiveis quando a imagem for recortada.</small></div></div></section>';
   }
 
   function breakpointBarMarkup() {
@@ -273,8 +328,8 @@
   function inspectorBodyMarkup(node, definition) {
     if (node.id === runtime.document.rootId && runtime.inspectorTab === "advanced") return pageSettingsMarkup(node);
     if (runtime.inspectorTab === "content") return slotManagerMarkup(definition, node) + '<section class="vb-inspector-section"><h3>Conteudo</h3>' + propsByGroups(definition, node, ["content", "data", "behavior"]) + '</section>';
-    if (runtime.inspectorTab === "layout") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Propriedades</h3>' + propsByGroups(definition, node, ["layout"]) + '</section><section class="vb-inspector-section"><h3>Layout e espacamento</h3>' + styleGroupMarkup("layout", node) + '</section>';
-    if (runtime.inspectorTab === "style") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Fundo e bordas</h3>' + propsByGroups(definition, node, ["style"]) + styleGroupMarkup("style", node) + '</section>';
+    if (runtime.inspectorTab === "layout") return breakpointBarMarkup() + quickLayoutMarkup(node) + '<section class="vb-inspector-section"><h3>Propriedades</h3>' + propsByGroups(definition, node, ["layout"]) + '</section><section class="vb-inspector-section"><h3>Layout e espacamento</h3>' + styleGroupMarkup("layout", node) + '</section>';
+    if (runtime.inspectorTab === "style") return breakpointBarMarkup() + imageFocalMarkup(node) + '<section class="vb-inspector-section"><h3>Fundo e bordas</h3>' + propsByGroups(definition, node, ["style"]) + styleGroupMarkup("style", node) + '</section>';
     if (runtime.inspectorTab === "typography") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Tipografia</h3>' + styleGroupMarkup("typography", node) + '</section>';
     if (runtime.inspectorTab === "responsive") return responsiveMarkup(node);
     if (runtime.inspectorTab === "effects") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Efeitos e posicionamento</h3>' + propsByGroups(definition, node, ["effects"]) + styleGroupMarkup("effects", node) + '</section>';
@@ -395,6 +450,20 @@
 
   function setNodeValue(path, value, label) {
     return execute({ type: "set", payload: { path: "nodes." + runtime.selectedId + "." + path, value: value }, label: label || "Editar componente" });
+  }
+
+  function setNodeValues(entries, label) {
+    const commands = Object.keys(entries).map(function (path) {
+      return { type: "set", payload: { path: "nodes." + runtime.selectedId + "." + path, value: entries[path] }, label: label };
+    });
+    return execute({ type: "batch", payload: { commands: commands, selectionId: runtime.selectedId }, label: label || "Editar componente" }, { select: runtime.selectedId });
+  }
+
+  function setCurrentStyles(values, label) {
+    const prefix = "styles." + currentBreakpoint() + "." + runtime.visualState + ".";
+    const entries = {};
+    Object.keys(values).forEach(function (key) { entries[prefix + key] = values[key]; });
+    return setNodeValues(entries, label || "Editar estilo");
   }
 
   function sendPreview() {
@@ -631,6 +700,24 @@
     if (component) { insertComponent(component.dataset.vbComponent); return; }
     const media = event.target.closest("[data-vb-media-pick]");
     if (media) { setNodeValue("props." + media.dataset.vbMediaPick, media.dataset.url, "Selecionar imagem"); return; }
+    const styleChoice = event.target.closest("[data-vb-style-choice]");
+    if (styleChoice) { setCurrentStyles({ [styleChoice.dataset.vbStyleChoice]: styleChoice.dataset.value }, "Ajustar alinhamento"); return; }
+    const propChoice = event.target.closest("[data-vb-prop-choice]");
+    if (propChoice) { setNodeValue("props." + propChoice.dataset.vbPropChoice, propChoice.dataset.value, "Ajustar enquadramento"); return; }
+    const imageAlign = event.target.closest("[data-vb-image-align]");
+    if (imageAlign) {
+      const value = imageAlign.dataset.vbImageAlign;
+      setCurrentStyles({ display: "block", marginLeft: value === "left" ? "0" : "auto", marginRight: value === "right" ? "0" : "auto" }, "Alinhar imagem");
+      return;
+    }
+    const imageWidth = event.target.closest("[data-vb-image-width]");
+    if (imageWidth) { setCurrentStyles({ width: imageWidth.dataset.vbImageWidth }, "Redimensionar imagem"); return; }
+    const imageFocal = event.target.closest("[data-vb-image-focal]");
+    if (imageFocal) {
+      const point = imageFocal.dataset.vbImageFocal.split(",").map(Number);
+      setNodeValues({ "props.focalX": point[0], "props.focalY": point[1] }, "Ajustar ponto focal");
+      return;
+    }
     const quick = event.target.closest("[data-vb-quick-add]");
     if (quick) { const node = selectedNode(); const slot = quick.dataset.slot; insertComponent(quick.dataset.vbQuickAdd, { parentId: node.id, slot: slot, index: (node.slots[slot] || []).length }); return; }
     const slotAdd = event.target.closest("[data-vb-slot-add]");

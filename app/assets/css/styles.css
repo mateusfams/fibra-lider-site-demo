@@ -3880,6 +3880,31 @@ svg {
   font-style: normal;
 }
 
+.nav-group .admin-studio-launch {
+  min-height: 48px;
+  margin: 3px 0 5px;
+  border: 1px solid rgba(45, 211, 139, 0.42);
+  background: #0d7354;
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(0, 63, 47, 0.24);
+}
+
+.nav-group .admin-studio-launch:hover {
+  border-color: rgba(111, 255, 195, 0.72);
+  background: #0b805d;
+}
+
+.nav-group .admin-studio-launch svg { color: #85f1c7; }
+.nav-group .admin-studio-launch b { font-weight: 800; }
+
+.nav-group .admin-studio-launch em {
+  min-width: 40px;
+  padding: 0 7px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #dffff2;
+  text-transform: uppercase;
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding: 12px;

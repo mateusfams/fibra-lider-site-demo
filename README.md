@@ -15,7 +15,7 @@ Demonstracao navegavel do novo site comercial da Fibra Lider e do painel de gest
 
 ## Painel demonstrativo
 
-Acesse `admin.html` com a senha de demonstracao `lider2026`.
+Acesse `admin.html` com a senha de demonstracao `lider2026`. O editor visual possui uma area de trabalho dedicada em `studio.html`, acessada pelo botao destacado no Dashboard.
 
 - Dashboard executivo com desempenho, funil e mapa de interesse regional.
 - Visual Theme Builder com arvore aninhada de componentes, drag and drop, edicao inline e inspector gerado por schema.
@@ -24,6 +24,7 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`.
 - Banners, sliders, slides e formularios criados e editados integralmente dentro do Theme Builder.
 - Workspaces de paginas com Home, paginas internas, header e footer no mesmo modelo versionado.
 - Estilos por breakpoint e estado, tokens globais, biblioteca de midia, secoes salvas, undo/redo e autosave.
+- Controles visuais para alinhamento de texto, distribuicao de containers, centralizacao, largura, recorte e ponto focal de imagens.
 - Rascunho e publicacao separados: o site publico recebe somente documento, renderer e CSS compilado.
 - Migracao automatica com backup local para rascunhos antigos e fallback seguro contra releases geradas pelo template anterior.
 - Construtor de paginas internas e Central de Midia otimizada.

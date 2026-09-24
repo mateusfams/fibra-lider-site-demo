@@ -1268,9 +1268,14 @@
     refreshIcons();
   }
 
+  function openThemeStudio() {
+    location.href = "./studio.html";
+  }
+
   function setPanel(panel) {
     const studioAliases = { banners: "slides", navigation: "header", appearance: "brand" };
     if (studioAliases[panel]) { builderStudioTab = studioAliases[panel]; panel = "builder"; }
+    if (panel === "builder") { openThemeStudio(); return; }
     if (panel === "support") panel = "leads";
     if (panel === "analytics" || panel === "heatmap") panel = "dashboard";
     if (!PANEL_META[panel]) panel = "dashboard";
@@ -2269,8 +2274,10 @@
     hydrateTenantChrome();
     FL.seedEventsIfEmpty();
     activePanel = location.hash.replace("#", "") || "dashboard";
+    const returnTarget = new URLSearchParams(location.search).get("return");
     const studioAliases = { banners: "slides", navigation: "header", appearance: "brand" };
     if (studioAliases[activePanel]) { builderStudioTab = studioAliases[activePanel]; activePanel = "builder"; }
+    if (returnTarget === "studio" || activePanel === "builder") { location.replace("./studio.html"); return; }
     if (activePanel === "support") activePanel = "leads";
     if (activePanel === "analytics" || activePanel === "heatmap") activePanel = "dashboard";
     if (!PANEL_META[activePanel]) activePanel = "dashboard";
@@ -2301,6 +2308,8 @@
         localStorage.setItem("fl-admin-nav-groups", JSON.stringify(stored));
         return;
       }
+      const studioButton = event.target.closest("[data-open-studio]");
+      if (studioButton) { openThemeStudio(); return; }
       const button = event.target.closest("[data-panel]"); if (button) setPanel(button.dataset.panel);
     });
     $("#sidebar-toggle").addEventListener("click", function () { document.body.classList.toggle("sidebar-open"); });
@@ -2333,7 +2342,7 @@
     window.addEventListener("message", function (event) {
       if (event.origin !== location.origin || !event.data || event.data.type !== "fl-builder-select") return;
       if (!state.pageBlocks.some(function (block) { return block.id === event.data.sectionId; })) return;
-      activePanel = "builder"; builderStudioTab = "layout"; selectedBlockId = event.data.sectionId; builderInspectorTab = "content"; builderMobileTab = "inspector"; renderPanel();
+      openThemeStudio();
     });
   }
 
