@@ -28,6 +28,9 @@ html[data-admin-theme="dark"] .theme-studio-body .vb-studio {
 .vb-studio input,
 .vb-studio textarea,
 .vb-studio select { font: inherit; }
+.vb-studio *,
+.vb-studio *::before,
+.vb-studio *::after { box-sizing: border-box; }
 .vb-studio button { color: inherit; }
 .vb-studio__toolbar {
   align-items: stretch;
@@ -74,18 +77,18 @@ html[data-admin-theme="dark"] .theme-studio-body .vb-studio {
 .vb-mobile-workspace { display: none; }
 
 .vb-studio__workspace { display: grid; grid-template-columns: 304px minmax(420px, 1fr) 330px; min-height: 0; }
-.vb-studio__left { background: var(--vb-editor-panel); border-right: 1px solid var(--vb-editor-line); display: grid; grid-template-columns: 48px minmax(0, 1fr); min-height: 0; position: relative; z-index: 10; }
+.vb-studio__left { background: var(--vb-editor-panel); border-right: 1px solid var(--vb-editor-line); display: grid; grid-template-columns: 54px minmax(0, 1fr); min-height: 0; min-width: 0; position: relative; z-index: 10; }
 .vb-side-tabs { background: color-mix(in srgb, var(--vb-editor-panel) 88%, var(--vb-editor-bg)); border-right: 1px solid var(--vb-editor-line); display: flex; flex-direction: column; gap: 4px; padding: 8px 5px; }
-.vb-side-tabs button { align-items: center; background: transparent; border: 0; cursor: pointer; display: flex; flex-direction: column; gap: 3px; height: 49px; justify-content: center; padding: 0; }
+.vb-side-tabs button { align-items: center; background: transparent; border: 0; cursor: pointer; display: flex; flex-direction: column; gap: 3px; height: 49px; justify-content: center; min-width: 0; padding: 0 2px; }
 .vb-side-tabs button svg { height: 17px; width: 17px; }
-.vb-side-tabs button span { color: var(--vb-editor-muted); font-size: 8px; font-weight: 700; }
+.vb-side-tabs button span { color: var(--vb-editor-muted); display: block; font-size: 8px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vb-side-tabs button.is-active { background: var(--vb-editor-primary); color: #fff; }
 .vb-side-tabs button.is-active span { color: #fff; }
-.vb-side-panel { min-height: 0; overflow: auto; padding-bottom: 30px; scrollbar-color: #b5c2d0 transparent; scrollbar-width: thin; }
+.vb-side-panel { min-height: 0; min-width: 0; overflow: auto; padding-bottom: 30px; scrollbar-color: #b5c2d0 transparent; scrollbar-width: thin; }
 .vb-panel-heading { align-items: center; border-bottom: 1px solid var(--vb-editor-line); display: flex; justify-content: space-between; min-height: 62px; padding: 12px 14px; }
-.vb-panel-heading > div { display: grid; gap: 3px; }
+.vb-panel-heading > div { display: grid; gap: 3px; min-width: 0; }
 .vb-panel-heading strong { font-size: 13px; }
-.vb-panel-heading span { color: var(--vb-editor-muted); font-size: 10px; }
+.vb-panel-heading span { color: var(--vb-editor-muted); font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
 .vb-panel-heading > button { align-items: center; background: transparent; border: 1px solid var(--vb-editor-line); cursor: pointer; display: inline-flex; height: 30px; justify-content: center; width: 30px; }
 .vb-panel-heading > button svg { height: 14px; width: 14px; }
 .vb-search { align-items: center; background: color-mix(in srgb, var(--vb-editor-bg) 65%, var(--vb-editor-panel)); border: 1px solid var(--vb-editor-line); display: flex; gap: 8px; margin: 12px; padding: 8px 10px; }
@@ -97,24 +100,25 @@ html[data-admin-theme="dark"] .theme-studio-body .vb-studio {
 .vb-global-groups h3,
 .vb-inspector-section h3 { font-size: 10px; font-weight: 800; letter-spacing: 0; margin: 0 0 11px; text-transform: uppercase; }
 .vb-component-library section > div { display: grid; gap: 7px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.vb-component-library section button { align-items: center; background: transparent; border: 1px solid var(--vb-editor-line); cursor: grab; display: grid; gap: 5px; justify-items: start; min-height: 86px; padding: 11px; text-align: left; }
+.vb-component-library section button { align-items: center; background: transparent; border: 1px solid var(--vb-editor-line); cursor: grab; display: grid; gap: 5px; justify-items: start; min-height: 92px; min-width: 0; overflow: hidden; padding: 10px; text-align: left; width: 100%; }
 .vb-component-library section button:hover { border-color: var(--vb-editor-primary); box-shadow: inset 0 -2px 0 var(--vb-editor-primary); }
 .vb-component-library section button.is-dragging { border-color: #29d884; box-shadow: inset 0 0 0 2px #29d884; opacity: .72; }
 .vb-component-library section button > span { align-items: center; background: color-mix(in srgb, var(--vb-editor-primary) 10%, transparent); color: var(--vb-editor-primary); display: inline-flex; height: 27px; justify-content: center; width: 27px; }
 .vb-component-library section button svg { height: 15px; width: 15px; }
-.vb-component-library section b { font-size: 11px; line-height: 1.2; }
-.vb-component-library section small { color: var(--vb-editor-muted); font-size: 9px; }
+.vb-component-library section b { display: -webkit-box; font-size: 11px; line-height: 1.25; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.vb-component-library section small { color: var(--vb-editor-muted); display: -webkit-box; font-size: 9px; line-height: 1.3; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .vb-insert-context { align-items: flex-start; background: color-mix(in srgb, var(--vb-editor-primary) 8%, var(--vb-editor-panel)); border-bottom: 1px solid var(--vb-editor-line); color: var(--vb-editor-muted); display: flex; font-size: 10px; gap: 8px; line-height: 1.45; padding: 10px 12px; }
 .vb-insert-context svg { color: var(--vb-editor-primary); flex: 0 0 auto; height: 14px; margin-top: 1px; width: 14px; }
 .vb-insert-context strong { color: var(--vb-editor-ink); }
 .vb-quick-start { border-bottom: 1px solid var(--vb-editor-line); padding: 12px; }
 .vb-quick-start h3 { color: var(--vb-editor-muted); font-size: 9px; margin: 0 0 8px; text-transform: uppercase; }
 .vb-quick-start > div { display: grid; gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.vb-quick-start button { align-items: center; background: color-mix(in srgb, var(--vb-editor-primary) 6%, var(--vb-editor-panel)); border: 1px solid var(--vb-editor-line); color: var(--vb-editor-ink); cursor: pointer; display: flex; font: inherit; font-size: 9px; gap: 7px; min-height: 34px; padding: 7px 8px; text-align: left; }
+.vb-quick-start button { align-items: center; background: color-mix(in srgb, var(--vb-editor-primary) 6%, var(--vb-editor-panel)); border: 1px solid var(--vb-editor-line); color: var(--vb-editor-ink); cursor: pointer; display: flex; font: inherit; font-size: 9px; gap: 7px; min-height: 38px; min-width: 0; overflow: hidden; padding: 7px 8px; text-align: left; }
 .vb-quick-start button:hover { border-color: var(--vb-editor-primary); color: var(--vb-editor-primary); }
 .vb-quick-start button[draggable="true"] { cursor: grab; }
 .vb-quick-start button.is-dragging { border-color: #29d884; box-shadow: inset 0 0 0 2px #29d884; opacity: .72; }
 .vb-quick-start button svg { flex: 0 0 auto; height: 13px; width: 13px; }
+.vb-quick-start button span { display: block; min-width: 0; overflow: hidden; overflow-wrap: anywhere; text-overflow: ellipsis; }
 .vb-component-library button:disabled { cursor: not-allowed; opacity: .42; }
 
 .vb-layers-help { align-items: center; background: color-mix(in srgb, var(--vb-editor-primary) 8%, transparent); color: var(--vb-editor-muted); display: flex; font-size: 10px; gap: 7px; margin: 10px; padding: 8px; }

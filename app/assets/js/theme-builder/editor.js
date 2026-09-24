@@ -58,7 +58,7 @@
     tenant: "", state: null, envelope: null, workspace: null, document: null, root: null, options: {},
     selectedId: "", leftTab: "components", inspectorTab: "content", librarySearch: "", device: "desktop", visualState: "normal",
     zoom: 86, expanded: new Set(), histories: new Map(), clipboard: null, styleClipboard: null, session: "", autosave: null,
-    abort: null, previewReady: false, saveStatus: "saved", dialog: "", diagnostics: null,
+    abort: null, previewReady: false, previewTimer: null, saveStatus: "saved", dialog: "", diagnostics: null,
     mobilePanel: "canvas", draggingComponent: "", previewDrop: null,
   };
 
@@ -130,7 +130,7 @@
   }
 
   function leftPanelMarkup() {
-    const tabs = [["components", "blocks", "Componentes"], ["layers", "layers-3", "Camadas"], ["templates", "layout-template", "Templates"], ["pages", "files", "Paginas"], ["saved", "library", "Salvos"], ["globals", "swatch-book", "Globais"]];
+    const tabs = [["components", "blocks", "Blocos"], ["layers", "layers-3", "Camadas"], ["templates", "layout-template", "Modelos"], ["pages", "files", "Paginas"], ["saved", "library", "Salvos"], ["globals", "swatch-book", "Tema"]];
     return '<aside class="vb-studio__left"><nav class="vb-side-tabs" aria-label="Ferramentas">' + tabs.map(function (tab) { return '<button type="button" class="' + (runtime.leftTab === tab[0] ? "is-active" : "") + '" data-vb-left-tab="' + tab[0] + '" title="' + tab[2] + '">' + icon(tab[1]) + '<span>' + tab[2] + '</span></button>'; }).join("") + '</nav><div class="vb-side-panel" data-vb-left-content>' + leftContentMarkup() + '</div></aside>';
   }
 
@@ -501,6 +501,8 @@
   function execute(command, options) {
     if (!can("document.edit")) { notify("Seu perfil possui acesso somente para visualizacao.", "error"); return null; }
     try {
+      clearTimeout(runtime.previewTimer);
+      runtime.previewTimer = null;
       const result = historyFor(runtime.document.documentId).execute(runtime.document, command);
       runtime.document = result.document;
       runtime.workspace.documents[runtime.document.documentId] = runtime.document;
@@ -531,11 +533,34 @@
     return setNodeValues(entries, label || "Editar estilo");
   }
 
-  function sendPreview() {
+  function sendPreview(documentValue) {
     if (!runtime.root) return;
     const frame = runtime.root.querySelector("#vb-preview-frame");
     if (!frame || !frame.contentWindow) return;
-    frame.contentWindow.postMessage(TB.createMessage("render", runtime.session, { document: runtime.document, selectedId: runtime.selectedId, device: runtime.device }), location.origin);
+    const previewDocument = documentValue && documentValue.nodes ? documentValue : runtime.document;
+    frame.contentWindow.postMessage(TB.createMessage("render", runtime.session, { document: previewDocument, selectedId: runtime.selectedId, device: runtime.device }), location.origin);
+  }
+
+  function previewMutation(path, value) {
+    if (!runtime.document || !path) return;
+    const documentValue = TB.clone(runtime.document);
+    try { TB.setAt(documentValue, path, value); }
+    catch (error) { return; }
+    clearTimeout(runtime.previewTimer);
+    runtime.previewTimer = setTimeout(function () {
+      runtime.previewTimer = null;
+      sendPreview(documentValue);
+    }, 45);
+  }
+
+  function alignmentStyles(key, value) {
+    const node = selectedNode();
+    const values = { [key]: value };
+    if (value && (key === "justifyContent" || key === "alignItems")) {
+      const display = effectiveStyle(node, "display");
+      if (!["flex", "inline-flex", "grid"].includes(display)) values.display = "flex";
+    }
+    return values;
   }
 
   function fitCanvas() {
@@ -836,13 +861,16 @@
     const media = event.target.closest("[data-vb-media-pick]");
     if (media) { setNodeValue("props." + media.dataset.vbMediaPick, media.dataset.url, "Selecionar imagem"); return; }
     const styleChoice = event.target.closest("[data-vb-style-choice]");
-    if (styleChoice) { setCurrentStyles({ [styleChoice.dataset.vbStyleChoice]: styleChoice.dataset.value }, "Ajustar alinhamento"); return; }
+    if (styleChoice) { setCurrentStyles(alignmentStyles(styleChoice.dataset.vbStyleChoice, styleChoice.dataset.value), "Ajustar alinhamento"); return; }
     const propChoice = event.target.closest("[data-vb-prop-choice]");
     if (propChoice) { setNodeValue("props." + propChoice.dataset.vbPropChoice, propChoice.dataset.value, "Ajustar enquadramento"); return; }
     const imageAlign = event.target.closest("[data-vb-image-align]");
     if (imageAlign) {
       const value = imageAlign.dataset.vbImageAlign;
-      setCurrentStyles({ display: "block", marginLeft: value === "left" ? "0" : "auto", marginRight: value === "right" ? "0" : "auto" }, "Alinhar imagem");
+      const styles = { display: "block", marginLeft: value === "left" ? "0" : "auto", marginRight: value === "right" ? "0" : "auto" };
+      const width = effectiveStyle(selectedNode(), "width");
+      if (value !== "left" && (!width || width === "100%")) styles.width = "75%";
+      setCurrentStyles(styles, "Alinhar imagem");
       return;
     }
     const imageWidth = event.target.closest("[data-vb-image-width]");
@@ -939,6 +967,10 @@
     if (target.matches("[data-vb-library-search]")) { runtime.librarySearch = target.value; const panel = runtime.root.querySelector(".vb-component-library"); const heading = runtime.root.querySelector(".vb-panel-heading"); const wrapper = document.createElement("div"); wrapper.innerHTML = libraryMarkup(); const next = wrapper.querySelector(".vb-component-library"); const nextHeading = wrapper.querySelector(".vb-panel-heading"); if (panel && next) panel.replaceWith(next); if (heading && nextHeading) heading.replaceWith(nextHeading); refreshIcons(); }
     if (target.matches("[data-vb-icon-search]")) { const term = target.value.trim().toLowerCase(); const picker = target.closest(".vb-icon-library"); if (picker) picker.querySelectorAll("[data-vb-icon-choice]").forEach(function (button) { button.hidden = Boolean(term) && !button.dataset.vbIconChoice.includes(term); }); }
     if (target.matches('input[type="range"][data-vb-style]')) { const output = target.closest("label").querySelector("output"); if (output) output.value = target.value; }
+    if (target.matches("[data-vb-prop]") && target.type !== "checkbox") previewMutation("nodes." + runtime.selectedId + ".props." + target.dataset.vbProp, parseControlValue(target));
+    if (target.matches("[data-vb-style]") && target.type !== "checkbox") previewMutation("nodes." + runtime.selectedId + ".styles." + currentBreakpoint() + "." + runtime.visualState + "." + target.dataset.vbStyle, parseControlValue(target));
+    if (target.matches("[data-vb-token]")) previewMutation("theme.tokens." + target.dataset.vbToken, target.value);
+    if (target.matches("[data-vb-dark-token]")) previewMutation("theme.darkTokens." + target.dataset.vbDarkToken, target.value);
   }
 
   function normalizeRoute(value) {

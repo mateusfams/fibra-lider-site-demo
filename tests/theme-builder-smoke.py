@@ -48,6 +48,11 @@ try:
     if CAPTURE_DIR:
         os.makedirs(CAPTURE_DIR, exist_ok=True)
         driver.save_screenshot(os.path.join(CAPTURE_DIR, "theme-builder-desktop.png"))
+    sidebar_overflow = driver.execute_script(
+        "return Array.from(document.querySelectorAll('.vb-studio__left button,.vb-studio__left b,.vb-studio__left small')).filter(function(item){"
+        "return item.scrollWidth>item.clientWidth+1&&getComputedStyle(item).overflowX==='visible';}).length"
+    )
+    check(sidebar_overflow == 0, "Theme Builder left panel contains unclipped horizontal overflow")
 
     template_registry = driver.execute_script(
         "return FLThemeBuilder.templateRegistry.list().map(function(item){"
@@ -252,6 +257,14 @@ try:
         image_id,
     )
     check(image_style.get("marginLeft") == "auto" and image_style.get("marginRight") == "auto", "Image centering did not update the document")
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    image_layout = driver.execute_script(
+        "var item=document.querySelector('[data-vb-node=\"'+arguments[0]+'\"]'),style=getComputedStyle(item),parent=item.parentElement.getBoundingClientRect(),box=item.getBoundingClientRect();"
+        "return {width:box.width,parentWidth:parent.width,marginLeft:parseFloat(style.marginLeft),marginRight:parseFloat(style.marginRight)};",
+        image_id,
+    )
+    driver.switch_to.default_content()
+    check(image_layout["width"] < image_layout["parentWidth"] and abs(image_layout["marginLeft"] - image_layout["marginRight"]) < 2, "Image centering was saved but had no visual effect: " + repr(image_layout))
     driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="style"]').click()
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-vb-image-focal="0,0"]'))).click()
     time.sleep(1.1)
@@ -269,6 +282,15 @@ try:
     driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
     heading_id = driver.find_element(By.CSS_SELECTOR, ".vb-heading.is-vb-selected").get_attribute("data-vb-node")
     driver.switch_to.default_content()
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="content"]').click()
+    heading_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-vb-prop="text"]')))
+    driver.execute_script("arguments[0].value='Titulo atualizado em tempo real';arguments[0].dispatchEvent(new Event('input',{bubbles:true}))", heading_input)
+    time.sleep(0.2)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    check(driver.find_element(By.CSS_SELECTOR, '.vb-heading.is-vb-selected').text == "Titulo atualizado em tempo real", "Text input did not update the visual preview in real time")
+    driver.switch_to.default_content()
+    driver.execute_script("arguments[0].dispatchEvent(new Event('change',{bubbles:true}))", heading_input)
+    time.sleep(0.3)
     driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="typography"]').click()
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-vb-style-choice="textAlign"][data-value="center"]'))).click()
     time.sleep(1.1)
@@ -278,7 +300,11 @@ try:
         heading_id,
     )
     check(heading_align == "center", "Text centering control failed")
-    driver.execute_script("document.querySelector('[data-vb-action=undo]').click();document.querySelector('[data-vb-action=undo]').click()")
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    heading_computed_align = driver.execute_script("return getComputedStyle(document.querySelector('[data-vb-node=\"'+arguments[0]+'\"]')).textAlign", heading_id)
+    driver.switch_to.default_content()
+    check(heading_computed_align == "center", "Text centering was saved but had no visual effect")
+    driver.execute_script("document.querySelector('[data-vb-action=undo]').click();document.querySelector('[data-vb-action=undo]').click();document.querySelector('[data-vb-action=undo]').click()")
     time.sleep(0.5)
 
     security = driver.execute_script(
@@ -374,6 +400,45 @@ try:
 
     driver.execute_cdp_cmd("Emulation.clearDeviceMetricsOverride", {})
     driver.set_window_size(1600, 1000)
+    driver.get(BASE_URL + "/admin.html#whatsapp")
+    campaign_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '[data-action="new-whatsapp-campaign"]')))
+    campaign_button.click()
+    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".campaign-builder-form")))
+    campaign_choice_count = len(driver.find_elements(By.CSS_SELECTOR, ".campaign-choice"))
+    check(campaign_choice_count >= 8, "Campaign audience options were not rendered")
+    campaign_dark = driver.execute_script(
+        "var previous=document.documentElement.dataset.adminTheme||'';document.documentElement.dataset.adminTheme='dark';"
+        "var style=getComputedStyle(document.querySelector('.campaign-choice'));var result={previous:previous,background:style.backgroundColor,border:style.borderTopColor};"
+        "if(previous)document.documentElement.dataset.adminTheme=previous;else delete document.documentElement.dataset.adminTheme;return result;"
+    )
+    check(campaign_dark["background"] != "rgba(0, 0, 0, 0)" and campaign_dark["border"] != "rgba(0, 0, 0, 0)", "Campaign choices lose their visual boundaries in dark mode: " + repr(campaign_dark))
+    campaign_overflow = driver.execute_script(
+        "return Array.from(document.querySelectorAll('.campaign-choice__body strong,.campaign-choice__body small')).filter(function(item){"
+        "var style=getComputedStyle(item);return item.scrollWidth>item.clientWidth+1&&style.whiteSpace==='nowrap';}).length"
+    )
+    check(campaign_overflow == 0, "Campaign labels are still truncated")
+    audience_before = int(driver.find_element(By.CSS_SELECTOR, "[data-campaign-audience-count]").text)
+    first_stage = driver.find_element(By.CSS_SELECTOR, 'input[name="stages"]')
+    driver.execute_script("arguments[0].click()", first_stage)
+    audience_filtered = int(driver.find_element(By.CSS_SELECTOR, "[data-campaign-audience-count]").text)
+    check(audience_filtered <= audience_before, "Campaign audience did not react to funnel filters")
+    driver.find_element(By.CSS_SELECTOR, '[data-campaign-clear="stages"]').click()
+    check(int(driver.find_element(By.CSS_SELECTOR, "[data-campaign-audience-count]").text) == audience_before, "Clearing a campaign filter did not restore the audience")
+    plan_search = driver.find_element(By.CSS_SELECTOR, "[data-campaign-plan-search]")
+    plan_search.send_keys("1000")
+    visible_plans = driver.execute_script("return Array.from(document.querySelectorAll('.campaign-choice--plan')).filter(function(item){return !item.hidden;}).length")
+    check(visible_plans > 0 and visible_plans < len(driver.find_elements(By.CSS_SELECTOR, ".campaign-choice--plan")), "Plan search did not filter campaign options")
+    if CAPTURE_DIR:
+        driver.find_element(By.CSS_SELECTOR, ".admin-modal__dialog").screenshot(os.path.join(CAPTURE_DIR, "admin-whatsapp-campaign.png"))
+    driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", {"width": 390, "height": 844, "deviceScaleFactor": 1, "mobile": True})
+    time.sleep(0.4)
+    campaign_mobile = driver.execute_script("var modal=document.querySelector('.admin-modal__dialog').getBoundingClientRect();return {client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,left:modal.left,right:modal.right};")
+    check(campaign_mobile["scroll"] <= campaign_mobile["client"] + 1 and campaign_mobile["left"] >= 0 and campaign_mobile["right"] <= campaign_mobile["client"], "Campaign modal overflows on mobile: " + repr(campaign_mobile))
+    if CAPTURE_DIR:
+        driver.save_screenshot(os.path.join(CAPTURE_DIR, "admin-whatsapp-campaign-mobile.png"))
+    driver.execute_cdp_cmd("Emulation.clearDeviceMetricsOverride", {})
+    driver.set_window_size(1600, 1000)
+    driver.find_element(By.CSS_SELECTOR, ".admin-modal__close").click()
     driver.get(BASE_URL + "/admin.html#coverage")
     wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-panel=coverage]"))).click()
     wait.until(EC.presence_of_element_located((By.ID, "admin-regional-map")))

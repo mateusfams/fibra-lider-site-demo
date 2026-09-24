@@ -18,7 +18,7 @@ Demonstracao navegavel do novo site comercial da Fibra Lider e do painel de gest
 Acesse `admin.html` com a senha de demonstracao `lider2026`. O editor visual possui uma area de trabalho dedicada em `studio.html`, acessada pelo botao destacado no Dashboard.
 
 - Dashboard executivo com desempenho, funil e mapa de interesse regional.
-- Visual Theme Builder com arvore aninhada de componentes, drag and drop, edicao inline e inspector gerado por schema.
+- Visual Theme Builder com arvore aninhada de componentes, drag and drop, edicao inline, preview instantaneo e inspector gerado por schema.
 - Catalogo de tres templates completos: Fibra Essencial, Aurora Regional e Nexus Performance, todos renderizados pelo mesmo documento versionado.
 - Biblioteca visual com 6 familias tipograficas, 72 icones Lucide curados e seletores integrados ao inspector e aos tokens globais.
 - Componentes podem ser adicionados por clique ou arrastados diretamente da biblioteca para uma posicao valida no preview.
@@ -35,7 +35,7 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`. O editor visual pos
 - Gestao de planos, categorias, aplicativos, beneficios e descontos estruturados.
 - Cobertura em modo automatico, hibrido, manual ou importado por KMZ, CEP, cidade, bairro, regiao e raio.
 - Tratamento de nomes tecnicos do KMZ para bairros, cidades e vias, com marcadores da marca e rotulos progressivos por zoom.
-- Leads e WhatsApp em workspaces separados, com funil, atribuicao, templates e campanhas manuais.
+- Leads e WhatsApp em workspaces separados, com funil, atribuicao, templates e campanhas manuais segmentadas por plano, etapa, origem e regiao.
 - Campanhas e cupons separados, SEO tecnico/local ampliado e central de Integracoes e APIs.
 - Navegacao por dominios, listagens com busca/filtros/ordenacao/paginacao e acoes em massa.
 - Confirmacoes destrutivas acessiveis, validacao inline e trilha local de atividade administrativa.

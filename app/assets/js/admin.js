@@ -1425,7 +1425,22 @@
     const campaign = item || { id: "", name: "", type: "followup", templateId: state.whatsappTemplates[0] ? state.whatsappTemplates[0].id : "", message: "Ola {name}! Aqui e da {brand}. Vimos seu interesse no plano {plan}. Posso ajudar com a oferta {offer}?", planIds: [], stages: [], sources: [], region: "", status: "draft", contactsSent: 0 };
     const sources = Array.from(new Set(state.leads.map(function (lead) { return lead.source; }).filter(Boolean)));
     const stages = [["new", "Novo"], ["qualified", "Qualificado"], ["proposal", "Proposta"], ["won", "Convertido"], ["lost", "Encerrado"]];
-    openModal(modalHeader(item ? "Editar campanha manual" : "Nova campanha manual", "Segmente por interesse, etapa, origem e regiao. O envio continua individual.") + '<form class="modal-form" data-form-kind="whatsapp-campaign"><input type="hidden" name="id" value="' + esc(campaign.id) + '"><div class="form-grid"><label class="field"><span>Nome interno</span><input name="name" value="' + esc(campaign.name) + '" placeholder="Retorno 600 Mega" required></label><label class="field"><span>Tipo da campanha</span><select name="type"><option value="followup"' + (campaign.type === "followup" ? " selected" : "") + '>Retorno comercial</option><option value="promotion"' + (campaign.type === "promotion" ? " selected" : "") + '>Promocao</option><option value="coverage"' + (campaign.type === "coverage" ? " selected" : "") + '>Cobertura</option><option value="proposal"' + (campaign.type === "proposal" ? " selected" : "") + '>Proposta</option><option value="recovery"' + (campaign.type === "recovery" ? " selected" : "") + '>Recuperacao</option><option value="seasonal"' + (campaign.type === "seasonal" ? " selected" : "") + '>Sazonal</option></select></label><label class="field"><span>Template inicial</span><select name="templateId" data-campaign-template><option value="">Mensagem personalizada</option>' + state.whatsappTemplates.filter(function (template) { return template.active; }).map(function (template) { return '<option value="' + esc(template.id) + '"' + (template.id === campaign.templateId ? " selected" : "") + '>' + esc(template.name) + '</option>'; }).join("") + '</select></label><label class="field"><span>Regiao contem</span><input name="region" value="' + esc(campaign.region || "") + '" placeholder="Ex.: Sumare"></label></div><label class="field"><span>Mensagem</span><textarea name="message" rows="7" required>' + esc(campaign.message) + '</textarea><small>Variaveis: {brand}, {name}, {plan}, {speed}, {price}, {offer}, {region}, {source}.</small></label><div class="campaign-segmentation"><fieldset class="plan-selector"><legend>Planos de interesse</legend><p>Sem selecao, considera todos os planos.</p><div>' + state.plans.map(function (plan) { return '<label><input type="checkbox" name="planIds" value="' + esc(plan.id) + '"' + (campaign.planIds.includes(plan.id) ? " checked" : "") + '><span><strong>' + esc(plan.speed) + '</strong><small>' + esc(plan.title) + '</small></span></label>'; }).join("") + '</div></fieldset><fieldset class="plan-selector plan-selector--compact"><legend>Etapas do funil</legend><div>' + stages.map(function (stage) { return '<label><input type="checkbox" name="stages" value="' + stage[0] + '"' + (campaign.stages.includes(stage[0]) ? " checked" : "") + '><span><strong>' + stage[1] + '</strong></span></label>'; }).join("") + '</div></fieldset><fieldset class="plan-selector plan-selector--compact"><legend>Origens</legend><div>' + sources.map(function (source) { return '<label><input type="checkbox" name="sources" value="' + esc(source) + '"' + (campaign.sources.includes(source) ? " checked" : "") + '><span><strong>' + esc(source) + '</strong></span></label>'; }).join("") + '</div></fieldset></div><label class="check-field"><input name="active" type="checkbox"' + (campaign.status === "active" ? " checked" : "") + '><span>Campanha pronta para atendimento</span></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + ' Salvar campanha</button></div></form>', true);
+    const planOptions = state.plans.map(function (plan) {
+      const category = state.categories.find(function (entry) { return entry.id === plan.categoryId; });
+      const detail = [plan.title, category && category.name].filter(function (value, index, values) { return value && values.indexOf(value) === index; }).join(" · ");
+      return '<label class="campaign-choice campaign-choice--plan"><input type="checkbox" name="planIds" value="' + esc(plan.id) + '"' + (campaign.planIds.includes(plan.id) ? " checked" : "") + '><span class="campaign-choice__check">' + icon("check") + '</span><span class="campaign-choice__body"><strong>' + esc(plan.speed) + '</strong><small>' + esc(detail || "Plano de internet") + '</small></span><em>' + esc(FL.formatCurrency(plan.price)) + '</em></label>';
+    }).join("");
+    const stageOptions = stages.map(function (stage) {
+      return '<label class="campaign-choice"><input type="checkbox" name="stages" value="' + stage[0] + '"' + (campaign.stages.includes(stage[0]) ? " checked" : "") + '><span class="campaign-choice__check">' + icon("check") + '</span><span class="campaign-choice__body"><strong>' + stage[1] + '</strong><small>Etapa do funil</small></span></label>';
+    }).join("");
+    const sourceOptions = sources.length ? sources.map(function (source) {
+      return '<label class="campaign-choice"><input type="checkbox" name="sources" value="' + esc(source) + '"' + (campaign.sources.includes(source) ? " checked" : "") + '><span class="campaign-choice__check">' + icon("check") + '</span><span class="campaign-choice__body"><strong>' + esc(source) + '</strong><small>Origem do lead</small></span></label>';
+    }).join("") : '<div class="campaign-choice-empty">As origens aparecerao aqui quando houver leads capturados.</div>';
+    const audienceCount = campaignAudience(campaign).length;
+    const basicFields = '<section class="campaign-form-section"><header><span>' + icon("settings-2") + '</span><div><strong>Configuracao da campanha</strong><small>Identifique a acao e escolha uma mensagem inicial.</small></div></header><div class="form-grid"><label class="field"><span>Nome interno</span><input name="name" value="' + esc(campaign.name) + '" placeholder="Retorno 600 Mega" required></label><label class="field"><span>Tipo da campanha</span><select name="type"><option value="followup"' + (campaign.type === "followup" ? " selected" : "") + '>Retorno comercial</option><option value="promotion"' + (campaign.type === "promotion" ? " selected" : "") + '>Promocao</option><option value="coverage"' + (campaign.type === "coverage" ? " selected" : "") + '>Cobertura</option><option value="proposal"' + (campaign.type === "proposal" ? " selected" : "") + '>Proposta</option><option value="recovery"' + (campaign.type === "recovery" ? " selected" : "") + '>Recuperacao</option><option value="seasonal"' + (campaign.type === "seasonal" ? " selected" : "") + '>Sazonal</option></select></label><label class="field"><span>Template inicial</span><select name="templateId" data-campaign-template><option value="">Mensagem personalizada</option>' + state.whatsappTemplates.filter(function (template) { return template.active; }).map(function (template) { return '<option value="' + esc(template.id) + '"' + (template.id === campaign.templateId ? " selected" : "") + '>' + esc(template.name) + '</option>'; }).join("") + '</select></label><label class="field"><span>Regiao contem</span><input name="region" value="' + esc(campaign.region || "") + '" placeholder="Ex.: Sumare"></label></div></section>';
+    const messageFields = '<section class="campaign-form-section campaign-message-section"><header><span>' + icon("message-square-text") + '</span><div><strong>Mensagem do atendimento</strong><small>O atendente revisa o texto antes de abrir cada conversa.</small></div></header><label class="field"><span>Mensagem</span><textarea name="message" rows="6" maxlength="1800" required>' + esc(campaign.message) + '</textarea><small><span data-campaign-message-count>' + String(campaign.message || "").length + '</span>/1800 caracteres</small></label><div class="campaign-variable-list"><span>{name}</span><span>{plan}</span><span>{price}</span><span>{offer}</span><span>{region}</span><span>{source}</span></div></section>';
+    const audienceFields = '<section class="campaign-audience-builder"><header class="campaign-audience-builder__head"><span>' + icon("users-round") + '</span><div><strong>Publico da campanha</strong><small>Sem filtros marcados, todos os leads entram na selecao.</small></div><div class="campaign-audience-total"><strong data-campaign-audience-count>' + audienceCount + '</strong><span>leads compativeis</span></div></header><fieldset class="campaign-filter-group campaign-filter-group--plans" data-campaign-filter-group="planIds"><legend><span><strong>Planos de interesse</strong><small data-campaign-selected-count>Todos os planos</small></span><span class="campaign-filter-actions"><label>' + icon("search") + '<input type="search" data-campaign-plan-search placeholder="Buscar plano"></label><button type="button" data-campaign-clear="planIds">Usar todos</button></span></legend><div class="campaign-choice-grid" data-campaign-plan-list>' + planOptions + '</div></fieldset><div class="campaign-filter-columns"><fieldset class="campaign-filter-group" data-campaign-filter-group="stages"><legend><span><strong>Etapas do funil</strong><small data-campaign-selected-count>Todas as etapas</small></span><button type="button" data-campaign-clear="stages">Usar todas</button></legend><div class="campaign-choice-grid campaign-choice-grid--compact">' + stageOptions + '</div></fieldset><fieldset class="campaign-filter-group" data-campaign-filter-group="sources"><legend><span><strong>Origens</strong><small data-campaign-selected-count>Todas as origens</small></span><button type="button" data-campaign-clear="sources">Usar todas</button></legend><div class="campaign-choice-grid campaign-choice-grid--compact">' + sourceOptions + '</div></fieldset></div></section>';
+    openModal(modalHeader(item ? "Editar campanha manual" : "Nova campanha manual", "Defina o publico, prepare a mensagem e mantenha cada envio sob controle do atendente.") + '<form class="modal-form campaign-builder-form" data-form-kind="whatsapp-campaign"><input type="hidden" name="id" value="' + esc(campaign.id) + '">' + basicFields + messageFields + audienceFields + '<label class="check-field campaign-ready-toggle"><input name="active" type="checkbox"' + (campaign.status === "active" ? " checked" : "") + '><span><strong>Campanha pronta para atendimento</strong><small>Ela ficara disponivel na fila manual de contatos.</small></span></label><div class="modal-actions"><button class="button button--ghost" type="button" data-admin-modal-close>Cancelar</button><button class="button button--primary" type="submit">' + icon("save") + ' Salvar campanha</button></div></form>', true);
   }
 
   function whatsappTemplateModal(item) {
@@ -1757,8 +1772,57 @@
     const campaignTemplate = $("[data-campaign-template]", $("#admin-modal"));
     if (campaignTemplate && form) campaignTemplate.addEventListener("change", function () {
       const template = state.whatsappTemplates.find(function (item) { return item.id === campaignTemplate.value; });
-      if (template) form.elements.message.value = template.message;
+      if (template) {
+        form.elements.message.value = template.message;
+        form.elements.message.dispatchEvent(new Event("input", { bubbles: true }));
+      }
     });
+    if (form && form.dataset.formKind === "whatsapp-campaign") {
+      const checkedValues = function (name) {
+        return $$('input[name="' + name + '"]:checked', form).map(function (input) { return input.value; });
+      };
+      const audienceLabels = {
+        planIds: ["Todos os planos", "plano selecionado", "planos selecionados"],
+        stages: ["Todas as etapas", "etapa selecionada", "etapas selecionadas"],
+        sources: ["Todas as origens", "origem selecionada", "origens selecionadas"],
+      };
+      const updateCampaignAudience = function () {
+        ["planIds", "stages", "sources"].forEach(function (name) {
+          const group = $('[data-campaign-filter-group="' + name + '"]', form);
+          const selected = checkedValues(name).length;
+          const output = group && $("[data-campaign-selected-count]", group);
+          if (output) output.textContent = selected ? selected + " " + audienceLabels[name][selected === 1 ? 1 : 2] : audienceLabels[name][0];
+        });
+        const probe = {
+          planIds: checkedValues("planIds"),
+          stages: checkedValues("stages"),
+          sources: checkedValues("sources"),
+          region: form.elements.region ? form.elements.region.value.trim() : "",
+        };
+        const audience = campaignAudience(probe);
+        const count = $("[data-campaign-audience-count]", form);
+        if (count) count.textContent = audience.length;
+      };
+      $$('[data-campaign-filter-group] input[type="checkbox"]', form).forEach(function (input) { input.addEventListener("change", updateCampaignAudience); });
+      $$('[data-campaign-clear]', form).forEach(function (button) { button.addEventListener("click", function () {
+        $$('input[name="' + button.dataset.campaignClear + '"]', form).forEach(function (input) { input.checked = false; });
+        updateCampaignAudience();
+      }); });
+      const region = form.elements.region;
+      if (region) region.addEventListener("input", updateCampaignAudience);
+      const planSearch = $("[data-campaign-plan-search]", form);
+      if (planSearch) planSearch.addEventListener("input", function () {
+        const term = planSearch.value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+        $$(".campaign-choice--plan", form).forEach(function (choice) {
+          const content = choice.textContent.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+          choice.hidden = Boolean(term) && !content.includes(term);
+        });
+      });
+      const message = form.elements.message;
+      const messageCount = $("[data-campaign-message-count]", form);
+      if (message && messageCount) message.addEventListener("input", function () { messageCount.textContent = message.value.length; });
+      updateCampaignAudience();
+    }
     const composeTemplate = $("[data-compose-template]", $("#admin-modal"));
     if (composeTemplate && form) {
       const textarea = form.elements.message; const counter = $("[data-message-count]", form);
