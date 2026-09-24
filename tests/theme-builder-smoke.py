@@ -35,6 +35,7 @@ wait = WebDriverWait(driver, 20)
 try:
     driver.get(BASE_URL + "/admin.html#builder")
     password = wait.until(EC.presence_of_element_located((By.ID, "login-password")))
+    wait.until(lambda browser: browser.execute_script("return document.readyState") == "complete")
     if driver.find_element(By.ID, "admin-login").is_displayed():
         password.send_keys("lider2026")
         driver.find_element(By.CSS_SELECTOR, "#login-form button[type=submit]").click()
