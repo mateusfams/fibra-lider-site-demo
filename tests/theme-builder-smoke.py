@@ -126,11 +126,25 @@ try:
     driver.execute_script("document.querySelector('[data-vb-action=close-dialog]').click()")
     driver.execute_script("document.querySelector('.vb-studio [data-vb-action=publish]').click()")
     time.sleep(0.8)
+    driver.execute_script("var state=FL.getState(),coupon=state.coupons.find(function(item){return item.code==='LIDER10';});if(coupon){coupon.startsAt='2000-01-01';coupon.expiresAt='2099-12-31';coupon.active=true;}FL.saveRuntimeState(state);")
 
     driver.get(BASE_URL + "/index.html")
     wait.until(lambda browser: "visual-theme-active" in browser.find_element(By.TAG_NAME, "body").get_attribute("class"))
     check(driver.find_element(By.ID, "visual-theme-root").is_displayed(), "Published renderer is not active")
     check(len(driver.find_elements(By.CSS_SELECTOR, "#visual-theme-root [data-vb-plan-id]")) > 0, "Published plan grid is empty")
+    driver.execute_script("document.querySelector('#visual-theme-root [data-canonical-theme-toggle]').click()")
+    wait.until(lambda browser: browser.execute_script("return document.documentElement.dataset.theme") == "dark")
+    check("is-dark" in driver.find_element(By.CSS_SELECTOR, "#visual-theme-root .vb-document").get_attribute("class"), "Canonical renderer did not activate dark tokens")
+    dark_colors = driver.execute_script("var title=document.querySelector('#visual-theme-root .plans-section h2');var section=document.querySelector('#visual-theme-root .plans-section');return {text:getComputedStyle(title).color,background:getComputedStyle(section).backgroundColor};")
+    check(dark_colors["text"] != "rgb(10, 22, 40)" and dark_colors["background"] == "rgb(7, 17, 30)", "Dark mode kept light-theme colors: " + repr(dark_colors))
+    driver.execute_script("document.querySelector('#visual-theme-root [data-canonical-theme-toggle]').click()")
+    wait.until(lambda browser: browser.execute_script("return document.documentElement.dataset.theme") == "light")
+    coupon = driver.find_element(By.CSS_SELECTOR, "#visual-theme-root [data-canonical-coupon] input[name=coupon]")
+    coupon.send_keys("LIDER10")
+    coupon.submit()
+    wait.until(lambda browser: not browser.find_element(By.CSS_SELECTOR, '#visual-theme-root [data-plan-id-value="internet-600"] .plan-promotion').get_attribute("hidden"))
+    check("89" in driver.find_element(By.CSS_SELECTOR, '#visual-theme-root [data-plan-id-value="internet-600"] .plan-price').text, "Coupon did not update the eligible plan price")
+    driver.execute_script("document.querySelector('#visual-theme-root [data-canonical-coupon-clear]').click()")
     if CAPTURE_DIR:
         driver.save_screenshot(os.path.join(CAPTURE_DIR, "theme-home-desktop.png"))
     driver.execute_script("document.querySelector('#visual-theme-root [data-vb-plan-id]').click()")
@@ -141,10 +155,10 @@ try:
     if campaign_modal.is_displayed():
         driver.execute_script("document.querySelector('#campaign-modal .modal-close').click()")
 
-    driver.execute_script("document.querySelector('.vb-coverage').scrollIntoView({block:'center'})")
-    wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, ".vb-coverage .leaflet-overlay-pane path")) > 0)
-    wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, ".vb-coverage .coverage-place-marker")) > 0)
-    coverage = driver.find_element(By.CSS_SELECTOR, ".vb-coverage")
+    driver.execute_script("document.querySelector('#visual-theme-root .coverage-section').scrollIntoView({block:'center'})")
+    wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, "#visual-theme-root .coverage-section .leaflet-overlay-pane path")) > 0)
+    wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, "#visual-theme-root .coverage-section .coverage-place-marker")) > 0)
+    coverage = driver.find_element(By.CSS_SELECTOR, "#visual-theme-root .coverage-section")
     check("OLT" not in coverage.text.upper(), "Technical KMZ names leaked into the public coverage section")
     if CAPTURE_DIR:
         driver.execute_script("document.querySelector('#campaign-modal').style.setProperty('display','none','important'); const cookie=document.querySelector('.cookie-banner'); if(cookie) cookie.style.display='none'; document.body.classList.remove('modal-open')")
@@ -155,6 +169,8 @@ try:
     wait.until(lambda browser: "visual-theme-active" in browser.find_element(By.TAG_NAME, "body").get_attribute("class"))
     mobile_widths = driver.execute_script("return {client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth}")
     check(mobile_widths["scroll"] <= mobile_widths["client"] + 1, "Published Home has horizontal overflow on mobile")
+    driver.execute_script("document.querySelector('#visual-theme-root [data-canonical-menu]').click()")
+    check("menu-open" in driver.find_element(By.TAG_NAME, "body").get_attribute("class"), "Mobile menu did not open")
     if CAPTURE_DIR:
         driver.save_screenshot(os.path.join(CAPTURE_DIR, "theme-home-mobile.png"))
 

@@ -20,10 +20,12 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`.
 - Dashboard executivo com desempenho, funil e mapa de interesse regional.
 - Visual Theme Builder com arvore aninhada de componentes, drag and drop, edicao inline e inspector gerado por schema.
 - Preview e Home publicada renderizados pelo mesmo documento visual, sem uma segunda pagina divergente.
+- Template Home canonico com o mesmo markup, CSS, secoes, responsividade e fluxos do `index.html`, protegido por comparacao visual desktop/mobile.
 - Banners, sliders, slides e formularios criados e editados integralmente dentro do Theme Builder.
 - Workspaces de paginas com Home, paginas internas, header e footer no mesmo modelo versionado.
 - Estilos por breakpoint e estado, tokens globais, biblioteca de midia, secoes salvas, undo/redo e autosave.
 - Rascunho e publicacao separados: o site publico recebe somente documento, renderer e CSS compilado.
+- Migracao automatica com backup local para rascunhos antigos e fallback seguro contra releases geradas pelo template anterior.
 - Construtor de paginas internas e Central de Midia otimizada.
 - Gestao de planos, categorias, aplicativos, beneficios e descontos estruturados.
 - Cobertura em modo automatico, hibrido, manual ou importado por KMZ, CEP, cidade, bairro, regiao e raio.

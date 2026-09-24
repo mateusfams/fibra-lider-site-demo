@@ -17,7 +17,11 @@
     if (!release || !release.workspace) return;
     const route = currentRoute();
     const documents = Object.values(release.workspace.documents || {});
-    const documentValue = documents.find(function (entry) { return entry.settings && entry.settings.slug === route; }) || (route === "/" ? release.workspace.documents[release.workspace.activeDocumentId] : null);
+    let documentValue = documents.find(function (entry) { return entry.settings && entry.settings.slug === route; }) || (route === "/" ? release.workspace.documents[release.workspace.activeDocumentId] : null);
+    if (route === "/" && documentValue && documentValue.meta && documentValue.meta.migratedFrom === "fibra-lider-studio-state-v13" && window.FLThemeBuilder.canonicalHomeFactory) {
+      const canonical = window.FLThemeBuilder.canonicalHomeFactory(state);
+      if (canonical.meta.templateVersion !== documentValue.meta.templateVersion) documentValue = canonical;
+    }
     if (!documentValue || !window.FLThemeBuilder.validateDocument(documentValue).valid) return;
 
     const root = document.getElementById("visual-theme-root");
@@ -40,7 +44,10 @@
     if (!result.validation.valid) return;
     document.body.classList.add("visual-theme-active");
     root.hidden = false;
-    [document.querySelector(".site-header"), document.getElementById("conteudo"), document.getElementById("page-content"), document.querySelector(".site-footer")].forEach(function (element) { if (element) element.hidden = true; });
+    const legacyShell = [document.getElementById("conteudo"), document.getElementById("page-content")].concat(
+      Array.from(document.querySelectorAll(".site-header,.site-footer")).filter(function (element) { return !root.contains(element); })
+    );
+    legacyShell.forEach(function (element) { if (element) element.hidden = true; });
     const skip = document.querySelector(".skip-link");
     if (skip) skip.href = "#visual-theme-root";
 

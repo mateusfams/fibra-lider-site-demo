@@ -465,6 +465,7 @@
 .plan-promotion small { color: var(--muted); font-size: .65rem; }
 .plan-old-price { display: block; margin-top: 12px; color: var(--muted); font-size: .72rem; text-decoration: line-through; }
 .plan-card .plan-old-price + .plan-price { margin-top: 1px; }
+.plan-card .plan-old-price[hidden] + .plan-price { margin-top: 22px; }
 .plan-price-after { display: block; margin-top: -4px; color: var(--muted); font-size: .7rem; }
 .plan-cta { border: 0; cursor: pointer; }
 

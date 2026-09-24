@@ -894,6 +894,12 @@
     return base;
   }
 
+  function colorChannels(value, fallback) {
+    const match = String(value || "").trim().match(/^#([0-9a-f]{6})$/i);
+    if (!match) return fallback || "8,116,231";
+    return [parseInt(match[1].slice(0, 2), 16), parseInt(match[1].slice(2, 4), 16), parseInt(match[1].slice(4, 6), 16)].join(",");
+  }
+
   function themeVariables(document, mode) {
     const tokens = document.theme && (mode === "dark" ? document.theme.darkTokens : document.theme.tokens) || {};
     const lightDefaults = {
@@ -911,6 +917,11 @@
       "--vb-radius-sm:" + cssValue({ type: "length" }, value.radiusSm), "--vb-radius-md:" + cssValue({ type: "length" }, value.radiusMd), "--vb-radius-lg:" + cssValue({ type: "length" }, value.radiusLg),
       "--vb-space-xs:" + cssValue({ type: "length" }, value.spaceXs), "--vb-space-sm:" + cssValue({ type: "length" }, value.spaceSm), "--vb-space-md:" + cssValue({ type: "length" }, value.spaceMd),
       "--vb-space-lg:" + cssValue({ type: "length" }, value.spaceLg), "--vb-space-xl:" + cssValue({ type: "length" }, value.spaceXl),
+      "--brand:" + cssValue({ type: "color" }, value.primary), "--brand-rgb:" + colorChannels(value.primary),
+      "--accent:" + cssValue({ type: "color" }, value.secondary), "--surface:" + cssValue({ type: "color" }, value.background),
+      "--panel:" + cssValue({ type: "color" }, value.surface), "--ink:" + cssValue({ type: "color" }, value.text),
+      "--muted:" + cssValue({ type: "color" }, value.muted),
+      "--radius:" + cssValue({ type: "length" }, value.radiusMd), "--font:" + cssValue({ type: "font" }, value.fontBody),
     ].filter(function (entry) { return !entry.endsWith(":"); }).join(";");
   }
 
