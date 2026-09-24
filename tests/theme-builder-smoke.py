@@ -73,6 +73,37 @@ try:
     driver.switch_to.default_content()
     check(after_undo == before, "Undo did not restore the document")
 
+    drag_result = driver.execute_script(
+        "const component=document.querySelector('[data-vb-component=\"layout.section\"]');"
+        "const frame=document.querySelector('#vb-preview-frame');"
+        "const bridge=document.querySelector('[data-vb-preview-drop]');"
+        "const target=frame.contentDocument.querySelector('[data-vb-node=\"canonical_header\"]')||frame.contentDocument.querySelector('[data-vb-node]');"
+        "if(!component||!bridge||!target)return {ok:false,reason:'missing drag fixture'};"
+        "const transfer=new DataTransfer();"
+        "const dispatch=(element,type,options)=>{const dragEvent=new DragEvent(type,Object.assign({bubbles:true,cancelable:true},options||{}));"
+        "Object.defineProperty(dragEvent,'dataTransfer',{value:transfer});return element.dispatchEvent(dragEvent);};"
+        "dispatch(component,'dragstart');"
+        "const frameRect=frame.getBoundingClientRect(),targetRect=target.getBoundingClientRect();"
+        "const scaleX=frameRect.width/frame.contentWindow.innerWidth,scaleY=frameRect.height/frame.contentWindow.innerHeight;"
+        "const point={clientX:frameRect.left+(targetRect.left+targetRect.width/2)*scaleX,clientY:frameRect.top+(targetRect.bottom-4)*scaleY};"
+        "dispatch(bridge,'dragover',point);const marked=Boolean(frame.contentDocument.querySelector('.is-vb-drop-before,.is-vb-drop-after,.is-vb-drop-inside'));"
+        "dispatch(bridge,'drop',point);dispatch(component,'dragend');"
+        "return {ok:true,draggable:component.draggable,marked:marked,payload:transfer.getData('text/plain')};"
+    )
+    check(drag_result["ok"] and drag_result["draggable"] and drag_result["marked"], "Preview did not show a valid drag destination: " + repr(drag_result))
+    check(drag_result["payload"] == "fl-component:layout.section", "Drag payload fallback was not registered")
+    time.sleep(1.0)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    after_drag = len(driver.find_elements(By.CSS_SELECTOR, "[data-vb-node]"))
+    driver.switch_to.default_content()
+    check(after_drag >= before + 2, "Dropping a component on the visual preview did not insert it")
+    driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
+    time.sleep(0.8)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    after_drag_undo = len(driver.find_elements(By.CSS_SELECTOR, "[data-vb-node]"))
+    driver.switch_to.default_content()
+    check(after_drag_undo == before, "Undo did not restore a visual drag insertion")
+
     driver.execute_script("document.querySelector('[data-vb-component=\"marketing.slider\"]').click()")
     time.sleep(0.9)
     driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
@@ -219,7 +250,7 @@ try:
         driver.execute_script("document.querySelector('#campaign-modal').style.setProperty('display','none','important'); const cookie=document.querySelector('.cookie-banner'); if(cookie) cookie.style.display='none'; document.body.classList.remove('modal-open')")
         coverage.screenshot(os.path.join(CAPTURE_DIR, "theme-home-coverage.png"))
 
-    driver.set_window_size(390, 844)
+    driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", {"width": 390, "height": 844, "deviceScaleFactor": 1, "mobile": True})
     driver.get(BASE_URL + "/index.html")
     wait.until(lambda browser: "visual-theme-active" in browser.find_element(By.TAG_NAME, "body").get_attribute("class"))
     mobile_widths = driver.execute_script("return {client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth}")
@@ -235,12 +266,28 @@ try:
     check("Contrato de prestacao" in driver.find_element(By.ID, "visual-theme-root").text, "Internal page route rendered the wrong document")
 
     driver.get(BASE_URL + "/admin.html#builder")
+    wait.until(lambda browser: "/studio.html" in browser.current_url)
     wait.until(EC.presence_of_element_located((By.ID, "visual-theme-builder")))
+    wait.until(lambda browser: browser.execute_script("const item=document.querySelector('[data-vb-mobile-workspace]');return item&&getComputedStyle(item).display!=='none'"))
+    mobile_nav = driver.find_element(By.CSS_SELECTOR, "[data-vb-mobile-workspace]")
+    mobile_viewport = driver.execute_script(
+        "return {display:getComputedStyle(arguments[0]).display,innerWidth:innerWidth,outerWidth:outerWidth,"
+        "clientWidth:document.documentElement.clientWidth,matches:matchMedia('(max-width:1020px)').matches,url:location.href}",
+        mobile_nav,
+    )
+    check(mobile_viewport["display"] != "none", "Mobile workspace navigation is hidden: " + repr(mobile_viewport))
+    driver.find_element(By.CSS_SELECTOR, '.vb-mobile-workspace [data-vb-mobile-panel="components"]').click()
+    check(driver.find_element(By.CSS_SELECTOR, ".vb-studio__left").is_displayed(), "Mobile component panel did not open")
+    driver.find_element(By.CSS_SELECTOR, '.vb-mobile-workspace [data-vb-mobile-panel="inspector"]').click()
+    check(driver.find_element(By.CSS_SELECTOR, ".vb-studio__inspector").is_displayed(), "Mobile inspector did not open")
+    driver.find_element(By.CSS_SELECTOR, '.vb-mobile-workspace [data-vb-mobile-panel="canvas"]').click()
+    check(driver.find_element(By.CSS_SELECTOR, ".vb-studio__canvas").is_displayed(), "Mobile canvas did not open")
     admin_widths = driver.execute_script("return {client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth}")
     check(admin_widths["scroll"] <= admin_widths["client"] + 1, "Theme Builder has horizontal overflow on mobile")
     if CAPTURE_DIR:
         driver.save_screenshot(os.path.join(CAPTURE_DIR, "theme-builder-mobile.png"))
 
+    driver.execute_cdp_cmd("Emulation.clearDeviceMetricsOverride", {})
     driver.set_window_size(1600, 1000)
     driver.get(BASE_URL + "/admin.html#coverage")
     wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-panel=coverage]"))).click()

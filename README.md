@@ -19,6 +19,8 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`. O editor visual pos
 
 - Dashboard executivo com desempenho, funil e mapa de interesse regional.
 - Visual Theme Builder com arvore aninhada de componentes, drag and drop, edicao inline e inspector gerado por schema.
+- Componentes podem ser adicionados por clique ou arrastados diretamente da biblioteca para uma posicao valida no preview.
+- No celular, o editor organiza o fluxo em tres areas acessiveis: Adicionar, Visualizar e Editar.
 - Preview e Home publicada renderizados pelo mesmo documento visual, sem uma segunda pagina divergente.
 - Template Home canonico com o mesmo markup, CSS, secoes, responsividade e fluxos do `index.html`, protegido por comparacao visual desktop/mobile.
 - Banners, sliders, slides e formularios criados e editados integralmente dentro do Theme Builder.

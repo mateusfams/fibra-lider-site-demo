@@ -233,8 +233,9 @@
         if (!target) return;
         event.preventDefault();
         event.stopPropagation();
-        const nodeId = event.dataTransfer.getData("application/x-fl-vb-node");
-        const componentType = event.dataTransfer.getData("application/x-fl-vb-component");
+        const plain = event.dataTransfer.getData("text/plain") || "";
+        const nodeId = event.dataTransfer.getData("application/x-fl-vb-node") || (plain.startsWith("fl-node:") ? plain.slice(8) : this.document.nodes[plain] ? plain : "");
+        const componentType = event.dataTransfer.getData("application/x-fl-vb-component") || (plain.startsWith("fl-component:") ? plain.slice(13) : TB.registry.get(plain) ? plain : "");
         const childType = componentType || nodeId && this.document.nodes[nodeId] && this.document.nodes[nodeId].type;
         const position = target.dataset.vbDropPosition || "inside";
         const placement = dropPlacement(this.document, target.dataset.vbNode, position, childType);

@@ -59,6 +59,7 @@
     selectedId: "", leftTab: "components", inspectorTab: "content", librarySearch: "", device: "desktop", visualState: "normal",
     zoom: 86, expanded: new Set(), histories: new Map(), clipboard: null, styleClipboard: null, session: "", autosave: null,
     abort: null, previewReady: false, saveStatus: "saved", dialog: "", diagnostics: null,
+    mobilePanel: "canvas", draggingComponent: "", previewDrop: null,
   };
 
   function esc(value) { return TB.escapeHtml(value); }
@@ -114,7 +115,12 @@
 
   function render(state) {
     ensure(state);
-    return '<section class="vb-studio" id="visual-theme-builder">' + toolbarMarkup() + '<div class="vb-studio__workspace">' + leftPanelMarkup() + canvasMarkup() + inspectorMarkup() + '</div>' + statusMarkup() + dialogMarkup() + '</section>';
+    return '<section class="vb-studio" id="visual-theme-builder" data-vb-mobile-panel="' + esc(runtime.mobilePanel) + '">' + toolbarMarkup() + mobileWorkspaceMarkup() + '<div class="vb-studio__workspace">' + leftPanelMarkup() + canvasMarkup() + inspectorMarkup() + '</div>' + statusMarkup() + dialogMarkup() + '</section>';
+  }
+
+  function mobileWorkspaceMarkup() {
+    const panels = [["components", "blocks", "Adicionar"], ["canvas", "monitor", "Visualizar"], ["inspector", "sliders-horizontal", "Editar"]];
+    return '<nav class="vb-mobile-workspace" data-vb-mobile-workspace aria-label="Area do editor">' + panels.map(function (panel) { return '<button type="button" class="' + (runtime.mobilePanel === panel[0] ? "is-active" : "") + '" data-vb-mobile-panel="' + panel[0] + '">' + icon(panel[1]) + '<span>' + panel[2] + '</span></button>'; }).join("") + '</nav>';
   }
 
   function toolbarMarkup() {
@@ -141,8 +147,8 @@
     const categories = Array.from(new Set(definitions.map(function (definition) { return definition.category; })));
     const selected = selectedNode();
     const quickTypes = ["layout.section", "layout.row", "marketing.banner", "marketing.slider", "commerce.plan-grid", "domain.coverage"];
-    const quick = quickTypes.map(function (type) { const definition = TB.registry.get(type); const placement = definition && placementFor(type); return definition && placement ? '<button type="button" data-vb-component="' + esc(type) + '">' + icon(definition.icon) + '<span>' + esc(definition.label) + '</span></button>' : ""; }).join("");
-    return '<div class="vb-panel-heading"><div><strong>Adicionar</strong><span>' + definitions.length + ' componentes</span></div></div><div class="vb-insert-context">' + icon("mouse-pointer-2") + '<span>O novo item entra perto de <strong>' + esc(selected && selected.name || "Pagina") + '</strong></span></div><section class="vb-quick-start"><h3>Mais usados</h3><div>' + quick + '</div></section><label class="vb-search">' + icon("search") + '<input type="search" data-vb-library-search value="' + esc(runtime.librarySearch) + '" placeholder="O que voce quer adicionar?"></label><div class="vb-component-library">' + categories.map(function (category) { const entries = definitions.filter(function (definition) { return definition.category === category; }); return '<section><h3>' + esc(CATEGORY_LABELS[category] || category) + '</h3><div>' + entries.map(function (definition) { const placement = placementFor(definition.type); return '<button type="button" draggable="' + (placement ? "true" : "false") + '" data-vb-component="' + esc(definition.type) + '"' + (placement ? "" : " disabled") + '><span>' + icon(definition.icon) + '</span><b>' + esc(definition.label) + '</b><small>' + (placement ? "Clique para adicionar" : "Selecione um container") + '</small></button>'; }).join("") + '</div></section>'; }).join("") + '</div>';
+    const quick = quickTypes.map(function (type) { const definition = TB.registry.get(type); const placement = definition && placementFor(type); return definition && placement ? '<button type="button" draggable="true" data-vb-component="' + esc(type) + '">' + icon(definition.icon) + '<span>' + esc(definition.label) + '</span></button>' : ""; }).join("");
+    return '<div class="vb-panel-heading"><div><strong>Adicionar</strong><span>' + definitions.length + ' componentes</span></div></div><div class="vb-insert-context">' + icon("mouse-pointer-2") + '<span>O novo item entra perto de <strong>' + esc(selected && selected.name || "Pagina") + '</strong></span></div><section class="vb-quick-start"><h3>Mais usados</h3><div>' + quick + '</div></section><label class="vb-search">' + icon("search") + '<input type="search" data-vb-library-search value="' + esc(runtime.librarySearch) + '" placeholder="O que voce quer adicionar?"></label><div class="vb-component-library">' + categories.map(function (category) { const entries = definitions.filter(function (definition) { return definition.category === category; }); return '<section><h3>' + esc(CATEGORY_LABELS[category] || category) + '</h3><div>' + entries.map(function (definition) { const placement = placementFor(definition.type); return '<button type="button" draggable="' + (placement ? "true" : "false") + '" data-vb-component="' + esc(definition.type) + '"' + (placement ? "" : " disabled") + '><span>' + icon(definition.icon) + '</span><b>' + esc(definition.label) + '</b><small>' + (placement ? "Clique ou arraste" : "Selecione um container") + '</small></button>'; }).join("") + '</div></section>'; }).join("") + '</div>';
   }
 
   function treeNodeMarkup(nodeId, depth) {
@@ -185,7 +191,7 @@
   }
 
   function canvasMarkup() {
-    return '<main class="vb-studio__canvas"><div class="vb-canvas-top"><span>' + icon("mouse-pointer-2") + ' Clique para selecionar. Arraste para reorganizar.</span><div class="vb-rich-toolbar"><button type="button" data-vb-format="bold" title="Negrito"><b>B</b></button><button type="button" data-vb-format="italic" title="Italico"><i>I</i></button><button type="button" data-vb-format="underline" title="Sublinhado"><u>U</u></button><button type="button" data-vb-format="insertUnorderedList" title="Lista">' + icon("list") + '</button><button type="button" data-vb-format="createLink" title="Link">' + icon("link") + '</button></div></div><div class="vb-canvas-stage is-' + runtime.device + '" style="--vb-scale:1"><div class="vb-canvas-viewport"><div class="vb-canvas-device"><iframe id="vb-preview-frame" src="./builder-preview.html?mode=editor&amp;session=' + encodeURIComponent(runtime.session) + '" title="Preview visual da pagina"></iframe></div></div></div></main>';
+    return '<main class="vb-studio__canvas"><div class="vb-canvas-top"><span>' + icon("mouse-pointer-2") + ' Clique para selecionar. Arraste componentes para o site.</span><div class="vb-rich-toolbar"><button type="button" data-vb-format="bold" title="Negrito"><b>B</b></button><button type="button" data-vb-format="italic" title="Italico"><i>I</i></button><button type="button" data-vb-format="underline" title="Sublinhado"><u>U</u></button><button type="button" data-vb-format="insertUnorderedList" title="Lista">' + icon("list") + '</button><button type="button" data-vb-format="createLink" title="Link">' + icon("link") + '</button></div></div><div class="vb-canvas-stage is-' + runtime.device + '" style="--vb-scale:1"><div class="vb-canvas-viewport"><div class="vb-canvas-device"><iframe id="vb-preview-frame" src="./builder-preview.html?mode=editor&amp;session=' + encodeURIComponent(runtime.session) + '" title="Preview visual da pagina"></iframe><div class="vb-preview-drop-bridge" data-vb-preview-drop><span>' + icon("mouse-pointer-square-dashed") + '<b>Solte para adicionar</b><small data-vb-drop-label>Escolha uma posicao no site</small></span></div></div></div></div></main>';
   }
 
   function inspectorMarkup() {
@@ -364,6 +370,7 @@
     root.addEventListener("change", onChange, { signal: signal });
     root.addEventListener("input", onInput, { signal: signal });
     root.addEventListener("dragstart", onDragStart, { signal: signal });
+    root.addEventListener("dragend", onDragEnd, { signal: signal });
     root.addEventListener("dragover", onDragOver, { signal: signal });
     root.addEventListener("dragleave", onDragLeave, { signal: signal });
     root.addEventListener("drop", onDrop, { signal: signal });
@@ -413,7 +420,17 @@
     if (oldDialog) oldDialog.remove();
     if (runtime.dialog) runtime.root.insertAdjacentHTML("beforeend", dialogMarkup());
     updateToolbarState();
+    updateMobilePanelState();
     refreshIcons();
+  }
+
+  function updateMobilePanelState() {
+    if (!runtime.root) return;
+    runtime.root.dataset.vbMobilePanel = runtime.mobilePanel;
+    runtime.root.querySelectorAll("[data-vb-mobile-panel]").forEach(function (button) {
+      if (button === runtime.root) return;
+      button.classList.toggle("is-active", button.dataset.vbMobilePanel === runtime.mobilePanel);
+    });
   }
 
   function updateToolbarState() {
@@ -523,6 +540,7 @@
     const node = subtree.nodes[subtree.rootId];
     const result = execute({ type: "insert-subtree", payload: { subtree: subtree, parentId: target.parentId, slot: target.slot, index: target.index }, label: "Adicionar " + node.name }, { select: node.id });
     if (result) {
+      if (window.matchMedia("(max-width: 1020px)").matches) { runtime.mobilePanel = "canvas"; updateMobilePanelState(); }
       notify(node.name + " adicionado", "success");
       window.setTimeout(function () { postPreview("scroll-to", { id: node.id }); }, 120);
     }
@@ -551,6 +569,7 @@
     runtime.selectedId = id;
     let current = id;
     while (current) { runtime.expanded.add(current); const parent = TB.parentOf(runtime.document, current); current = parent && parent.parentId; }
+    if (window.matchMedia("(max-width: 1020px)").matches) runtime.mobilePanel = "inspector";
     repaintPanels();
     sendPreview();
   }
@@ -563,7 +582,7 @@
     runtime.expanded = new Set([runtime.document.rootId]);
     scheduleSave();
     if (runtime.root) {
-      runtime.root.innerHTML = toolbarMarkup() + '<div class="vb-studio__workspace">' + leftPanelMarkup() + canvasMarkup() + inspectorMarkup() + '</div>' + statusMarkup() + dialogMarkup();
+      runtime.root.innerHTML = toolbarMarkup() + mobileWorkspaceMarkup() + '<div class="vb-studio__workspace">' + leftPanelMarkup() + canvasMarkup() + inspectorMarkup() + '</div>' + statusMarkup() + dialogMarkup();
       mount(runtime.root, runtime.options);
     }
   }
@@ -686,6 +705,8 @@
   }
 
   function onClick(event) {
+    const mobilePanel = event.target.closest("[data-vb-mobile-panel]");
+    if (mobilePanel && mobilePanel !== runtime.root) { runtime.mobilePanel = mobilePanel.dataset.vbMobilePanel; updateMobilePanelState(); if (runtime.mobilePanel === "canvas") requestAnimationFrame(fitCanvas); return; }
     const leftTab = event.target.closest("[data-vb-left-tab]");
     if (leftTab) { runtime.leftTab = leftTab.dataset.vbLeftTab; const nav = leftTab.parentElement; nav.querySelectorAll("button").forEach(function (button) { button.classList.toggle("is-active", button === leftTab); }); const content = runtime.root.querySelector("[data-vb-left-content]"); if (content) content.innerHTML = leftContentMarkup(); refreshIcons(); return; }
     const inspectorTab = event.target.closest("[data-vb-inspector-tab]");
@@ -822,9 +843,89 @@
 
   function onDragStart(event) {
     const component = event.target.closest("[data-vb-component]");
-    if (component) { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-fl-vb-component", component.dataset.vbComponent); event.dataTransfer.setData("text/plain", component.dataset.vbComponent); return; }
+    if (component) {
+      runtime.draggingComponent = component.dataset.vbComponent;
+      runtime.root.classList.add("is-vb-library-dragging");
+      component.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "copy";
+      event.dataTransfer.setData("application/x-fl-vb-component", component.dataset.vbComponent);
+      event.dataTransfer.setData("text/plain", "fl-component:" + component.dataset.vbComponent);
+      return;
+    }
     const treeNode = event.target.closest("[data-vb-tree-node]");
-    if (treeNode && treeNode.draggable) { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("application/x-fl-vb-node", treeNode.dataset.vbTreeNode); event.dataTransfer.setData("text/plain", treeNode.dataset.vbTreeNode); treeNode.classList.add("is-dragging"); }
+    if (treeNode && treeNode.draggable) { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("application/x-fl-vb-node", treeNode.dataset.vbTreeNode); event.dataTransfer.setData("text/plain", "fl-node:" + treeNode.dataset.vbTreeNode); treeNode.classList.add("is-dragging"); }
+  }
+
+  function dragPayload(dataTransfer) {
+    let nodeId = "";
+    let componentType = runtime.draggingComponent || "";
+    try {
+      nodeId = dataTransfer.getData("application/x-fl-vb-node") || "";
+      componentType = dataTransfer.getData("application/x-fl-vb-component") || componentType;
+      const plain = dataTransfer.getData("text/plain") || "";
+      if (!nodeId && plain.startsWith("fl-node:")) nodeId = plain.slice(8);
+      if (!componentType && plain.startsWith("fl-component:")) componentType = plain.slice(13);
+      if (!nodeId && !componentType && runtime.document.nodes[plain]) nodeId = plain;
+      if (!nodeId && !componentType && TB.registry.get(plain)) componentType = plain;
+    } catch (error) { /* DataTransfer can hide values until drop. */ }
+    return { nodeId: nodeId, componentType: componentType };
+  }
+
+  function clearPreviewDrop() {
+    if (!runtime.root) return;
+    const frame = runtime.root.querySelector("#vb-preview-frame");
+    try {
+      if (frame && frame.contentDocument) frame.contentDocument.querySelectorAll(".is-vb-drop-before,.is-vb-drop-after,.is-vb-drop-inside,.is-vb-drop-invalid").forEach(function (element) { element.classList.remove("is-vb-drop-before", "is-vb-drop-after", "is-vb-drop-inside", "is-vb-drop-invalid"); });
+    } catch (error) { /* Preview is same-origin in supported deployments. */ }
+    runtime.previewDrop = null;
+    const label = runtime.root.querySelector("[data-vb-drop-label]");
+    if (label) label.textContent = "Escolha uma posicao no site";
+  }
+
+  function validDropPlacement(targetId, preferredPosition, componentType) {
+    const positions = [preferredPosition, "inside", "before", "after"].filter(function (value, index, list) { return list.indexOf(value) === index; });
+    for (let index = 0; index < positions.length; index += 1) {
+      const placement = treePlacement(targetId, positions[index], componentType);
+      if (!placement) continue;
+      const allowed = TB.canInsert(runtime.document, placement.parentId, placement.slot, componentType);
+      if (allowed.ok) return { placement: placement, position: positions[index] };
+    }
+    return null;
+  }
+
+  function previewDropHit(event, componentType) {
+    const frame = runtime.root && runtime.root.querySelector("#vb-preview-frame");
+    if (!frame || !frame.contentWindow || !frame.contentDocument || !componentType) return null;
+    const frameRect = frame.getBoundingClientRect();
+    if (!frameRect.width || !frameRect.height) return null;
+    const x = (event.clientX - frameRect.left) * (frame.contentWindow.innerWidth / frameRect.width);
+    const y = (event.clientY - frameRect.top) * (frame.contentWindow.innerHeight / frameRect.height);
+    const pointElement = frame.contentDocument.elementFromPoint(x, y);
+    const target = pointElement && pointElement.closest("[data-vb-node]");
+    if (!target) return null;
+    const rectangle = target.getBoundingClientRect();
+    const ratio = rectangle.height ? (y - rectangle.top) / rectangle.height : 0.5;
+    const preferred = ratio < 0.22 ? "before" : ratio > 0.78 ? "after" : "inside";
+    const result = validDropPlacement(target.dataset.vbNode, preferred, componentType);
+    clearPreviewDrop();
+    if (!result) {
+      target.classList.add("is-vb-drop-invalid");
+      const invalidLabel = runtime.root.querySelector("[data-vb-drop-label]");
+      if (invalidLabel) invalidLabel.textContent = "Este componente nao cabe aqui";
+      return null;
+    }
+    target.classList.add("is-vb-drop-" + result.position);
+    const definition = TB.registry.get(componentType);
+    const label = runtime.root.querySelector("[data-vb-drop-label]");
+    if (label) label.textContent = (definition && definition.label || "Componente") + " em " + (target.dataset.vbLabel || "pagina");
+    return { ...result.placement, targetId: target.dataset.vbNode, position: result.position };
+  }
+
+  function onDragEnd() {
+    runtime.draggingComponent = "";
+    if (runtime.root) runtime.root.classList.remove("is-vb-library-dragging");
+    clearTreeDrop();
+    clearPreviewDrop();
   }
 
   function clearTreeDrop() {
@@ -833,6 +934,14 @@
   }
 
   function onDragOver(event) {
+    const bridge = event.target.closest("[data-vb-preview-drop]");
+    if (bridge) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      const payload = dragPayload(event.dataTransfer);
+      runtime.previewDrop = previewDropHit(event, payload.componentType || runtime.draggingComponent);
+      return;
+    }
     const treeNode = event.target.closest("[data-vb-tree-node]");
     if (!treeNode) return;
     event.preventDefault();
@@ -846,22 +955,36 @@
   }
 
   function onDragLeave(event) {
+    const bridge = event.target.closest("[data-vb-preview-drop]");
+    if (bridge && !bridge.contains(event.relatedTarget)) { clearPreviewDrop(); return; }
     const treeNode = event.target.closest("[data-vb-tree-node]");
     if (treeNode && !treeNode.contains(event.relatedTarget)) treeNode.classList.remove("is-drop-before", "is-drop-after", "is-drop-inside");
   }
 
   function onDrop(event) {
+    const bridge = event.target.closest("[data-vb-preview-drop]");
+    if (bridge) {
+      event.preventDefault();
+      const payload = dragPayload(event.dataTransfer);
+      const placement = runtime.previewDrop || previewDropHit(event, payload.componentType || runtime.draggingComponent);
+      const componentType = payload.componentType || runtime.draggingComponent;
+      onDragEnd();
+      if (placement && componentType) insertComponent(componentType, placement);
+      return;
+    }
     const treeNode = event.target.closest("[data-vb-tree-node]");
     if (!treeNode) return;
     event.preventDefault();
-    const nodeId = event.dataTransfer.getData("application/x-fl-vb-node");
-    const componentType = event.dataTransfer.getData("application/x-fl-vb-component");
+    const payload = dragPayload(event.dataTransfer);
+    const nodeId = payload.nodeId;
+    const componentType = payload.componentType;
     const childType = componentType || nodeId && runtime.document.nodes[nodeId] && runtime.document.nodes[nodeId].type;
     const placement = treePlacement(treeNode.dataset.vbTreeNode, treeNode.dataset.dropPosition || "inside", childType);
     clearTreeDrop();
-    if (!placement) return;
+    if (!placement) { onDragEnd(); return; }
     if (nodeId && nodeId !== treeNode.dataset.vbTreeNode) moveComponent(nodeId, placement);
     else if (componentType) insertComponent(componentType, placement);
+    onDragEnd();
   }
 
   function onPreviewMessage(event) {

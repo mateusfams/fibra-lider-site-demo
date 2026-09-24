@@ -92,8 +92,8 @@ html[data-admin-theme="dark"] .theme-studio-loading { background: #0d1724; color
 
 @media (max-width: 760px) {
   html:has(.theme-studio-body),
-  .theme-studio-body { height: auto; min-height: 100%; overflow: auto; }
-  .theme-studio-shell { height: auto; min-height: 100vh; }
+  .theme-studio-body { height: 100%; min-height: 0; overflow: hidden; }
+  .theme-studio-shell { height: 100dvh; min-height: 0; }
   .theme-studio-nav { grid-template-columns: auto 1fr auto; }
   .theme-studio-nav__brand { justify-self: start; }
   .theme-studio-nav__brand div,
@@ -102,5 +102,6 @@ html[data-admin-theme="dark"] .theme-studio-loading { background: #0d1724; color
   .theme-studio-nav__actions a,
   .theme-studio-nav__actions button,
   .theme-studio-nav__back { padding: 0 9px; }
-  .theme-studio-root > .vb-studio { min-height: calc(100vh - 48px); }
+  .theme-studio-root { min-height: 0; overflow: hidden; }
+  .theme-studio-root > .vb-studio { height: 100%; min-height: 0; }
 }

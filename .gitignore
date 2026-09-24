@@ -22,6 +22,7 @@ __pycache__/
 *.bak
 
 # Local validation screenshots
+artifacts/
 qa-*.png
 app/site-*.png
 app/admin-*.png
