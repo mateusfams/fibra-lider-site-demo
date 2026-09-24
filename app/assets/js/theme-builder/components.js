@@ -15,6 +15,7 @@
   function numberField(label, group, options) { return { type: "number", control: "number", label: label, group: group || "content", ...(options || {}) }; }
   function imageField(label, group, extra) { return { type: "image", control: "asset", label: label, group: group || "content", ...(extra || {}) }; }
   function urlField(label, group) { return { type: "url", control: "link", label: label, group: group || "content" }; }
+  function iconField(label, group) { return { type: "string", control: "icon", label: label, group: group || "content", maxLength: 60 }; }
 
   function element(tag, className) {
     const node = document.createElement(tag);
@@ -194,7 +195,7 @@
 
   registry.register({
     type: "content.icon", version: 1, label: "Icone", category: "content", icon: "sparkles",
-    propsSchema: { name: textField("Icone Lucide", "content", { maxLength: 60 }), label: textField("Nome acessivel", "advanced", { maxLength: 120 }) }, slots: {}, styleCapabilities: ["typography", "spacing", "size", "background", "border", "effects", "responsive"],
+    propsSchema: { name: iconField("Icone", "content"), label: textField("Nome acessivel", "advanced", { maxLength: 120 }) }, slots: {}, styleCapabilities: ["typography", "spacing", "size", "background", "border", "effects", "responsive"],
     defaults: { props: { name: "wifi", label: "" }, styles: { base: { normal: { color: "token.color.primary" } } } },
     render: function (context) { const root = element("span", "vb-icon"); appendIcon(root, context.props.name); if (context.props.label) root.setAttribute("aria-label", TB.plainText(context.props.label, 120)); else root.setAttribute("aria-hidden", "true"); return { element: root, slots: {} }; },
   });
@@ -203,7 +204,7 @@
     type: "content.button", version: 1, label: "Botao", category: "content", icon: "mouse-pointer-click", inlineProperty: "text", inlineSelector: "span",
     propsSchema: {
       text: textField("Texto", "content", { required: true, maxLength: 120 }), url: urlField("Link", "content"), target: selectField("Abrir em", [option("self", "Mesma aba"), option("blank", "Nova aba")], "content"),
-      icon: textField("Icone", "content", { maxLength: 60 }), iconPosition: selectField("Posicao do icone", [option("left", "Esquerda"), option("right", "Direita")], "content"), ariaLabel: textField("Nome acessivel", "advanced", { maxLength: 160 }),
+      icon: iconField("Icone", "content"), iconPosition: selectField("Posicao do icone", [option("left", "Esquerda"), option("right", "Direita")], "content"), ariaLabel: textField("Nome acessivel", "advanced", { maxLength: 160 }),
     },
     slots: {}, styleCapabilities: ["layout", "typography", "spacing", "size", "background", "border", "effects", "responsive"],
     defaults: { props: { text: "Saiba mais", url: "#", target: "self", icon: "arrow-right", iconPosition: "right", ariaLabel: "" }, styles: { base: { normal: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", paddingTop: "13px", paddingRight: "20px", paddingBottom: "13px", paddingLeft: "20px", backgroundColor: "token.color.primary", color: "#ffffff", borderRadius: "token.radius.md", fontWeight: "700", transitionProperty: "all", transitionDuration: "0.2s" }, hover: { transform: "translateY(-2px)", backgroundColor: "#0758b8" }, focus: { borderColor: "token.color.secondary" } } } },

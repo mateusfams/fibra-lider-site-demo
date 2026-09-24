@@ -128,6 +128,38 @@
   }
 
   const registry = new ComponentRegistry();
+  class TemplateRegistry {
+    constructor() { this.definitions = new Map(); }
+
+    register(definition) {
+      if (!definition || !/^[a-z][a-z0-9-]{1,59}$/.test(definition.id || "")) throw new Error("ID de template invalido.");
+      if (this.definitions.has(definition.id)) throw new Error("Template duplicado: " + definition.id);
+      if (typeof definition.create !== "function") throw new Error("Template sem factory: " + definition.id);
+      const normalized = Object.freeze({
+        name: definition.id,
+        description: "",
+        category: "Provedor",
+        palette: ["#0874e7", "#29d884", "#07111e"],
+        font: "Inter",
+        ...definition,
+      });
+      this.definitions.set(normalized.id, normalized);
+      return normalized;
+    }
+
+    get(id) { return this.definitions.get(id) || null; }
+    list() { return Array.from(this.definitions.values()); }
+    create(id, state) {
+      const definition = this.get(id);
+      if (!definition) throw new Error("Template nao encontrado: " + id);
+      const documentValue = definition.create(state);
+      const validation = validateDocument(documentValue);
+      if (!validation.valid) throw new Error("O template " + definition.name + " gerou um documento invalido.");
+      return documentValue;
+    }
+  }
+
+  const templateRegistry = new TemplateRegistry();
   let documentFactory = null;
   let pageDocumentFactory = null;
 
@@ -945,7 +977,9 @@
     MAX_NODES: MAX_NODES,
     MAX_DEPTH: MAX_DEPTH,
     registry: registry,
+    templateRegistry: templateRegistry,
     ComponentRegistry: ComponentRegistry,
+    TemplateRegistry: TemplateRegistry,
     CommandHistory: CommandHistory,
     Autosave: Autosave,
     STYLE_FIELDS: STYLE_FIELDS,
@@ -968,6 +1002,7 @@
     createNode: createNode,
     createComponentSubtree: createComponentSubtree,
     createDefaultDocument: function (state) { return typeof documentFactory === "function" ? documentFactory(state) : null; },
+    createTemplateDocument: function (id, state) { return templateRegistry.create(id, state); },
     createDocument: createDocument,
     createWorkspace: createWorkspace,
     parentOf: parentOf,

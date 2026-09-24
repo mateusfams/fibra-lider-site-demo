@@ -19,6 +19,8 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`. O editor visual pos
 
 - Dashboard executivo com desempenho, funil e mapa de interesse regional.
 - Visual Theme Builder com arvore aninhada de componentes, drag and drop, edicao inline e inspector gerado por schema.
+- Catalogo de tres templates completos: Fibra Essencial, Aurora Regional e Nexus Performance, todos renderizados pelo mesmo documento versionado.
+- Biblioteca visual com 6 familias tipograficas, 72 icones Lucide curados e seletores integrados ao inspector e aos tokens globais.
 - Componentes podem ser adicionados por clique ou arrastados diretamente da biblioteca para uma posicao valida no preview.
 - No celular, o editor organiza o fluxo em tres areas acessiveis: Adicionar, Visualizar e Editar.
 - Preview e Home publicada renderizados pelo mesmo documento visual, sem uma segunda pagina divergente.

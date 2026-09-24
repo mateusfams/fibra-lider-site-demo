@@ -130,12 +130,13 @@
   }
 
   function leftPanelMarkup() {
-    const tabs = [["components", "blocks", "Componentes"], ["layers", "layers-3", "Camadas"], ["pages", "files", "Paginas"], ["saved", "library", "Salvos"], ["globals", "swatch-book", "Globais"]];
+    const tabs = [["components", "blocks", "Componentes"], ["layers", "layers-3", "Camadas"], ["templates", "layout-template", "Templates"], ["pages", "files", "Paginas"], ["saved", "library", "Salvos"], ["globals", "swatch-book", "Globais"]];
     return '<aside class="vb-studio__left"><nav class="vb-side-tabs" aria-label="Ferramentas">' + tabs.map(function (tab) { return '<button type="button" class="' + (runtime.leftTab === tab[0] ? "is-active" : "") + '" data-vb-left-tab="' + tab[0] + '" title="' + tab[2] + '">' + icon(tab[1]) + '<span>' + tab[2] + '</span></button>'; }).join("") + '</nav><div class="vb-side-panel" data-vb-left-content>' + leftContentMarkup() + '</div></aside>';
   }
 
   function leftContentMarkup() {
     if (runtime.leftTab === "layers") return layersMarkup();
+    if (runtime.leftTab === "templates") return templatesMarkup();
     if (runtime.leftTab === "pages") return pagesMarkup();
     if (runtime.leftTab === "saved") return savedMarkup();
     if (runtime.leftTab === "globals") return globalsMarkup();
@@ -175,6 +176,16 @@
     return '<div class="vb-panel-heading"><div><strong>Biblioteca</strong><span>Secoes e blocos reutilizaveis</span></div></div>' + (fragments.length ? '<div class="vb-saved-list">' + fragments.map(function (fragment) { return '<article><span>' + icon("layout-template") + '</span><div><strong>' + esc(fragment.name) + '</strong><small>' + new Date(fragment.createdAt).toLocaleDateString("pt-BR") + '</small></div><button type="button" data-vb-insert-fragment="' + esc(fragment.id) + '" title="Inserir">' + icon("plus") + '</button><button type="button" data-vb-delete-fragment="' + esc(fragment.id) + '" title="Excluir">' + icon("trash-2") + '</button></article>'; }).join("") + '</div>' : '<div class="vb-empty-panel">' + icon("library") + '<strong>Nenhuma secao salva</strong><p>Selecione um elemento e use Salvar como modelo.</p></div>');
   }
 
+  function templatesMarkup() {
+    const activeId = runtime.document.meta && runtime.document.meta.templateId || "provider-classic";
+    const home = runtime.document.settings && runtime.document.settings.slug === "/";
+    const templates = TB.templateRegistry.list();
+    return '<div class="vb-panel-heading"><div><strong>Templates completos</strong><span>' + templates.length + ' opcoes para provedores</span></div></div><div class="vb-template-intro">' + icon("wand-sparkles") + '<div><strong>Comece pronto. Personalize tudo.</strong><span>Aplicar troca a estrutura da Home e guarda uma copia local da versao atual.</span></div></div><div class="vb-template-list">' + templates.map(function (template) {
+      const active = activeId === template.id;
+      return '<article class="vb-template-card' + (active ? ' is-active' : '') + '"><div class="vb-template-preview" data-template-preview="' + esc(template.id) + '"><div class="vb-template-preview__nav"></div><div class="vb-template-preview__hero"><i></i><span></span><span></span><b></b></div><div class="vb-template-preview__grid"><i></i><i></i><i></i></div></div><div class="vb-template-card__body"><div><span>' + esc(template.category) + '</span><h3>' + esc(template.name) + '</h3></div>' + (active ? '<em>' + icon("circle-check") + ' Em uso</em>' : '') + '<p>' + esc(template.description) + '</p><div class="vb-template-meta"><span style="font-family:' + esc(template.font.split(" + ")[0]) + '">Aa</span><small>' + esc(template.font) + '</small><div>' + template.palette.map(function (color) { return '<i style="background:' + esc(color) + '"></i>'; }).join("") + '</div></div><button type="button" data-vb-apply-template="' + esc(template.id) + '"' + (!home || active ? ' disabled' : '') + '>' + icon(active ? "check" : "replace") + (active ? ' Template atual' : ' Usar este template') + '</button></div></article>';
+    }).join("") + '</div>' + (!home ? '<div class="vb-empty-panel">' + icon("house") + '<strong>Templates sao aplicados na Home</strong><p>Abra a pagina Home para trocar o visual completo do site.</p></div>' : '');
+  }
+
   function tokenField(key, label, type) {
     const value = runtime.document.theme.tokens[key] || "";
     if (type === "color") return '<label class="vb-token-field"><span>' + esc(label) + '</span><div><input type="color" value="' + (/^#[0-9a-f]{6}$/i.test(value) ? esc(value) : "#0874e7") + '" data-vb-token="' + esc(key) + '"><input value="' + esc(value) + '" data-vb-token="' + esc(key) + '"></div></label>';
@@ -186,12 +197,35 @@
     return '<label class="vb-token-field"><span>' + esc(label) + '</span><div><input type="color" value="' + (/^#[0-9a-f]{6}$/i.test(value) ? esc(value) : "#07111e") + '" data-vb-dark-token="' + esc(key) + '"><input value="' + esc(value) + '" data-vb-dark-token="' + esc(key) + '"></div></label>';
   }
 
+  function fontPickerMarkup(key, label) {
+    const fonts = TB.designCatalog && TB.designCatalog.fonts || [];
+    const value = runtime.document.theme.tokens[key] || "";
+    return '<section class="vb-font-library"><header><div><h3>' + esc(label) + '</h3><span>' + fonts.length + ' fontes locais</span></div><span class="vb-font-current" style="font-family:' + esc(value) + '">Aa</span></header><div>' + fonts.map(function (font) { return '<button type="button" class="' + (font.value === value ? "is-active" : "") + '" data-vb-font-token="' + esc(key) + '" data-value="' + esc(font.value) + '" style="font-family:' + esc(font.value) + '"><strong>' + esc(font.name) + '</strong><span>' + esc(font.sample) + '</span><small>' + esc(font.category) + '</small></button>'; }).join("") + '</div></section>';
+  }
+
   function globalsMarkup() {
-    return '<div class="vb-panel-heading"><div><strong>Design system</strong><span>Tokens compartilhados no tema</span></div></div><div class="vb-global-groups"><section><h3>Cores claras</h3>' + tokenField("primary", "Principal", "color") + tokenField("secondary", "Destaque", "color") + tokenField("background", "Fundo", "color") + tokenField("surface", "Superficie", "color") + tokenField("text", "Texto", "color") + tokenField("muted", "Texto secundario", "color") + '</section><section><h3>Cores escuras</h3>' + darkTokenField("primary", "Principal") + darkTokenField("secondary", "Destaque") + darkTokenField("background", "Fundo") + darkTokenField("surface", "Superficie") + darkTokenField("text", "Texto") + darkTokenField("muted", "Texto secundario") + '</section><section><h3>Tipografia</h3>' + tokenField("fontHeading", "Fonte de titulos") + tokenField("fontBody", "Fonte de texto") + '</section><section><h3>Raios e espacamento</h3>' + tokenField("radiusSm", "Raio pequeno") + tokenField("radiusMd", "Raio medio") + tokenField("radiusLg", "Raio grande") + tokenField("spaceSm", "Espaco pequeno") + tokenField("spaceMd", "Espaco medio") + tokenField("spaceLg", "Espaco grande") + tokenField("spaceXl", "Espaco extra") + '</section></div>';
+    return '<div class="vb-panel-heading"><div><strong>Design system</strong><span>Identidade compartilhada no site</span></div></div><div class="vb-global-groups"><section><h3>Cores claras</h3>' + tokenField("primary", "Principal", "color") + tokenField("secondary", "Destaque", "color") + tokenField("background", "Fundo", "color") + tokenField("surface", "Superficie", "color") + tokenField("text", "Texto", "color") + tokenField("muted", "Texto secundario", "color") + '</section><section><h3>Cores escuras</h3>' + darkTokenField("primary", "Principal") + darkTokenField("secondary", "Destaque") + darkTokenField("background", "Fundo") + darkTokenField("surface", "Superficie") + darkTokenField("text", "Texto") + darkTokenField("muted", "Texto secundario") + '</section>' + fontPickerMarkup("fontHeading", "Fonte dos titulos") + fontPickerMarkup("fontBody", "Fonte dos textos") + '<section><h3>Raios e espacamento</h3>' + tokenField("radiusSm", "Raio pequeno") + tokenField("radiusMd", "Raio medio") + tokenField("radiusLg", "Raio grande") + tokenField("spaceSm", "Espaco pequeno") + tokenField("spaceMd", "Espaco medio") + tokenField("spaceLg", "Espaco grande") + tokenField("spaceXl", "Espaco extra") + '</section></div>';
+  }
+
+  function selectionTrailMarkup() {
+    const trail = [];
+    let id = runtime.selectedId;
+    while (id && trail.length < 4) {
+      const node = runtime.document.nodes[id];
+      if (!node) break;
+      trail.unshift(node.name || definitionFor(node) && definitionFor(node).label || node.type);
+      const parent = TB.parentOf(runtime.document, id);
+      id = parent && parent.parentId;
+    }
+    return trail.map(function (label, index) { return (index ? icon("chevron-right") : "") + '<span>' + esc(label) + '</span>'; }).join("");
+  }
+
+  function canvasContextMarkup() {
+    return icon("mouse-pointer-2") + '<div>' + selectionTrailMarkup() + '</div>';
   }
 
   function canvasMarkup() {
-    return '<main class="vb-studio__canvas"><div class="vb-canvas-top"><span>' + icon("mouse-pointer-2") + ' Clique para selecionar. Arraste componentes para o site.</span><div class="vb-rich-toolbar"><button type="button" data-vb-format="bold" title="Negrito"><b>B</b></button><button type="button" data-vb-format="italic" title="Italico"><i>I</i></button><button type="button" data-vb-format="underline" title="Sublinhado"><u>U</u></button><button type="button" data-vb-format="insertUnorderedList" title="Lista">' + icon("list") + '</button><button type="button" data-vb-format="createLink" title="Link">' + icon("link") + '</button></div></div><div class="vb-canvas-stage is-' + runtime.device + '" style="--vb-scale:1"><div class="vb-canvas-viewport"><div class="vb-canvas-device"><iframe id="vb-preview-frame" src="./builder-preview.html?mode=editor&amp;session=' + encodeURIComponent(runtime.session) + '" title="Preview visual da pagina"></iframe><div class="vb-preview-drop-bridge" data-vb-preview-drop><span>' + icon("mouse-pointer-square-dashed") + '<b>Solte para adicionar</b><small data-vb-drop-label>Escolha uma posicao no site</small></span></div></div></div></div></main>';
+    return '<main class="vb-studio__canvas"><div class="vb-canvas-top"><div class="vb-canvas-context">' + canvasContextMarkup() + '</div><div class="vb-rich-toolbar"><button type="button" data-vb-format="bold" title="Negrito"><b>B</b></button><button type="button" data-vb-format="italic" title="Italico"><i>I</i></button><button type="button" data-vb-format="underline" title="Sublinhado"><u>U</u></button><button type="button" data-vb-format="insertUnorderedList" title="Lista">' + icon("list") + '</button><button type="button" data-vb-format="createLink" title="Link">' + icon("link") + '</button></div></div><div class="vb-canvas-stage is-' + runtime.device + '" style="--vb-scale:1"><div class="vb-canvas-viewport"><div class="vb-canvas-device"><iframe id="vb-preview-frame" src="./builder-preview.html?mode=editor&amp;session=' + encodeURIComponent(runtime.session) + '" title="Preview visual da pagina"></iframe><div class="vb-preview-drop-bridge" data-vb-preview-drop><span>' + icon("mouse-pointer-square-dashed") + '<b>Solte para adicionar</b><small data-vb-drop-label>Escolha uma posicao no site</small></span></div></div></div></div></main>';
   }
 
   function inspectorMarkup() {
@@ -212,9 +246,16 @@
     if (schema.control === "select") return '<label class="vb-field"><span>' + esc(schema.label) + '</span><select' + base + '>' + (schema.options || []).map(function (entry) { const option = typeof entry === "string" ? { value: entry, label: entry } : entry; return '<option value="' + esc(option.value) + '"' + (String(value) === String(option.value) ? " selected" : "") + '>' + esc(option.label) + '</option>'; }).join("") + '</select></label>';
     if (schema.control === "textarea") return '<label class="vb-field"><span>' + esc(schema.label) + '</span><textarea rows="5"' + base + '>' + esc(value || "") + '</textarea></label>';
     if (schema.control === "asset") return assetFieldMarkup(key, schema, node);
+    if (schema.control === "icon") return iconFieldMarkup(key, schema, value);
     const type = schema.type === "number" ? "number" : schema.type === "url" ? "url" : "text";
     const constraints = ["min", "max", "step", "maxLength"].map(function (name) { return schema[name] == null ? "" : ' ' + (name === "maxLength" ? "maxlength" : name) + '="' + esc(schema[name]) + '"'; }).join("");
     return '<label class="vb-field"><span>' + esc(schema.label) + '</span><input type="' + type + '" value="' + esc(value == null ? "" : value) + '"' + base + constraints + '></label>';
+  }
+
+  function iconFieldMarkup(key, schema, value) {
+    const groups = TB.designCatalog && TB.designCatalog.iconGroups || [];
+    const current = /^[a-z0-9-]{1,60}$/.test(String(value || "")) ? value : "sparkles";
+    return '<details class="vb-icon-library"><summary><span>' + icon(current) + '</span><div><small>' + esc(schema.label) + '</small><strong>' + esc(current) + '</strong></div>' + icon("chevron-down") + '</summary><div class="vb-icon-library__panel"><label>' + icon("search") + '<input type="search" data-vb-icon-search placeholder="Buscar icone"></label>' + groups.map(function (group) { return '<section><h4>' + esc(group.label) + '</h4><div>' + group.icons.map(function (name) { return '<button type="button" class="' + (name === current ? "is-active" : "") + '" data-vb-icon-choice="' + esc(name) + '" data-prop="' + esc(key) + '" title="' + esc(name) + '">' + icon(name) + '</button>'; }).join("") + '</div></section>'; }).join("") + '</div></details>';
   }
 
   function assetFieldMarkup(key, schema, node) {
@@ -252,6 +293,10 @@
     if (field.type === "color") {
       const color = /^#[0-9a-f]{6}$/i.test(value) ? value : "#0874e7";
       return '<label class="vb-color-field"><span>' + esc(STYLE_LABELS[key] || key) + '</span><div><input type="color" value="' + esc(color) + '"' + attr + '><input value="' + esc(value) + '"' + attr + ' placeholder="#000000 ou token.color.primary"></div></label>';
+    }
+    if (field.type === "font") {
+      const fonts = TB.designCatalog && TB.designCatalog.fonts || [];
+      return '<label class="vb-font-style-field"><span>' + esc(STYLE_LABELS[key] || key) + '</span><select' + attr + '><option value="">Herdar fonte global</option><option value="token.font.heading"' + (value === "token.font.heading" ? " selected" : "") + '>Fonte global de titulos</option><option value="token.font.body"' + (value === "token.font.body" ? " selected" : "") + '>Fonte global de textos</option>' + fonts.map(function (font) { return '<option value="' + esc(font.value) + '"' + (value === font.value ? " selected" : "") + '>' + esc(font.name) + '</option>'; }).join("") + '</select><small style="font-family:' + esc(value && !value.startsWith("token.") ? value : "inherit") + '">Aa Bb Cc 0123</small></label>';
     }
     if (key === "opacity") return '<label class="vb-range-field"><span>' + esc(STYLE_LABELS[key]) + '<output>' + esc(value || "1") + '</output></span><input type="range" min="0" max="1" step="0.05" value="' + esc(value || "1") + '"' + attr + '></label>';
     return '<label class="vb-field"><span>' + esc(STYLE_LABELS[key] || key) + '</span><input value="' + esc(value) + '"' + attr + ' placeholder="Automatico"></label>';
@@ -344,7 +389,8 @@
 
   function statusMarkup() {
     const validation = TB.validateDocument(runtime.document);
-    return '<footer class="vb-studio__status"><span data-vb-save-status class="is-' + esc(runtime.saveStatus) + '"><i></i>' + saveStatusLabel() + '</span><span>' + icon("boxes") + Object.keys(runtime.document.nodes).length + ' componentes</span><button type="button" data-vb-action="validate" class="' + (validation.valid ? "is-valid" : "is-invalid") + '">' + icon(validation.valid ? "circle-check" : "triangle-alert") + (validation.valid ? "Estrutura valida" : validation.errors.length + " erro(s)") + '</button><span class="vb-studio__shortcut">Ctrl+Z desfaz &middot; Ctrl+C/V copia e cola</span></footer>';
+    const template = TB.templateRegistry.get(runtime.document.meta && runtime.document.meta.templateId || "provider-classic");
+    return '<footer class="vb-studio__status"><span data-vb-save-status class="is-' + esc(runtime.saveStatus) + '"><i></i>' + saveStatusLabel() + '</span><span>' + icon("boxes") + Object.keys(runtime.document.nodes).length + ' componentes</span><span class="vb-status-template">' + icon("layout-template") + esc(template && template.name || "Pagina personalizada") + '</span><button type="button" data-vb-action="validate" class="' + (validation.valid ? "is-valid" : "is-invalid") + '">' + icon(validation.valid ? "circle-check" : "triangle-alert") + (validation.valid ? "Estrutura valida" : validation.errors.length + " erro(s)") + '</button><span class="vb-studio__shortcut">Ctrl+Z desfaz &middot; Ctrl+C/V copia e cola</span></footer>';
   }
 
   function saveStatusLabel() {
@@ -416,6 +462,8 @@
     if (inspector && config.inspector !== false) inspector.outerHTML = inspectorMarkup();
     const footer = runtime.root.querySelector(".vb-studio__status");
     if (footer) footer.outerHTML = statusMarkup();
+    const canvasContext = runtime.root.querySelector(".vb-canvas-context");
+    if (canvasContext) canvasContext.innerHTML = canvasContextMarkup();
     const oldDialog = runtime.root.querySelector(".vb-dialog");
     if (oldDialog) oldDialog.remove();
     if (runtime.dialog) runtime.root.insertAdjacentHTML("beforeend", dialogMarkup());
@@ -587,6 +635,66 @@
     }
   }
 
+  function saveTemplateBackup(documentValue) {
+    const prefix = "fl-vb-template-backup:" + runtime.tenant + ":";
+    const indexKey = prefix + "index";
+    let keys = [];
+    try {
+      const stored = JSON.parse(localStorage.getItem(indexKey) || "[]");
+      if (Array.isArray(stored)) keys = stored.filter(function (key) { return typeof key === "string" && key.startsWith(prefix) && key !== indexKey; });
+    } catch (error) { keys = []; }
+    while (keys.length >= 5) localStorage.removeItem(keys.pop());
+    const backupKey = prefix + Date.now();
+    try {
+      localStorage.setItem(backupKey, JSON.stringify(documentValue));
+      localStorage.setItem(indexKey, JSON.stringify([backupKey].concat(keys)));
+    } catch (error) {
+      keys.forEach(function (key) { localStorage.removeItem(key); });
+      try {
+        localStorage.setItem(backupKey, JSON.stringify(documentValue));
+        localStorage.setItem(indexKey, JSON.stringify([backupKey]));
+      } catch (retryError) {
+        localStorage.removeItem(backupKey);
+        throw new Error("Nao foi possivel criar o backup local antes de trocar o template.");
+      }
+    }
+    return backupKey;
+  }
+
+  function replaceHomeTemplate(templateId, message) {
+    if (!runtime.document.settings || runtime.document.settings.slug !== "/") return;
+    const previous = runtime.document;
+    const backupKey = saveTemplateBackup(previous);
+    const next = TB.createTemplateDocument(templateId, runtime.state);
+    next.name = previous.name;
+    next.settings = { ...next.settings, seo: TB.clone(previous.settings.seo || next.settings.seo) };
+    delete runtime.workspace.documents[previous.documentId];
+    runtime.workspace.documents[next.documentId] = next;
+    runtime.workspace.meta = { ...(runtime.workspace.meta || {}), activeTemplateId: templateId, templateBackupKey: backupKey };
+    runtime.histories.set(next.documentId, new TB.CommandHistory(120));
+    switchDocument(next.documentId);
+    notify(message || "Template aplicado na Home", "success");
+  }
+
+  function applyTemplate(templateId) {
+    const definition = TB.templateRegistry.get(templateId);
+    if (!definition || runtime.document.settings.slug !== "/") return;
+    if (!window.confirm("Aplicar o template " + definition.name + "? A Home atual sera guardada como backup local.")) return;
+    replaceHomeTemplate(templateId, definition.name + " aplicado com sucesso");
+  }
+
+  function applyGlobalFont(key, value) {
+    if (!TB.designCatalog || !TB.designCatalog.font(value)) return;
+    execute({
+      type: "batch",
+      payload: { commands: [
+        { type: "set", payload: { path: "theme.tokens." + key, value: value }, label: "Alterar fonte global" },
+        { type: "set", payload: { path: "theme.darkTokens." + key, value: value }, label: "Alterar fonte global" },
+      ], selectionId: runtime.selectedId },
+      label: "Alterar fonte global",
+    }, { select: runtime.selectedId });
+  }
+
   function newPage() {
     const count = Object.keys(runtime.workspace.documents).length + 1;
     const documentValue = TB.createDocument({ name: "Nova pagina " + count, slug: "/nova-pagina-" + count });
@@ -717,6 +825,12 @@
     if (select) { selectNode(select.dataset.vbSelect); return; }
     const openPage = event.target.closest("[data-vb-open-page]");
     if (openPage) { switchDocument(openPage.dataset.vbOpenPage); return; }
+    const applyTemplateButton = event.target.closest("[data-vb-apply-template]");
+    if (applyTemplateButton) { applyTemplate(applyTemplateButton.dataset.vbApplyTemplate); return; }
+    const fontToken = event.target.closest("[data-vb-font-token]");
+    if (fontToken) { applyGlobalFont(fontToken.dataset.vbFontToken, fontToken.dataset.value); return; }
+    const iconChoice = event.target.closest("[data-vb-icon-choice]");
+    if (iconChoice) { setNodeValue("props." + iconChoice.dataset.prop, iconChoice.dataset.vbIconChoice, "Escolher icone"); return; }
     const component = event.target.closest("[data-vb-component]");
     if (component) { insertComponent(component.dataset.vbComponent); return; }
     const media = event.target.closest("[data-vb-media-pick]");
@@ -781,19 +895,9 @@
     else if (name === "zoom-in" || name === "zoom-out") { runtime.zoom = Math.max(40, Math.min(120, runtime.zoom + (name === "zoom-in" ? 5 : -5))); fitCanvas(); const output = runtime.root.querySelector(".vb-studio__zoom output"); if (output) output.textContent = runtime.zoom + "%"; }
     else if (name === "new-page") newPage();
     else if (name === "sync-home" && runtime.document.settings.slug === "/") {
-      if (!window.confirm("Restaurar a Home base atual? A versao deste rascunho sera guardada como backup local.")) return;
-      const backupKey = "fl-vb-manual-backup:" + runtime.tenant + ":" + Date.now();
-      localStorage.setItem(backupKey, JSON.stringify(runtime.document));
-      const previousId = runtime.document.documentId;
-      const next = TB.createDefaultDocument(runtime.state);
-      delete runtime.workspace.documents[previousId];
-      runtime.workspace.documents[next.documentId] = next;
-      runtime.workspace.activeDocumentId = next.documentId;
-      runtime.workspace.meta = { ...(runtime.workspace.meta || {}), manualBackupKey: backupKey };
-      runtime.document = next;
-      runtime.selectedId = initialSelection(next);
-      runtime.histories.set(next.documentId, new TB.CommandHistory(120));
-      scheduleSave(); repaintPanels(); sendPreview(); notify("Home restaurada a partir do template atual", "success");
+      const templateId = runtime.document.meta && runtime.document.meta.templateId || "provider-classic";
+      if (!window.confirm("Restaurar o template atual? A versao deste rascunho sera guardada como backup local.")) return;
+      replaceHomeTemplate(templateId, "Home restaurada a partir do template atual");
     }
     else if (name === "duplicate-page") duplicatePage(action.dataset.id);
     else if (name === "delete-page") deletePage(action.dataset.id);
@@ -833,6 +937,7 @@
   function onInput(event) {
     const target = event.target;
     if (target.matches("[data-vb-library-search]")) { runtime.librarySearch = target.value; const panel = runtime.root.querySelector(".vb-component-library"); const heading = runtime.root.querySelector(".vb-panel-heading"); const wrapper = document.createElement("div"); wrapper.innerHTML = libraryMarkup(); const next = wrapper.querySelector(".vb-component-library"); const nextHeading = wrapper.querySelector(".vb-panel-heading"); if (panel && next) panel.replaceWith(next); if (heading && nextHeading) heading.replaceWith(nextHeading); refreshIcons(); }
+    if (target.matches("[data-vb-icon-search]")) { const term = target.value.trim().toLowerCase(); const picker = target.closest(".vb-icon-library"); if (picker) picker.querySelectorAll("[data-vb-icon-choice]").forEach(function (button) { button.hidden = Boolean(term) && !button.dataset.vbIconChoice.includes(term); }); }
     if (target.matches('input[type="range"][data-vb-style]')) { const output = target.closest("label").querySelector("output"); if (output) output.value = target.value; }
   }
 

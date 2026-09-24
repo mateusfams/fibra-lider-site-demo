@@ -49,6 +49,87 @@ try:
         os.makedirs(CAPTURE_DIR, exist_ok=True)
         driver.save_screenshot(os.path.join(CAPTURE_DIR, "theme-builder-desktop.png"))
 
+    template_registry = driver.execute_script(
+        "return FLThemeBuilder.templateRegistry.list().map(function(item){"
+        "var documentValue=FLThemeBuilder.createTemplateDocument(item.id,FL.getState());"
+        "return {id:item.id,valid:FLThemeBuilder.validateDocument(documentValue).valid,nodes:Object.keys(documentValue.nodes).length};});"
+    )
+    check([item["id"] for item in template_registry] == ["provider-classic", "provider-aurora", "provider-nexus"], "Template catalog is incomplete: " + repr(template_registry))
+    check(all(item["valid"] and item["nodes"] >= 14 for item in template_registry), "A template generated an invalid or incomplete document: " + repr(template_registry))
+
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-left-tab="templates"]').click()
+    wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, ".vb-template-card")) == 3)
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-apply-template="provider-aurora"]').click()
+    wait.until(EC.alert_is_present()).accept()
+    wait.until(lambda browser: browser.execute_script("var env=FLThemeBuilder.storage.loadWorkspace(FL.getState());return env.workspace.documents[env.workspace.activeDocumentId].meta.templateId") == "provider-aurora")
+    time.sleep(0.8)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.vb-document[data-vb-template="provider-aurora"]')))
+    driver.switch_to.default_content()
+    if CAPTURE_DIR:
+        driver.save_screenshot(os.path.join(CAPTURE_DIR, "theme-builder-aurora.png"))
+
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-left-tab="globals"]').click()
+    wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, "[data-vb-font-token]")) == 12)
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-font-token="fontHeading"][data-value*="Lora"]').click()
+    time.sleep(1.1)
+    font_tokens = driver.execute_script(
+        "var env=FLThemeBuilder.storage.loadWorkspace(FL.getState()),doc=env.workspace.documents[env.workspace.activeDocumentId];"
+        "return {light:doc.theme.tokens.fontHeading,dark:doc.theme.darkTokens.fontHeading};"
+    )
+    check(font_tokens["light"].startswith('"Lora"') and font_tokens["dark"] == font_tokens["light"], "Global font was not synchronized between themes: " + repr(font_tokens))
+
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-left-tab="templates"]').click()
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-apply-template="provider-nexus"]').click()
+    wait.until(EC.alert_is_present()).accept()
+    wait.until(lambda browser: browser.execute_script("var env=FLThemeBuilder.storage.loadWorkspace(FL.getState());return env.workspace.documents[env.workspace.activeDocumentId].meta.templateId") == "provider-nexus")
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.vb-document[data-vb-template="provider-nexus"]')))
+    nexus_logo = driver.find_element(By.CSS_SELECTOR, ".site-logo img").get_attribute("src")
+    check("fibra-lider-logo.png" in nexus_logo and "-dark" not in nexus_logo, "Nexus used a dark logo over its dark header: " + nexus_logo)
+    driver.switch_to.default_content()
+    if CAPTURE_DIR:
+        driver.save_screenshot(os.path.join(CAPTURE_DIR, "theme-builder-nexus.png"))
+
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-left-tab="templates"]').click()
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-apply-template="provider-classic"]').click()
+    wait.until(EC.alert_is_present()).accept()
+    wait.until(lambda browser: browser.execute_script("var env=FLThemeBuilder.storage.loadWorkspace(FL.getState());return env.workspace.documents[env.workspace.activeDocumentId].meta.templateId") == "provider-classic")
+    backup_keys = driver.execute_script("return Object.keys(localStorage).filter(function(key){return key.indexOf('fl-vb-template-backup:')===0&&!key.endsWith(':index');});")
+    check(3 <= len(backup_keys) <= 5, "Template backup retention is inconsistent: " + repr(backup_keys))
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-left-tab="components"]').click()
+
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.vb-document[data-vb-template="provider-classic"]')))
+    icon_test_before = len(driver.find_elements(By.CSS_SELECTOR, "[data-vb-node]"))
+    driver.switch_to.default_content()
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-component="layout.section"]').click()
+    time.sleep(0.6)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    inserted_section = driver.find_element(By.CSS_SELECTOR, ".vb-section.is-vb-selected")
+    inserted_section.find_element(By.CSS_SELECTOR, ".vb-container").click()
+    driver.switch_to.default_content()
+    wait.until(lambda browser: not browser.find_element(By.CSS_SELECTOR, '[data-vb-component="content.icon"]').get_attribute("disabled"))
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-component="content.icon"]').click()
+    icon_picker = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".vb-icon-library")))
+    driver.execute_script("arguments[0].open=true", icon_picker)
+    icon_buttons = driver.find_elements(By.CSS_SELECTOR, "[data-vb-icon-choice]")
+    check(len(icon_buttons) == 72, "Curated icon library is incomplete")
+    check(len(driver.find_elements(By.CSS_SELECTOR, "[data-vb-icon-choice] svg")) == 72, "One or more curated Lucide icons could not be rendered")
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-icon-choice="zap"]').click()
+    time.sleep(1.1)
+    icon_name = driver.execute_script(
+        "var env=FLThemeBuilder.storage.loadWorkspace(FL.getState()),doc=env.workspace.documents[env.workspace.activeDocumentId];"
+        "return doc.nodes[Object.keys(doc.nodes).find(function(id){return doc.nodes[id].type==='content.icon'&&doc.nodes[id].props.name==='zap';})].props.name;"
+    )
+    check(icon_name == "zap", "Icon picker did not persist the selected icon")
+    for _ in range(3):
+        driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
+        time.sleep(0.35)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    check(len(driver.find_elements(By.CSS_SELECTOR, "[data-vb-node]")) == icon_test_before, "Icon-library test did not restore the document")
+    driver.switch_to.default_content()
+
     check(len(driver.find_elements(By.CSS_SELECTOR, "[data-vb-component]")) >= 30, "Component registry was not rendered")
     check(len(driver.find_elements(By.CSS_SELECTOR, "[data-vb-inspector-tab]")) == 7, "Inspector groups are incomplete")
     check(len(driver.find_elements(By.CSS_SELECTOR, "[data-vb-page-select] option")) >= 2, "Workspace pages were not migrated")
@@ -78,7 +159,8 @@ try:
         "const component=document.querySelector('[data-vb-component=\"layout.section\"]');"
         "const frame=document.querySelector('#vb-preview-frame');"
         "const bridge=document.querySelector('[data-vb-preview-drop]');"
-        "const target=frame.contentDocument.querySelector('[data-vb-node=\"canonical_header\"]')||frame.contentDocument.querySelector('[data-vb-node]');"
+        "const targets=Array.from(frame.contentDocument.querySelectorAll('.vb-page > [data-vb-node]'));"
+        "const target=targets.find(function(node){const rect=node.getBoundingClientRect();return rect.bottom>8&&rect.top<frame.contentWindow.innerHeight-8;})||targets[0];"
         "if(!component||!bridge||!target)return {ok:false,reason:'missing drag fixture'};"
         "const transfer=new DataTransfer();"
         "const dispatch=(element,type,options)=>{const dragEvent=new DragEvent(type,Object.assign({bubbles:true,cancelable:true},options||{}));"
@@ -86,10 +168,12 @@ try:
         "dispatch(component,'dragstart');"
         "const frameRect=frame.getBoundingClientRect(),targetRect=target.getBoundingClientRect();"
         "const scaleX=frameRect.width/frame.contentWindow.innerWidth,scaleY=frameRect.height/frame.contentWindow.innerHeight;"
-        "const point={clientX:frameRect.left+(targetRect.left+targetRect.width/2)*scaleX,clientY:frameRect.top+(targetRect.bottom-4)*scaleY};"
-        "dispatch(bridge,'dragover',point);const marked=Boolean(frame.contentDocument.querySelector('.is-vb-drop-before,.is-vb-drop-after,.is-vb-drop-inside'));"
+        "const targetX=Math.max(8,Math.min(frame.contentWindow.innerWidth-8,targetRect.left+targetRect.width/2));"
+        "const targetY=Math.max(8,Math.min(frame.contentWindow.innerHeight-8,targetRect.bottom-4));"
+        "const point={clientX:frameRect.left+targetX*scaleX,clientY:frameRect.top+targetY*scaleY};"
+        "dispatch(bridge,'dragover',point);const markedElement=frame.contentDocument.querySelector('.is-vb-drop-before,.is-vb-drop-after,.is-vb-drop-inside');const marked=Boolean(markedElement);"
         "dispatch(bridge,'drop',point);dispatch(component,'dragend');"
-        "return {ok:true,draggable:component.draggable,marked:marked,payload:transfer.getData('text/plain')};"
+        "return {ok:true,draggable:component.draggable,marked:marked,payload:transfer.getData('text/plain'),targetRect:{top:targetRect.top,bottom:targetRect.bottom,left:targetRect.left,right:targetRect.right},frameRect:{top:frameRect.top,bottom:frameRect.bottom,left:frameRect.left,right:frameRect.right},point:point,hit:(frame.contentDocument.elementFromPoint((point.clientX-frameRect.left)/scaleX,(point.clientY-frameRect.top)/scaleY)||{}).className||'',markedNode:markedElement&&markedElement.dataset.vbNode};"
     )
     check(drag_result["ok"] and drag_result["draggable"] and drag_result["marked"], "Preview did not show a valid drag destination: " + repr(drag_result))
     check(drag_result["payload"] == "fl-component:layout.section", "Drag payload fallback was not registered")

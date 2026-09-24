@@ -84,14 +84,16 @@
     propsSchema: {
       serviceText: text("Texto regional", "content"), ctaLabel: text("Botao principal", "content"),
       showServiceStrip: toggle("Mostrar faixa superior", "content"), sticky: toggle("Cabecalho fixo", "behavior"),
+      logoVariant: select("Logo no cabecalho", [option("auto", "Automatico pelo tema"), option("dark", "Escuro para fundo claro"), option("light", "Claro para fundo escuro")], "style"),
     },
-    defaults: { serviceText: "Internet fibra optica em Sumare e regiao", ctaLabel: "Falar com a gente", showServiceStrip: true, sticky: true },
+    defaults: { serviceText: "Internet fibra optica em Sumare e regiao", ctaLabel: "Falar com a gente", showServiceStrip: true, sticky: true, logoVariant: "auto" },
     render: function (context) {
       const brand = context.data.brand || {};
       const navigation = (context.data.navigation || []).filter(function (item) { return item.visible !== false; }).map(function (item) { return '<a href="' + esc(TB.safeUrl(item.href, "#")) + '">' + esc(item.label) + '</a>'; }).join("");
       const root = htmlElement("header", "site-header canonical-site-header" + (context.props.sticky === false ? " is-static" : ""),
         (context.props.showServiceStrip === false ? "" : '<div class="service-strip"><div class="shell service-strip__inner"><p>' + icon("map-pin") + " " + esc(context.props.serviceText) + '</p><div class="service-strip__links"><a href="tel:' + esc(String(brand.phone || "").replace(/\D/g, "")) + '">' + icon("phone") + " " + esc(brand.phone) + '</a><a href="' + esc(TB.safeUrl(brand.clientAreaUrl, "#")) + '" target="_blank" rel="noopener">' + icon("user-round") + ' Area do cliente</a></div></div></div>') +
         '<div class="nav-shell shell"><a class="site-logo" href="#topo" aria-label="' + esc(brand.name || "Marca") + ' - inicio"><img src="' + esc(TB.safeMediaUrl(brand.logoDark || brand.logo, "./assets/img/fibra-lider-logo-dark.png")) + '" alt="' + esc(brand.name || "Marca") + '"></a><nav class="site-nav" aria-label="Navegacao principal">' + navigation + '</nav><div class="header-actions"><button class="icon-button theme-toggle" data-canonical-theme-toggle type="button" aria-label="Alternar tema">' + icon("moon") + '</button><a class="button button--primary header-cta" href="' + esc(safeLink("whatsapp", context)) + '" target="_blank" rel="noopener">' + icon("message-circle") + '<span>' + esc(context.props.ctaLabel) + '</span></a><button class="icon-button mobile-menu-toggle" data-canonical-menu type="button" aria-label="Abrir menu" aria-expanded="false">' + icon("menu") + '</button></div></div>');
+      root.dataset.logoVariant = ["auto", "dark", "light"].includes(context.props.logoVariant) ? context.props.logoVariant : "auto";
       return { element: root, slots: {}, mount: "canonicalHeader" };
     },
   });
@@ -270,15 +272,15 @@
 
   function canonicalHome(state) {
     const content = state.content || {};
-    const documentValue = TB.createDocument({ name: "Home", slug: "/", pageType: "home" });
-    documentValue.meta = { ...(documentValue.meta || {}), migratedFrom: "fibra-lider-studio-state-v13", templateVersion: "fibra-index-canonical-v1", templateFamily: "provider-sales" };
+    const documentValue = TB.createDocument({ name: "Home", slug: "/" });
+    documentValue.meta = { ...(documentValue.meta || {}), migratedFrom: "fibra-lider-studio-state-v13", templateId: "provider-classic", templateVersion: "fibra-index-canonical-v1", templateFamily: "provider-sales" };
     documentValue.theme.tokens = {
       ...(documentValue.theme.tokens || {}), primary: state.theme.primary, secondary: state.theme.accent, background: state.theme.surface, surface: state.theme.panel,
       text: state.theme.ink, muted: state.theme.muted, fontHeading: state.theme.font + ", Arial, sans-serif", fontBody: state.theme.font + ", Arial, sans-serif", radiusSm: "8px", radiusMd: state.theme.radius + "px", radiusLg: "24px",
     };
     documentValue.theme.darkTokens = { ...(documentValue.theme.darkTokens || {}), primary: state.theme.primary, secondary: state.theme.accent, background: "#07111e", surface: "#0d1a2a", text: "#edf6ff", muted: "#96a9bd", fontHeading: state.theme.font + ", Arial, sans-serif", fontBody: state.theme.font + ", Arial, sans-serif", radiusMd: state.theme.radius + "px" };
 
-    append(documentValue, "template.header", { id: "canonical_header", name: "Cabecalho", props: { anchor: "topo", serviceText: "Internet fibra optica em Sumare e regiao", ctaLabel: "Falar com a gente", showServiceStrip: true, sticky: true } });
+    append(documentValue, "template.header", { id: "canonical_header", name: "Cabecalho", props: { anchor: "topo", serviceText: "Internet fibra optica em Sumare e regiao", ctaLabel: "Falar com a gente", showServiceStrip: true, sticky: true, logoVariant: "auto" } });
     const hero = append(documentValue, "template.hero", { id: "canonical_hero", name: "Hero principal", props: { autoplay: state.slider.autoplay, interval: state.slider.interval, showArrows: state.slider.showArrows, showDots: state.slider.showDots } });
     const banners = (state.banners || []).filter(function (banner) { return banner.active !== false; });
     (banners.length ? banners : [{ name: "Banner principal", eyebrow: "Fibra optica na sua regiao", title: "Internet que acompanha a sua casa.", subtitle: "Conexao estavel e atendimento regional.", image: "./assets/img/hero-family-fiber.jpg", primaryLabel: "Conhecer planos", primaryLink: "#planos", secondaryLabel: "Consultar cobertura", secondaryLink: "#cobertura", badge: "Mais contratado", position: "center", overlay: 64 }]).forEach(function (banner, index) {
@@ -302,4 +304,13 @@
 
   TB.setDocumentFactory(canonicalHome);
   TB.canonicalHomeFactory = canonicalHome;
+  TB.templateRegistry.register({
+    id: "provider-classic",
+    name: "Fibra Essencial",
+    description: "Template comercial equilibrado, com foco em planos, cobertura e atendimento regional.",
+    category: "Conversao",
+    palette: ["#0874e7", "#29d884", "#07111e"],
+    font: "Inter",
+    create: canonicalHome,
+  });
 })();

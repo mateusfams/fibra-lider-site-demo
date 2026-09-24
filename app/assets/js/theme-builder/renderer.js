@@ -68,7 +68,6 @@
       this.callbacks = settings.callbacks || {};
       this.cleanups = [];
       this.styleElement = null;
-      this.dragMarker = null;
     }
 
     destroy() {
@@ -104,6 +103,8 @@
       shell.className = "vb-document" + (this.mode === "editor" ? " is-editor" : "");
       shell.dataset.vbSchema = String(this.document.schemaVersion);
       shell.dataset.vbDevice = this.document.meta && this.document.meta.previewDevice || "desktop";
+      const templateId = this.document.meta && this.document.meta.templateId || "provider-classic";
+      shell.dataset.vbTemplate = /^[a-z][a-z0-9-]{1,59}$/.test(templateId) ? templateId : "provider-classic";
       const activeTheme = localStorage.getItem("fl-site-theme") || localStorage.getItem("fl-vb-site-theme") || document.documentElement.dataset.theme;
       if (activeTheme === "dark") shell.classList.add("is-dark");
       const rootNode = this.renderNode(this.document.rootId, 0);
@@ -355,13 +356,15 @@
       const logo = element.querySelector(".site-logo img");
       const renderTheme = () => {
         const dark = document.documentElement.dataset.theme === "dark";
+        const logoVariant = ["auto", "dark", "light"].includes(element.dataset.logoVariant) ? element.dataset.logoVariant : "auto";
+        const useLightLogo = logoVariant === "light" || (logoVariant === "auto" && dark);
         const documentShell = element.closest(".vb-document");
         if (documentShell) documentShell.classList.toggle("is-dark", dark);
         const icon = themeButton && themeButton.querySelector("[data-lucide]");
         if (icon) icon.setAttribute("data-lucide", dark ? "sun" : "moon");
         if (logo) {
           const brand = this.data.brand || {};
-          logo.src = TB.safeMediaUrl(dark ? brand.logo : brand.logoDark || brand.logo, "./assets/img/fibra-lider-logo-dark.png");
+          logo.src = TB.safeMediaUrl(useLightLogo ? brand.logo : brand.logoDark || brand.logo, useLightLogo ? "./assets/img/fibra-lider-logo.png" : "./assets/img/fibra-lider-logo-dark.png");
         }
         this.refreshIcons();
       };
