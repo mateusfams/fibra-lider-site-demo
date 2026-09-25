@@ -238,7 +238,7 @@
     propsSchema: { autoplay: switchField("Autoplay", "behavior"), interval: numberField("Intervalo (ms)", "behavior", { min: 2500, max: 20000 }), loop: switchField("Loop", "behavior"), arrows: switchField("Setas", "behavior"), dots: switchField("Indicadores", "behavior"), pauseOnHover: switchField("Pausar no hover", "behavior"), transition: selectField("Animacao", [option("fade", "Fade"), option("slide", "Deslizar")], "effects") },
     slots: { slides: { types: ["marketing.slide"], min: 1, max: 20 } }, styleCapabilities: ["spacing", "size", "background", "border", "effects", "responsive"],
     defaults: { props: { autoplay: true, interval: 6500, loop: true, arrows: true, dots: true, pauseOnHover: true, transition: "fade" }, styles: { base: { normal: { minHeight: "620px", overflow: "hidden" } }, sm: { normal: { minHeight: "590px" } } } },
-    editor: { slotManager: { slot: "slides", label: "Slides", singular: "Slide", addType: "marketing.slide", imageProp: "image" } },
+    editor: { slotManager: { slot: "slides", label: "Slides", singular: "Slide", addType: "marketing.slide", imageProp: "image", variant: "slider" } },
     compose: function (builder) { builder.append(builder.root, "marketing.slide", { name: "Slide 1" }, "slides"); builder.append(builder.root, "marketing.slide", { name: "Slide 2", props: { image: "./assets/img/banner-streaming-family.jpg", mobileImage: "./assets/img/banner-streaming-family.jpg", alt: "Entretenimento para toda a familia", overlay: 62, position: "center" } }, "slides"); },
     render: function (context) {
       const root = element("section", "vb-slider vb-slider--" + (context.props.transition === "slide" ? "slide" : "fade"));

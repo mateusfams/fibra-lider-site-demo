@@ -278,25 +278,53 @@
     mountSlider(element, context) {
       const slides = Array.from(element.querySelectorAll(":scope > .vb-slider__track > .vb-slide"));
       if (!slides.length) return;
-      let current = 0;
+      const selectedIndex = this.mode === "editor" ? slides.findIndex((slide) => slide.dataset.vbNode === this.selectedId || Array.from(slide.querySelectorAll("[data-vb-node]")).some((node) => node.dataset.vbNode === this.selectedId)) : -1;
+      let current = selectedIndex >= 0 ? selectedIndex : 0;
       const dots = element.querySelector(".vb-slider__dots");
+      const previous = element.querySelector("[data-slider-previous]");
+      const next = element.querySelector("[data-slider-next]");
       const render = function () {
         slides.forEach(function (slide, index) { slide.classList.toggle("is-active", index === current); slide.setAttribute("aria-hidden", index === current ? "false" : "true"); });
         if (dots) Array.from(dots.children).forEach(function (dot, index) { dot.classList.toggle("is-active", index === current); });
+        if (context.props.loop === false) {
+          if (previous) previous.disabled = current === 0;
+          if (next) next.disabled = current === slides.length - 1;
+        }
       };
       if (dots) {
         dots.replaceChildren();
         slides.forEach(function (_, index) { const dot = document.createElement("button"); dot.type = "button"; dot.setAttribute("aria-label", "Ir para slide " + (index + 1)); dot.addEventListener("click", function () { current = index; render(); }); dots.appendChild(dot); });
       }
-      const previous = element.querySelector("[data-slider-previous]");
-      const next = element.querySelector("[data-slider-next]");
-      const go = function (step) { current = (current + step + slides.length) % slides.length; render(); };
-      if (previous) previous.addEventListener("click", function (event) { event.preventDefault(); go(-1); });
-      if (next) next.addEventListener("click", function (event) { event.preventDefault(); go(1); });
+      const go = function (step) {
+        const target = current + step;
+        current = context.props.loop === false ? Math.max(0, Math.min(slides.length - 1, target)) : (target + slides.length) % slides.length;
+        render();
+      };
+      const previousClick = function (event) { event.preventDefault(); go(-1); };
+      const nextClick = function (event) { event.preventDefault(); go(1); };
+      if (previous) previous.addEventListener("click", previousClick);
+      if (next) next.addEventListener("click", nextClick);
+      if (dots) dots.hidden = slides.length < 2;
+      if (previous && previous.parentElement) previous.parentElement.hidden = slides.length < 2;
       render();
       let timer = null;
-      if (context.props.autoplay && this.mode !== "editor" && slides.length > 1) timer = window.setInterval(function () { go(1); }, Math.max(2000, Number(context.props.interval || 6000)));
-      this.cleanups.push(function () { if (timer) window.clearInterval(timer); });
+      const start = () => {
+        if (timer) window.clearInterval(timer);
+        if (context.props.autoplay && this.mode !== "editor" && slides.length > 1) timer = window.setInterval(function () {
+          if (context.props.loop === false && current === slides.length - 1) { window.clearInterval(timer); timer = null; return; }
+          go(1);
+        }, Math.max(2000, Number(context.props.interval || 6000)));
+      };
+      const stop = function () { if (timer) window.clearInterval(timer); timer = null; };
+      if (context.props.pauseOnHover !== false) { element.addEventListener("mouseenter", stop); element.addEventListener("mouseleave", start); }
+      start();
+      this.cleanups.push(function () {
+        stop();
+        if (previous) previous.removeEventListener("click", previousClick);
+        if (next) next.removeEventListener("click", nextClick);
+        element.removeEventListener("mouseenter", stop);
+        element.removeEventListener("mouseleave", start);
+      });
     }
 
     mountPlanCatalog(element, context) {
@@ -409,7 +437,10 @@
       const dots = element.querySelector("[data-canonical-dots]");
       const arrows = element.querySelector("[data-canonical-arrows]");
       if (!slides.length) return;
-      let current = 0;
+      const mode = context.props.mode === "banner" ? "banner" : "slider";
+      const configuredIndex = Math.max(0, slides.findIndex((slide) => slide.dataset.vbNode === context.props.bannerId));
+      const selectedIndex = this.mode === "editor" ? slides.findIndex((slide) => slide.dataset.vbNode === this.selectedId || Array.from(slide.querySelectorAll("[data-vb-node]")).some((node) => node.dataset.vbNode === this.selectedId)) : -1;
+      let current = selectedIndex >= 0 ? selectedIndex : mode === "banner" ? configuredIndex : 0;
       const render = () => {
         slides.forEach(function (slide, index) {
           slide.classList.toggle("is-active", index === current);
@@ -435,16 +466,16 @@
       const nextClick = function (event) { event.preventDefault(); go(1); };
       if (previous) previous.addEventListener("click", previousClick);
       if (next) next.addEventListener("click", nextClick);
-      if (dots) dots.hidden = context.props.showDots === false || slides.length < 2;
-      if (arrows) arrows.hidden = context.props.showArrows === false || slides.length < 2;
+      if (dots) dots.hidden = mode === "banner" || context.props.showDots === false || slides.length < 2;
+      if (arrows) arrows.hidden = mode === "banner" || context.props.showArrows === false || slides.length < 2;
       render();
       let timer = null;
       const start = () => {
         if (timer) window.clearInterval(timer);
-        if (context.props.autoplay !== false && this.mode !== "editor" && slides.length > 1) timer = window.setInterval(function () { go(1); }, Math.max(3500, Number(context.props.interval || 6500)));
+        if (mode === "slider" && context.props.autoplay !== false && this.mode !== "editor" && slides.length > 1) timer = window.setInterval(function () { go(1); }, Math.max(3500, Number(context.props.interval || 6500)));
       };
       const stop = function () { if (timer) window.clearInterval(timer); timer = null; };
-      if (this.data.slider && this.data.slider.pauseOnHover) {
+      if (context.props.pauseOnHover !== false) {
         element.addEventListener("mouseenter", stop);
         element.addEventListener("mouseleave", start);
       }

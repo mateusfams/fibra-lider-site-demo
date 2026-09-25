@@ -100,10 +100,15 @@
 
   sectionDefinition({
     type: "template.hero", label: "Hero principal", category: "marketing", icon: "gallery-horizontal",
-    propsSchema: { autoplay: toggle("Rotacao automatica", "behavior"), interval: number("Intervalo (ms)", "behavior", { min: 3500, max: 20000 }), showArrows: toggle("Mostrar setas", "content"), showDots: toggle("Mostrar indicadores", "content") },
+    propsSchema: {
+      mode: select("Tipo do destaque", [option("slider", "Slider"), option("banner", "Banner estatico")], "internal"),
+      bannerId: text("Banner exibido", "internal", { maxLength: 120 }),
+      autoplay: { ...toggle("Rotacao automatica", "behavior"), visibleWhen: { prop: "mode", equals: "slider" } }, interval: { ...number("Intervalo (ms)", "behavior", { min: 3500, max: 20000 }), visibleWhen: { prop: "mode", equals: "slider" } },
+      pauseOnHover: { ...toggle("Pausar ao passar o mouse", "behavior"), visibleWhen: { prop: "mode", equals: "slider" } }, showArrows: { ...toggle("Mostrar setas", "content"), visibleWhen: { prop: "mode", equals: "slider" } }, showDots: { ...toggle("Mostrar indicadores", "content"), visibleWhen: { prop: "mode", equals: "slider" } },
+    },
     slots: { slides: { types: ["template.hero-slide"], min: 1, max: 12 } },
-    defaults: { autoplay: true, interval: 6500, showArrows: true, showDots: true },
-    editor: { slotManager: { slot: "slides", label: "Banners do hero", singular: "Banner", addType: "template.hero-slide", imageProp: "image" } },
+    defaults: { mode: "slider", bannerId: "", autoplay: true, interval: 6500, pauseOnHover: true, showArrows: true, showDots: true },
+    editor: { slotManager: { slot: "slides", label: "Banners do hero", singular: "Banner", addType: "template.hero-slide", imageProp: "image", variant: "hero" } },
     compose: function (builder) { builder.append(builder.root, "template.hero-slide", { name: "Banner 1" }, "slides"); },
     render: function (context) {
       const root = htmlElement("section", "hero-slider page-section canonical-hero", '<div class="canonical-hero-slides"></div><div class="hero-controls shell"><div class="hero-dots" data-canonical-dots aria-label="Selecionar destaque"></div><div class="hero-arrows" data-canonical-arrows><button class="icon-button icon-button--glass" data-slider-previous type="button" aria-label="Destaque anterior">' + icon("arrow-left") + '</button><button class="icon-button icon-button--glass" data-slider-next type="button" aria-label="Proximo destaque">' + icon("arrow-right") + '</button></div></div>');
@@ -111,6 +116,9 @@
       root.dataset.interval = String(Math.max(3500, Number(context.props.interval || 6500)));
       root.dataset.showArrows = String(context.props.showArrows !== false);
       root.dataset.showDots = String(context.props.showDots !== false);
+      root.dataset.heroMode = context.props.mode === "banner" ? "banner" : "slider";
+      root.dataset.bannerId = String(context.props.bannerId || "").replace(/[^a-zA-Z0-9_-]/g, "");
+      root.dataset.pauseOnHover = String(context.props.pauseOnHover !== false);
       return { element: root, slots: { slides: root.querySelector(".canonical-hero-slides") }, mount: "canonicalSlider" };
     },
   });
@@ -120,17 +128,21 @@
     allowedParents: ["template.hero"],
     propsSchema: {
       name: text("Nome interno", "content"), eyebrow: text("Chamada superior", "content"), title: text("Titulo", "content"), subtitle: textarea("Descricao", "content"),
-      image: image("Imagem desktop", "content", "Recomendado: 1920 x 900 px."), mobileImage: image("Imagem mobile", "responsive", "Recomendado: 900 x 1200 px."),
+      image: image("Imagem desktop", "content", "Recomendado: 1920 x 900 px."), mobileImage: image("Imagem mobile", "responsive", "Recomendado: 900 x 1200 px."), alt: text("Texto alternativo da imagem", "content", { maxLength: 240 }),
       primaryLabel: text("Botao principal", "content"), primaryLink: text("Destino principal", "content"), secondaryLabel: text("Botao secundario", "content"), secondaryLink: text("Destino secundario", "content"),
       badge: text("Selo do plano", "content"), position: select("Enquadramento", [option("left", "Esquerda"), option("center", "Centro"), option("right", "Direita")], "style"), overlay: number("Overlay (%)", "style", { min: 0, max: 90 }),
     },
-    defaults: { name: "Novo banner", eyebrow: "Fibra optica na sua regiao", title: "Internet que acompanha a sua casa.", subtitle: "Conexao estavel e atendimento regional.", image: "./assets/img/hero-family-fiber.jpg", mobileImage: "", primaryLabel: "Conhecer planos", primaryLink: "#planos", secondaryLabel: "Consultar cobertura", secondaryLink: "#cobertura", badge: "Mais contratado", position: "center", overlay: 64 },
+    defaults: { name: "Novo banner", eyebrow: "Fibra optica na sua regiao", title: "Internet que acompanha a sua casa.", subtitle: "Conexao estavel e atendimento regional.", image: "./assets/img/hero-family-fiber.jpg", mobileImage: "", alt: "Familia conectada a internet fibra optica", primaryLabel: "Conhecer planos", primaryLink: "#planos", secondaryLabel: "Consultar cobertura", secondaryLink: "#cobertura", badge: "Mais contratado", position: "center", overlay: 64 },
     render: function (context) {
       const plans = (context.data.plans || []).filter(function (plan) { return plan.active !== false; });
       const featured = plans.find(function (plan) { return plan.featured; }) || plans[0];
       const speed = featured ? String(featured.speed || "").split(/\s+/) : [];
-      const picture = context.props.mobileImage ? '<picture><source media="(max-width:767px)" srcset="' + esc(TB.safeMediaUrl(context.props.mobileImage, "")) + '"><img class="hero-slide__image hero-slide__image--' + esc(context.props.position) + '" src="' + esc(TB.safeMediaUrl(context.props.image, "./assets/img/hero-family-fiber.jpg")) + '" alt=""></picture>' : '<img class="hero-slide__image hero-slide__image--' + esc(context.props.position) + '" src="' + esc(TB.safeMediaUrl(context.props.image, "./assets/img/hero-family-fiber.jpg")) + '" alt="">';
-      const root = htmlElement("article", "hero-slide", picture + '<div class="hero-slide__shade"></div><div class="shell hero-slide__content"><div class="hero-copy"><span class="hero-eyebrow">' + icon("radio") + esc(context.props.eyebrow) + '</span><h1>' + esc(context.props.title) + '</h1><p>' + esc(context.props.subtitle) + '</p><div class="hero-actions"><a class="button button--primary button--large" href="' + esc(safeLink(context.props.primaryLink, context)) + '">' + esc(context.props.primaryLabel) + icon("arrow-right") + '</a><a class="button button--glass button--large" href="' + esc(safeLink(context.props.secondaryLink, context)) + '">' + esc(context.props.secondaryLabel) + '</a></div><div class="hero-proof"><span>' + icon("circle-check") + '100% fibra optica</span><span>' + icon("circle-check") + 'Suporte regional</span></div></div>' + (featured ? '<aside class="hero-plan-chip"><span>' + esc(context.props.badge) + '</span><strong>' + esc(speed[0]) + ' <small>' + esc(speed.slice(1).join(" ")) + '</small></strong><p>a partir de <b>' + esc(formatCurrency(featured.price)) + '/' + esc(featured.period || "mes") + '</b></p></aside>' : "") + '</div>');
+      const alt = esc(context.props.alt || context.props.title || "Destaque da empresa");
+      const picture = context.props.mobileImage ? '<picture><source media="(max-width:767px)" srcset="' + esc(TB.safeMediaUrl(context.props.mobileImage, "")) + '"><img class="hero-slide__image hero-slide__image--' + esc(context.props.position) + '" src="' + esc(TB.safeMediaUrl(context.props.image, "./assets/img/hero-family-fiber.jpg")) + '" alt="' + alt + '"></picture>' : '<img class="hero-slide__image hero-slide__image--' + esc(context.props.position) + '" src="' + esc(TB.safeMediaUrl(context.props.image, "./assets/img/hero-family-fiber.jpg")) + '" alt="' + alt + '">';
+      const primaryButton = context.props.primaryLabel ? '<a class="button button--primary button--large" href="' + esc(safeLink(context.props.primaryLink, context)) + '">' + esc(context.props.primaryLabel) + icon("arrow-right") + '</a>' : "";
+      const secondaryButton = context.props.secondaryLabel ? '<a class="button button--glass button--large" href="' + esc(safeLink(context.props.secondaryLink, context)) + '">' + esc(context.props.secondaryLabel) + '</a>' : "";
+      const actions = primaryButton || secondaryButton ? '<div class="hero-actions">' + primaryButton + secondaryButton + '</div>' : "";
+      const root = htmlElement("article", "hero-slide", picture + '<div class="hero-slide__shade"></div><div class="shell hero-slide__content"><div class="hero-copy"><span class="hero-eyebrow">' + icon("radio") + esc(context.props.eyebrow) + '</span><h1>' + esc(context.props.title) + '</h1><p>' + esc(context.props.subtitle) + '</p>' + actions + '<div class="hero-proof"><span>' + icon("circle-check") + '100% fibra optica</span><span>' + icon("circle-check") + 'Suporte regional</span></div></div>' + (featured ? '<aside class="hero-plan-chip"><span>' + esc(context.props.badge) + '</span><strong>' + esc(speed[0]) + ' <small>' + esc(speed.slice(1).join(" ")) + '</small></strong><p>a partir de <b>' + esc(formatCurrency(featured.price)) + '/' + esc(featured.period || "mes") + '</b></p></aside>' : "") + '</div>');
       root.style.setProperty("--hero-overlay", String(Math.min(.9, Math.max(0, Number(context.props.overlay || 0) / 100))));
       return { element: root, slots: {} };
     },
@@ -281,10 +293,10 @@
     documentValue.theme.darkTokens = { ...(documentValue.theme.darkTokens || {}), primary: state.theme.primary, secondary: state.theme.accent, background: "#07111e", surface: "#0d1a2a", text: "#edf6ff", muted: "#96a9bd", fontHeading: state.theme.font + ", Arial, sans-serif", fontBody: state.theme.font + ", Arial, sans-serif", radiusMd: state.theme.radius + "px" };
 
     append(documentValue, "template.header", { id: "canonical_header", name: "Cabecalho", props: { anchor: "topo", serviceText: "Internet fibra optica em Sumare e regiao", ctaLabel: "Falar com a gente", showServiceStrip: true, sticky: true, logoVariant: "auto" } });
-    const hero = append(documentValue, "template.hero", { id: "canonical_hero", name: "Hero principal", props: { autoplay: state.slider.autoplay, interval: state.slider.interval, showArrows: state.slider.showArrows, showDots: state.slider.showDots } });
+    const hero = append(documentValue, "template.hero", { id: "canonical_hero", name: "Hero principal", props: { mode: "slider", bannerId: "canonical_slide_1", autoplay: state.slider.autoplay, interval: state.slider.interval, pauseOnHover: state.slider.pauseOnHover !== false, showArrows: state.slider.showArrows, showDots: state.slider.showDots } });
     const banners = (state.banners || []).filter(function (banner) { return banner.active !== false; });
     (banners.length ? banners : [{ name: "Banner principal", eyebrow: "Fibra optica na sua regiao", title: "Internet que acompanha a sua casa.", subtitle: "Conexao estavel e atendimento regional.", image: "./assets/img/hero-family-fiber.jpg", primaryLabel: "Conhecer planos", primaryLink: "#planos", secondaryLabel: "Consultar cobertura", secondaryLink: "#cobertura", badge: "Mais contratado", position: "center", overlay: 64 }]).forEach(function (banner, index) {
-      const slide = TB.createNode("template.hero-slide", { id: "canonical_slide_" + (index + 1), name: banner.name || "Banner " + (index + 1), props: { name: banner.name, eyebrow: banner.eyebrow, title: banner.title, subtitle: banner.subtitle, image: banner.image, mobileImage: banner.mobileImage || "", primaryLabel: banner.primaryLabel, primaryLink: banner.primaryLink, secondaryLabel: banner.secondaryLabel, secondaryLink: banner.secondaryLink, badge: banner.badge, position: banner.position, overlay: banner.overlay } });
+      const slide = TB.createNode("template.hero-slide", { id: "canonical_slide_" + (index + 1), name: banner.name || "Banner " + (index + 1), props: { name: banner.name, eyebrow: banner.eyebrow, title: banner.title, subtitle: banner.subtitle, image: banner.image, mobileImage: banner.mobileImage || "", alt: banner.alt || banner.title, primaryLabel: banner.primaryLabel, primaryLink: banner.primaryLink, secondaryLabel: banner.secondaryLabel, secondaryLink: banner.secondaryLink, badge: banner.badge, position: banner.position, overlay: banner.overlay } });
       documentValue.nodes[slide.id] = slide;
       hero.slots.slides.push(slide.id);
     });

@@ -265,7 +265,16 @@
   }
 
   function propsByGroups(definition, node, groups) {
-    const entries = Object.entries(definition.propsSchema || {}).filter(function (entry) { return groups.includes(entry[1].group || "content"); });
+    const entries = Object.entries(definition.propsSchema || {}).filter(function (entry) {
+      const schema = entry[1];
+      const condition = schema.visibleWhen;
+      if (condition && node.props) {
+        const actual = node.props[condition.prop];
+        if (condition.equals !== undefined && actual !== condition.equals) return false;
+        if (condition.notEquals !== undefined && actual === condition.notEquals) return false;
+      }
+      return groups.includes(schema.group || "content");
+    });
     if (!entries.length) return '<div class="vb-empty-inspector">Este componente nao possui propriedades nesta categoria.</div>';
     return entries.map(function (entry) { return propFieldMarkup(entry[0], entry[1], node); }).join("");
   }
@@ -274,12 +283,62 @@
     const manager = definition.editor && definition.editor.slotManager;
     if (!manager || !node.slots || !node.slots[manager.slot]) return "";
     const ids = node.slots[manager.slot];
+    if (manager.variant === "hero" || manager.variant === "slider") return slideDeckMarkup(node, manager, ids);
     return '<section class="vb-inspector-section vb-slot-manager"><header><div><h3>' + esc(manager.label || "Itens") + '</h3><small>' + ids.length + ' cadastrado(s)</small></div><button type="button" data-vb-slot-add="' + esc(manager.addType) + '" data-slot="' + esc(manager.slot) + '" title="Adicionar ' + esc(manager.singular || "item") + '">' + icon("plus") + '</button></header><div>' + ids.map(function (id, index) {
       const item = runtime.document.nodes[id];
       if (!item) return "";
       const image = manager.imageProp && item.props && TB.safeMediaUrl(item.props[manager.imageProp], "");
       return '<article><button type="button" class="vb-slot-item-main" data-vb-select="' + esc(item.id) + '">' + (image ? '<img src="' + esc(image) + '" alt="">' : '<span>' + icon(definitionFor(item) && definitionFor(item).icon || "box") + '</span>') + '<div><strong>' + esc(item.name || (manager.singular || "Item") + " " + (index + 1)) + '</strong><small>' + esc(manager.singular || "Item") + ' ' + (index + 1) + '</small></div></button><div class="vb-slot-item-actions"><button type="button" data-vb-slot-move="up" data-id="' + esc(item.id) + '"' + (index === 0 ? " disabled" : "") + ' title="Mover para cima">' + icon("chevron-up") + '</button><button type="button" data-vb-slot-move="down" data-id="' + esc(item.id) + '"' + (index === ids.length - 1 ? " disabled" : "") + ' title="Mover para baixo">' + icon("chevron-down") + '</button><button type="button" data-vb-slot-duplicate="' + esc(item.id) + '" title="Duplicar">' + icon("copy-plus") + '</button><button type="button" data-vb-slot-delete="' + esc(item.id) + '"' + (ids.length <= 1 ? " disabled" : "") + ' title="Excluir">' + icon("trash-2") + '</button></div></article>';
     }).join("") + '</div></section>';
+  }
+
+  function firstDescendant(node, types) {
+    return TB.subtreeIds(runtime.document, node.id).slice(1).map(function (id) { return runtime.document.nodes[id]; }).find(function (entry) { return entry && types.includes(entry.type); });
+  }
+
+  function slideDeckMarkup(node, manager, ids) {
+    const heroMode = node.type === "template.hero" ? (node.props.mode === "banner" ? "banner" : "slider") : "slider";
+    const bannerId = ids.includes(node.props.bannerId) ? node.props.bannerId : ids[0];
+    const mode = node.type === "template.hero" ? '<div class="vb-hero-mode" role="group" aria-label="Tipo do destaque"><button type="button" class="' + (heroMode === "banner" ? "is-active" : "") + '" data-vb-hero-mode="banner">' + icon("image") + '<span><strong>Banner estatico</strong><small>Uma imagem em destaque</small></span></button><button type="button" class="' + (heroMode === "slider" ? "is-active" : "") + '" data-vb-hero-mode="slider">' + icon("gallery-horizontal") + '<span><strong>Slider</strong><small>Varios destaques</small></span></button></div>' : "";
+    const cards = ids.map(function (id, index) {
+      const item = runtime.document.nodes[id];
+      if (!item) return "";
+      const heading = item.props && item.props.title || (firstDescendant(item, ["content.heading"]) || { props: {} }).props.text || item.name || (manager.singular || "Slide") + " " + (index + 1);
+      const description = item.props && (item.props.subtitle || item.props.eyebrow) || (firstDescendant(item, ["content.text"]) || { props: {} }).props.text || "Conteudo visual";
+      const imageUrl = manager.imageProp && item.props && TB.safeMediaUrl(item.props[manager.imageProp], "");
+      const featured = node.type === "template.hero" && heroMode === "banner" && item.id === bannerId;
+      return '<article class="vb-slide-deck__card' + (featured ? " is-featured" : "") + '"><button type="button" class="vb-slide-deck__main" data-vb-select="' + esc(item.id) + '"><span class="vb-slide-deck__media">' + (imageUrl ? '<img src="' + esc(imageUrl) + '" alt="">' : icon("image")) + '<em>' + (index + 1) + '</em></span><span class="vb-slide-deck__copy"><small>' + esc(manager.singular || "Slide") + ' ' + (index + 1) + (featured ? " - Exibido" : "") + '</small><strong>' + esc(heading) + '</strong><span>' + esc(description) + '</span></span><i title="Editar">' + icon("pencil") + '</i></button><div class="vb-slide-deck__actions">' + (node.type === "template.hero" && heroMode === "banner" ? '<button type="button" class="' + (featured ? "is-active" : "") + '" data-vb-set-hero-banner="' + esc(item.id) + '" title="Exibir como banner">' + icon(featured ? "circle-check" : "pin") + '</button>' : "") + '<button type="button" data-vb-slot-move="up" data-id="' + esc(item.id) + '"' + (index === 0 ? " disabled" : "") + ' title="Mover para cima">' + icon("chevron-up") + '</button><button type="button" data-vb-slot-move="down" data-id="' + esc(item.id) + '"' + (index === ids.length - 1 ? " disabled" : "") + ' title="Mover para baixo">' + icon("chevron-down") + '</button><button type="button" data-vb-slot-duplicate="' + esc(item.id) + '" title="Duplicar">' + icon("copy-plus") + '</button><button type="button" data-vb-slot-delete="' + esc(item.id) + '"' + (ids.length <= 1 ? " disabled" : "") + ' title="Excluir">' + icon("trash-2") + '</button></div></article>';
+    }).join("");
+    return '<section class="vb-inspector-section vb-slot-manager vb-slide-deck"><header><div><h3>' + esc(manager.label || "Slides") + '</h3><small>' + ids.length + ' ' + (ids.length === 1 ? "item" : "itens") + '</small></div><button type="button" data-vb-slot-add="' + esc(manager.addType) + '" data-slot="' + esc(manager.slot) + '" title="Adicionar ' + esc(manager.singular || "slide") + '">' + icon("plus") + '</button></header>' + mode + '<div class="vb-slide-deck__list">' + cards + '</div></section>';
+  }
+
+  function ancestorNode(nodeId, types) {
+    let parent = TB.parentOf(runtime.document, nodeId);
+    while (parent) {
+      const node = runtime.document.nodes[parent.parentId];
+      if (!node) return null;
+      if (types.includes(node.type)) return node;
+      parent = TB.parentOf(runtime.document, node.id);
+    }
+    return null;
+  }
+
+  function editorContextMarkup(node) {
+    const slideTypes = ["template.hero-slide", "marketing.slide"];
+    const deckTypes = ["template.hero", "marketing.slider"];
+    const slide = slideTypes.includes(node.type) ? node : ancestorNode(node.id, slideTypes);
+    const deck = deckTypes.includes(node.type) ? node : ancestorNode(node.id, deckTypes);
+    if (!slide && !deck) return "";
+    const buttons = (deck && deck.id !== node.id ? '<button type="button" data-vb-select="' + esc(deck.id) + '">' + icon("gallery-horizontal") + '<span><small>Voltar para</small><strong>' + esc(deck.name || "Slider") + '</strong></span></button>' : "") + (slide && slide.id !== node.id ? '<button type="button" data-vb-select="' + esc(slide.id) + '">' + icon("panel-top") + '<span><small>Editar</small><strong>' + esc(slide.name || "Slide") + '</strong></span></button>' : "");
+    return buttons ? '<nav class="vb-editor-context" aria-label="Contexto do destaque">' + buttons + '</nav>' : "";
+  }
+
+  function editableDescendantsMarkup(node) {
+    if (!["marketing.banner", "marketing.slide"].includes(node.type)) return "";
+    const allowed = ["content.heading", "content.text", "content.rich-text", "content.button", "content.link"];
+    const children = TB.subtreeIds(runtime.document, node.id).slice(1).map(function (id) { return runtime.document.nodes[id]; }).filter(function (entry) { return entry && allowed.includes(entry.type); });
+    if (!children.length) return "";
+    return '<section class="vb-inspector-section vb-slide-content"><h3>Textos e botoes</h3><div>' + children.map(function (entry) { const definition = definitionFor(entry); const value = entry.props && (entry.props.text || entry.props.html) || entry.name || definition.label; return '<button type="button" data-vb-select="' + esc(entry.id) + '"><span>' + icon(definition.icon) + '</span><span><strong>' + esc(entry.name || definition.label) + '</strong><small>' + esc(TB.plainText(value, 90)) + '</small></span>' + icon("chevron-right") + '</button>'; }).join("") + '</div></section>';
   }
 
   function styleControlMarkup(key, node) {
@@ -349,10 +408,12 @@
     return '<div class="vb-breakpoint-bar"><span>Editando em</span><div>' + Object.keys(DEVICES).map(function (device) { return '<button type="button" class="' + (runtime.device === device ? "is-active" : "") + '" data-vb-device="' + device + '">' + icon(DEVICES[device].icon) + '</button>'; }).join("") + '</div><small>' + ({ desktop: "> 1024 px", tablet: "768 - 1024 px", mobile: "ate 767 px" }[runtime.device]) + '</small></div><div class="vb-state-bar"><span>Estado</span><select data-vb-state><option value="normal"' + (runtime.visualState === "normal" ? " selected" : "") + '>Normal</option><option value="hover"' + (runtime.visualState === "hover" ? " selected" : "") + '>Hover</option><option value="focus"' + (runtime.visualState === "focus" ? " selected" : "") + '>Focus</option><option value="active"' + (runtime.visualState === "active" ? " selected" : "") + '>Active</option><option value="disabled"' + (runtime.visualState === "disabled" ? " selected" : "") + '>Disabled</option></select></div>';
   }
 
-  function responsiveMarkup(node) {
+  function responsiveMarkup(node, definition) {
     const breakpoint = currentBreakpoint();
     const visible = !node.visibility || node.visibility[breakpoint] !== false;
-    return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Visibilidade</h3><label class="vb-switch"><span><strong>Mostrar neste dispositivo</strong><small>Oculta somente no breakpoint atual.</small></span><input type="checkbox" data-vb-visibility' + (visible ? " checked" : "") + '><i></i></label></section><section class="vb-inspector-section"><h3>Dimensoes especificas</h3>' + ["width", "minWidth", "maxWidth", "height", "minHeight", "maxHeight", "fontSize", "gap"].map(function (key) { return styleControlMarkup(key, node); }).join("") + '</section>';
+    const responsiveProps = Object.entries(definition.propsSchema || {}).filter(function (entry) { return entry[1].group === "responsive"; });
+    const content = responsiveProps.length ? '<section class="vb-inspector-section"><h3>Conteudo por dispositivo</h3><p class="vb-section-help">Use uma versao propria para celular quando o enquadramento desktop nao funcionar bem.</p>' + responsiveProps.map(function (entry) { return propFieldMarkup(entry[0], entry[1], node); }).join("") + '</section>' : "";
+    return breakpointBarMarkup() + editorContextMarkup(node) + content + '<section class="vb-inspector-section"><h3>Visibilidade</h3><label class="vb-switch"><span><strong>Mostrar neste dispositivo</strong><small>Oculta somente no breakpoint atual.</small></span><input type="checkbox" data-vb-visibility' + (visible ? " checked" : "") + '><i></i></label></section><section class="vb-inspector-section"><h3>Dimensoes especificas</h3>' + ["width", "minWidth", "maxWidth", "height", "minHeight", "maxHeight", "fontSize", "gap"].map(function (key) { return styleControlMarkup(key, node); }).join("") + '</section>';
   }
 
   function advancedMarkup(node, definition) {
@@ -378,11 +439,11 @@
 
   function inspectorBodyMarkup(node, definition) {
     if (node.id === runtime.document.rootId && runtime.inspectorTab === "advanced") return pageSettingsMarkup(node);
-    if (runtime.inspectorTab === "content") return slotManagerMarkup(definition, node) + '<section class="vb-inspector-section"><h3>Conteudo</h3>' + propsByGroups(definition, node, ["content", "data", "behavior"]) + '</section>';
+    if (runtime.inspectorTab === "content") return editorContextMarkup(node) + slotManagerMarkup(definition, node) + editableDescendantsMarkup(node) + '<section class="vb-inspector-section"><h3>Conteudo</h3>' + propsByGroups(definition, node, ["content", "data", "behavior"]) + '</section>';
     if (runtime.inspectorTab === "layout") return breakpointBarMarkup() + quickLayoutMarkup(node) + '<section class="vb-inspector-section"><h3>Propriedades</h3>' + propsByGroups(definition, node, ["layout"]) + '</section><section class="vb-inspector-section"><h3>Layout e espacamento</h3>' + styleGroupMarkup("layout", node) + '</section>';
     if (runtime.inspectorTab === "style") return breakpointBarMarkup() + imageFocalMarkup(node) + '<section class="vb-inspector-section"><h3>Fundo e bordas</h3>' + propsByGroups(definition, node, ["style"]) + styleGroupMarkup("style", node) + '</section>';
     if (runtime.inspectorTab === "typography") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Tipografia</h3>' + styleGroupMarkup("typography", node) + '</section>';
-    if (runtime.inspectorTab === "responsive") return responsiveMarkup(node);
+    if (runtime.inspectorTab === "responsive") return responsiveMarkup(node, definition);
     if (runtime.inspectorTab === "effects") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Efeitos e posicionamento</h3>' + propsByGroups(definition, node, ["effects"]) + styleGroupMarkup("effects", node) + '</section>';
     return advancedMarkup(node, definition);
   }
@@ -881,6 +942,23 @@
       setNodeValues({ "props.focalX": point[0], "props.focalY": point[1] }, "Ajustar ponto focal");
       return;
     }
+    const heroMode = event.target.closest("[data-vb-hero-mode]");
+    if (heroMode) {
+      const node = selectedNode();
+      if (!node || node.type !== "template.hero") return;
+      const mode = heroMode.dataset.vbHeroMode === "banner" ? "banner" : "slider";
+      const entries = { "props.mode": mode };
+      const slides = node.slots && node.slots.slides || [];
+      if (mode === "banner" && !slides.includes(node.props.bannerId)) entries["props.bannerId"] = slides[0] || "";
+      setNodeValues(entries, mode === "banner" ? "Usar banner estatico" : "Usar slider");
+      return;
+    }
+    const heroBanner = event.target.closest("[data-vb-set-hero-banner]");
+    if (heroBanner) {
+      const node = selectedNode();
+      if (node && node.type === "template.hero" && (node.slots.slides || []).includes(heroBanner.dataset.vbSetHeroBanner)) setNodeValue("props.bannerId", heroBanner.dataset.vbSetHeroBanner, "Escolher banner estatico");
+      return;
+    }
     const quick = event.target.closest("[data-vb-quick-add]");
     if (quick) { const node = selectedNode(); const slot = quick.dataset.slot; insertComponent(quick.dataset.vbQuickAdd, { parentId: node.id, slot: slot, index: (node.slots[slot] || []).length }); return; }
     const slotAdd = event.target.closest("[data-vb-slot-add]");
@@ -898,7 +976,21 @@
     const slotDuplicate = event.target.closest("[data-vb-slot-duplicate]");
     if (slotDuplicate) { execute({ type: "duplicate", payload: { nodeId: slotDuplicate.dataset.vbSlotDuplicate }, label: "Duplicar item" }, { select: true }); return; }
     const slotDelete = event.target.closest("[data-vb-slot-delete]");
-    if (slotDelete) { const item = runtime.document.nodes[slotDelete.dataset.vbSlotDelete]; if (item && window.confirm("Excluir " + item.name + "?")) execute({ type: "delete", payload: { nodeId: item.id }, label: "Excluir item" }); return; }
+    if (slotDelete) {
+      const item = runtime.document.nodes[slotDelete.dataset.vbSlotDelete];
+      if (item && window.confirm("Excluir " + item.name + "?")) {
+        const location = TB.parentOf(runtime.document, item.id);
+        const parent = location && runtime.document.nodes[location.parentId];
+        if (parent && parent.type === "template.hero" && parent.props.bannerId === item.id) {
+          const nextBanner = (parent.slots[location.slot] || []).find(function (id) { return id !== item.id; }) || "";
+          execute({ type: "batch", payload: { commands: [
+            { type: "set", payload: { path: "nodes." + parent.id + ".props.bannerId", value: nextBanner } },
+            { type: "delete", payload: { nodeId: item.id } },
+          ], selectionId: parent.id }, label: "Excluir banner" }, { select: parent.id });
+        } else execute({ type: "delete", payload: { nodeId: item.id }, label: "Excluir item" });
+      }
+      return;
+    }
     const insertSaved = event.target.closest("[data-vb-insert-fragment]");
     if (insertSaved) { insertFragment(insertSaved.dataset.vbInsertFragment); return; }
     const deleteSaved = event.target.closest("[data-vb-delete-fragment]");

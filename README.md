@@ -26,6 +26,7 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`. O editor visual pos
 - Preview e Home publicada renderizados pelo mesmo documento visual, sem uma segunda pagina divergente.
 - Template Home canonico com o mesmo markup, CSS, secoes, responsividade e fluxos do `index.html`, protegido por comparacao visual desktop/mobile.
 - Banners, sliders, slides e formularios criados e editados integralmente dentro do Theme Builder.
+- Hero configuravel como banner estatico ou slider, com miniaturas, escolha do destaque, imagens desktop/mobile, textos, botoes, ordenacao e reproducao editados no mesmo fluxo visual.
 - Workspaces de paginas com Home, paginas internas, header e footer no mesmo modelo versionado.
 - Estilos por breakpoint e estado, tokens globais, biblioteca de midia, secoes salvas, undo/redo e autosave.
 - Controles visuais para alinhamento de texto, distribuicao de containers, centralizacao, largura, recorte e ponto focal de imagens.
