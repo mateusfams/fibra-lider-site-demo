@@ -56,6 +56,10 @@
       defaults: { props: config.defaults || {}, styles: {} },
       allowedParents: config.allowedParents,
       editor: config.editor,
+      requiredModule: config.requiredModule || ({
+        "template.plans": "plans", "template.apps": "apps", "template.coverage": "coverage",
+        "template.testimonials": "testimonials", "template.faq": "faq", "template.support": "support",
+      })[config.type],
       compose: config.compose,
       render: function (context) {
         const output = config.render(context);
@@ -171,7 +175,7 @@
       const categories = (context.data.categories || []).filter(function (item) { return item.active !== false; });
       const plans = (context.data.plans || []).filter(function (item) { return item.active !== false; });
       const filters = categories.map(function (category) { const count = plans.filter(function (plan) { return plan.categoryId === category.id; }).length; return '<button class="filter-tab' + (category.id === context.props.initialCategory ? " is-active" : "") + '" type="button" role="tab" data-canonical-category="' + esc(category.id) + '">' + esc(category.name) + '<span>' + count + '</span></button>'; }).join("");
-      const coupon = context.props.showCoupon === false ? "" : '<div class="coupon-activation" data-canonical-coupon><div class="coupon-activation__intro"><span>' + icon("ticket-percent") + '</span><div><strong>Tem um cupom?</strong><small>Ative o codigo para conferir os planos participantes.</small></div></div><form><label class="sr-only">Codigo do cupom</label><input name="coupon" autocomplete="off" maxlength="24" placeholder="Digite o codigo"><button class="button button--dark" type="submit">Aplicar</button></form><div class="coupon-activation__status" hidden><span></span><button class="icon-button" type="button" data-canonical-coupon-clear aria-label="Remover cupom">' + icon("x") + '</button></div></div>';
+      const coupon = context.props.showCoupon === false || context.data.modules && context.data.modules.promotions === false ? "" : '<div class="coupon-activation" data-canonical-coupon><div class="coupon-activation__intro"><span>' + icon("ticket-percent") + '</span><div><strong>Tem um cupom?</strong><small>Ative o codigo para conferir os planos participantes.</small></div></div><form><label class="sr-only">Codigo do cupom</label><input name="coupon" autocomplete="off" maxlength="24" placeholder="Digite o codigo"><button class="button button--dark" type="submit">Aplicar</button></form><div class="coupon-activation__status" hidden><span></span><button class="icon-button" type="button" data-canonical-coupon-clear aria-label="Remover cupom">' + icon("x") + '</button></div></div>';
       const root = htmlElement("section", "section plans-section page-section", '<div class="shell"><div class="section-heading section-heading--split"><div><span class="eyebrow">' + esc(context.props.eyebrow) + '</span><h2>' + esc(context.props.title) + '</h2></div><p>' + esc(context.props.description) + '</p></div><div class="filter-tabs" role="tablist" aria-label="Tipos de plano">' + filters + '</div>' + coupon + '<div class="plans-grid">' + plans.map(planCard).join("") + '</div><div class="plans-footer"><p>Todos os planos estao sujeitos a consulta de viabilidade e condicoes comerciais.</p><button class="text-button" data-canonical-show-all type="button">Ver todos os planos ' + icon("arrow-right") + '</button></div></div>');
       root.dataset.initialCategory = context.props.initialCategory || (categories[0] && categories[0].id) || "all";
       root.dataset.visibleLimit = String(Math.max(1, Number(context.props.visibleLimit || 3)));

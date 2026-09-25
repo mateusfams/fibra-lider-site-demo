@@ -144,7 +144,7 @@
   }
 
   function libraryMarkup() {
-    const definitions = TB.registry.list({ search: runtime.librarySearch });
+    const definitions = TB.registry.list({ search: runtime.librarySearch }).filter(function (definition) { return !(definition.requiredModule && runtime.state.modules && runtime.state.modules[definition.requiredModule] === false); });
     const categories = Array.from(new Set(definitions.map(function (definition) { return definition.category; })));
     const selected = selectedNode();
     const quickTypes = ["layout.section", "layout.row", "marketing.banner", "marketing.slider", "commerce.plan-grid", "domain.coverage"];
@@ -361,8 +361,28 @@
     return '<label class="vb-field"><span>' + esc(STYLE_LABELS[key] || key) + '</span><input value="' + esc(value) + '"' + attr + ' placeholder="Automatico"></label>';
   }
 
-  function styleGroupMarkup(group, node) {
-    const fields = (STYLE_GROUPS[group] || []).slice();
+  function dimensionValue(node, control) {
+    const units = control.units || {};
+    const source = String(effectiveStyle(node, control.key) || "");
+    const match = source.match(/^(-?\d+(?:\.\d+)?)(px|vh|vw|%|rem|em)$/);
+    const unit = match && units[match[2]] ? match[2] : Object.keys(units)[0] || "px";
+    const settings = units[unit] || { min: 0, max: 100, step: 1, value: 0 };
+    const parsed = match && match[2] === unit ? Number(match[1]) : Number(settings.value);
+    return { unit: unit, value: Math.min(Number(settings.max), Math.max(Number(settings.min), Number.isFinite(parsed) ? parsed : Number(settings.value))), settings: settings };
+  }
+
+  function visualDimensionsMarkup(definition, node) {
+    const controls = definition && definition.editor && definition.editor.dimensionControls || [];
+    if (!controls.length) return "";
+    return '<section class="vb-inspector-section vb-dimension-panel"><header><div><h3>Tamanho visual</h3><small>Ajuste arrastando. O valor vale para ' + esc(DEVICES[runtime.device].label.toLowerCase()) + '.</small></div>' + icon("move-vertical") + '</header>' + controls.map(function (control) {
+      const current = dimensionValue(node, control);
+      return '<div class="vb-dimension-control"><div class="vb-dimension-control__head"><span>' + esc(control.label || STYLE_LABELS[control.key] || control.key) + '</span><output data-vb-dimension-output="' + esc(control.key) + '">' + esc(current.value + current.unit) + '</output></div><input type="range" min="' + esc(current.settings.min) + '" max="' + esc(current.settings.max) + '" step="' + esc(current.settings.step || 1) + '" value="' + esc(current.value) + '" data-vb-dimension="' + esc(control.key) + '" data-unit="' + esc(current.unit) + '" aria-label="' + esc(control.label || control.key) + '"><div class="vb-dimension-units" role="group" aria-label="Unidade">' + Object.keys(control.units || {}).map(function (unit) { return '<button type="button" class="' + (current.unit === unit ? "is-active" : "") + '" data-vb-dimension-unit="' + esc(unit) + '" data-key="' + esc(control.key) + '">' + esc(unit) + '</button>'; }).join("") + '</div></div>';
+    }).join("") + '</section>';
+  }
+
+  function styleGroupMarkup(group, node, definition) {
+    const visualKeys = (definition && definition.editor && definition.editor.dimensionControls || []).map(function (control) { return control.key; });
+    const fields = (STYLE_GROUPS[group] || []).filter(function (key) { return !visualKeys.includes(key); });
     if (group === "layout" && node.type === "content.image") fields.splice(fields.indexOf("maxHeight") + 1, 0, "objectFit");
     const compactGroups = group === "layout" ? [
       ["Margem", ["marginTop", "marginRight", "marginBottom", "marginLeft"]],
@@ -413,7 +433,8 @@
     const visible = !node.visibility || node.visibility[breakpoint] !== false;
     const responsiveProps = Object.entries(definition.propsSchema || {}).filter(function (entry) { return entry[1].group === "responsive"; });
     const content = responsiveProps.length ? '<section class="vb-inspector-section"><h3>Conteudo por dispositivo</h3><p class="vb-section-help">Use uma versao propria para celular quando o enquadramento desktop nao funcionar bem.</p>' + responsiveProps.map(function (entry) { return propFieldMarkup(entry[0], entry[1], node); }).join("") + '</section>' : "";
-    return breakpointBarMarkup() + editorContextMarkup(node) + content + '<section class="vb-inspector-section"><h3>Visibilidade</h3><label class="vb-switch"><span><strong>Mostrar neste dispositivo</strong><small>Oculta somente no breakpoint atual.</small></span><input type="checkbox" data-vb-visibility' + (visible ? " checked" : "") + '><i></i></label></section><section class="vb-inspector-section"><h3>Dimensoes especificas</h3>' + ["width", "minWidth", "maxWidth", "height", "minHeight", "maxHeight", "fontSize", "gap"].map(function (key) { return styleControlMarkup(key, node); }).join("") + '</section>';
+    const visualKeys = (definition.editor && definition.editor.dimensionControls || []).map(function (control) { return control.key; });
+    return breakpointBarMarkup() + editorContextMarkup(node) + content + visualDimensionsMarkup(definition, node) + '<section class="vb-inspector-section"><h3>Visibilidade</h3><label class="vb-switch"><span><strong>Mostrar neste dispositivo</strong><small>Oculta somente no breakpoint atual.</small></span><input type="checkbox" data-vb-visibility' + (visible ? " checked" : "") + '><i></i></label></section><section class="vb-inspector-section"><h3>Dimensoes especificas</h3>' + ["width", "minWidth", "maxWidth", "height", "minHeight", "maxHeight", "fontSize", "gap"].filter(function (key) { return !visualKeys.includes(key); }).map(function (key) { return styleControlMarkup(key, node); }).join("") + '</section>';
   }
 
   function advancedMarkup(node, definition) {
@@ -440,11 +461,11 @@
   function inspectorBodyMarkup(node, definition) {
     if (node.id === runtime.document.rootId && runtime.inspectorTab === "advanced") return pageSettingsMarkup(node);
     if (runtime.inspectorTab === "content") return editorContextMarkup(node) + slotManagerMarkup(definition, node) + editableDescendantsMarkup(node) + '<section class="vb-inspector-section"><h3>Conteudo</h3>' + propsByGroups(definition, node, ["content", "data", "behavior"]) + '</section>';
-    if (runtime.inspectorTab === "layout") return breakpointBarMarkup() + quickLayoutMarkup(node) + '<section class="vb-inspector-section"><h3>Propriedades</h3>' + propsByGroups(definition, node, ["layout"]) + '</section><section class="vb-inspector-section"><h3>Layout e espacamento</h3>' + styleGroupMarkup("layout", node) + '</section>';
-    if (runtime.inspectorTab === "style") return breakpointBarMarkup() + imageFocalMarkup(node) + '<section class="vb-inspector-section"><h3>Fundo e bordas</h3>' + propsByGroups(definition, node, ["style"]) + styleGroupMarkup("style", node) + '</section>';
-    if (runtime.inspectorTab === "typography") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Tipografia</h3>' + styleGroupMarkup("typography", node) + '</section>';
+    if (runtime.inspectorTab === "layout") return breakpointBarMarkup() + quickLayoutMarkup(node) + visualDimensionsMarkup(definition, node) + '<section class="vb-inspector-section"><h3>Propriedades</h3>' + propsByGroups(definition, node, ["layout"]) + '</section><section class="vb-inspector-section"><h3>Layout e espacamento</h3>' + styleGroupMarkup("layout", node, definition) + '</section>';
+    if (runtime.inspectorTab === "style") return breakpointBarMarkup() + imageFocalMarkup(node) + '<section class="vb-inspector-section"><h3>Fundo e bordas</h3>' + propsByGroups(definition, node, ["style"]) + styleGroupMarkup("style", node, definition) + '</section>';
+    if (runtime.inspectorTab === "typography") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Tipografia</h3>' + styleGroupMarkup("typography", node, definition) + '</section>';
     if (runtime.inspectorTab === "responsive") return responsiveMarkup(node, definition);
-    if (runtime.inspectorTab === "effects") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Efeitos e posicionamento</h3>' + propsByGroups(definition, node, ["effects"]) + styleGroupMarkup("effects", node) + '</section>';
+    if (runtime.inspectorTab === "effects") return breakpointBarMarkup() + '<section class="vb-inspector-section"><h3>Efeitos e posicionamento</h3>' + propsByGroups(definition, node, ["effects"]) + styleGroupMarkup("effects", node, definition) + '</section>';
     return advancedMarkup(node, definition);
   }
 
@@ -672,7 +693,20 @@
     if (!target) { notify("Selecione um container compativel para inserir este componente.", "error"); return; }
     const subtree = TB.createComponentSubtree(type);
     const node = subtree.nodes[subtree.rootId];
-    const result = execute({ type: "insert-subtree", payload: { subtree: subtree, parentId: target.parentId, slot: target.slot, index: target.index }, label: "Adicionar " + node.name }, { select: node.id });
+    const definition = TB.registry.get(type);
+    const parent = runtime.document.nodes[target.parentId];
+    const parentLocation = parent && TB.parentOf(runtime.document, parent.id);
+    const section = parentLocation && runtime.document.nodes[parentLocation.parentId];
+    const isEmptyStage = definition && definition.editor && definition.editor.stage && parent && parent.type === "layout.container" && target.slot === "default" && !(parent.slots.default || []).length && section && section.type === "layout.section" && TB.childIds(section).length === 1;
+    const insert = { type: "insert-subtree", payload: { subtree: subtree, parentId: target.parentId, slot: target.slot, index: target.index } };
+    const command = isEmptyStage ? { type: "batch", payload: { selectionId: node.id, commands: [
+      insert,
+      { type: "set", payload: { path: "nodes." + parent.id + ".styles.base.normal.width", value: "100%" } },
+      { type: "set", payload: { path: "nodes." + parent.id + ".styles.base.normal.maxWidth", value: "100%" } },
+      { type: "set", payload: { path: "nodes." + section.id + ".styles.base.normal.paddingTop", value: "0" } },
+      { type: "set", payload: { path: "nodes." + section.id + ".styles.base.normal.paddingBottom", value: "0" } },
+    ] }, label: "Adicionar destaque em largura total" } : { ...insert, label: "Adicionar " + node.name };
+    const result = execute(command, { select: node.id });
     if (result) {
       if (window.matchMedia("(max-width: 1020px)").matches) { runtime.mobilePanel = "canvas"; updateMobilePanelState(); }
       notify(node.name + " adicionado", "success");
@@ -923,6 +957,14 @@
     if (media) { setNodeValue("props." + media.dataset.vbMediaPick, media.dataset.url, "Selecionar imagem"); return; }
     const styleChoice = event.target.closest("[data-vb-style-choice]");
     if (styleChoice) { setCurrentStyles(alignmentStyles(styleChoice.dataset.vbStyleChoice, styleChoice.dataset.value), "Ajustar alinhamento"); return; }
+    const dimensionUnit = event.target.closest("[data-vb-dimension-unit]");
+    if (dimensionUnit) {
+      const definition = definitionFor(selectedNode());
+      const control = definition && definition.editor && (definition.editor.dimensionControls || []).find(function (entry) { return entry.key === dimensionUnit.dataset.key; });
+      const settings = control && control.units && control.units[dimensionUnit.dataset.vbDimensionUnit];
+      if (settings) setCurrentStyles({ [control.key]: String(settings.value) + dimensionUnit.dataset.vbDimensionUnit }, "Alterar unidade da dimensao");
+      return;
+    }
     const propChoice = event.target.closest("[data-vb-prop-choice]");
     if (propChoice) { setNodeValue("props." + propChoice.dataset.vbPropChoice, propChoice.dataset.value, "Ajustar enquadramento"); return; }
     const imageAlign = event.target.closest("[data-vb-image-align]");
@@ -1039,6 +1081,7 @@
     if (target.matches("[data-vb-page-select]")) { switchDocument(target.value); return; }
     if (target.matches("[data-vb-state]")) { runtime.visualState = target.value; repaintPanels({ left: false }); return; }
     if (target.matches("[data-vb-prop]")) { setNodeValue("props." + target.dataset.vbProp, parseControlValue(target), "Editar conteudo"); return; }
+    if (target.matches("[data-vb-dimension]")) { setCurrentStyles({ [target.dataset.vbDimension]: String(target.value) + target.dataset.unit }, "Redimensionar componente"); return; }
     if (target.matches("[data-vb-style]")) { const path = "styles." + currentBreakpoint() + "." + runtime.visualState + "." + target.dataset.vbStyle; setNodeValue(path, parseControlValue(target), "Editar estilo"); return; }
     if (target.matches("[data-vb-token]")) { execute({ type: "set", payload: { path: "theme.tokens." + target.dataset.vbToken, value: target.value }, label: "Editar token global" }); return; }
     if (target.matches("[data-vb-dark-token]")) { execute({ type: "set", payload: { path: "theme.darkTokens." + target.dataset.vbDarkToken, value: target.value }, label: "Editar token escuro" }); return; }
@@ -1059,6 +1102,13 @@
     if (target.matches("[data-vb-library-search]")) { runtime.librarySearch = target.value; const panel = runtime.root.querySelector(".vb-component-library"); const heading = runtime.root.querySelector(".vb-panel-heading"); const wrapper = document.createElement("div"); wrapper.innerHTML = libraryMarkup(); const next = wrapper.querySelector(".vb-component-library"); const nextHeading = wrapper.querySelector(".vb-panel-heading"); if (panel && next) panel.replaceWith(next); if (heading && nextHeading) heading.replaceWith(nextHeading); refreshIcons(); }
     if (target.matches("[data-vb-icon-search]")) { const term = target.value.trim().toLowerCase(); const picker = target.closest(".vb-icon-library"); if (picker) picker.querySelectorAll("[data-vb-icon-choice]").forEach(function (button) { button.hidden = Boolean(term) && !button.dataset.vbIconChoice.includes(term); }); }
     if (target.matches('input[type="range"][data-vb-style]')) { const output = target.closest("label").querySelector("output"); if (output) output.value = target.value; }
+    if (target.matches("[data-vb-dimension]")) {
+      const value = String(target.value) + target.dataset.unit;
+      const output = target.closest(".vb-dimension-control").querySelector("[data-vb-dimension-output]");
+      if (output) output.value = value;
+      previewMutation("nodes." + runtime.selectedId + ".styles." + currentBreakpoint() + "." + runtime.visualState + "." + target.dataset.vbDimension, value);
+      return;
+    }
     if (target.matches("[data-vb-prop]") && target.type !== "checkbox") previewMutation("nodes." + runtime.selectedId + ".props." + target.dataset.vbProp, parseControlValue(target));
     if (target.matches("[data-vb-style]") && target.type !== "checkbox") previewMutation("nodes." + runtime.selectedId + ".styles." + currentBreakpoint() + "." + runtime.visualState + "." + target.dataset.vbStyle, parseControlValue(target));
     if (target.matches("[data-vb-token]")) previewMutation("theme.tokens." + target.dataset.vbToken, target.value);

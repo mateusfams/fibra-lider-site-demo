@@ -10,7 +10,7 @@
   function option(value, label) { return { value: value, label: label }; }
   function textField(label, group, options) { return { type: "string", control: "text", label: label, group: group || "content", maxLength: 500, ...(options || {}) }; }
   function textarea(label, group, options) { return { type: "string", control: "textarea", label: label, group: group || "content", maxLength: 5000, ...(options || {}) }; }
-  function selectField(label, values, group) { return { type: "string", control: "select", label: label, group: group || "content", options: values }; }
+  function selectField(label, values, group, extra) { return { type: "string", control: "select", label: label, group: group || "content", options: values, ...(extra || {}) }; }
   function switchField(label, group) { return { type: "boolean", control: "switch", label: label, group: group || "content" }; }
   function numberField(label, group, options) { return { type: "number", control: "number", label: label, group: group || "content", ...(options || {}) }; }
   function imageField(label, group, extra) { return { type: "image", control: "asset", label: label, group: group || "content", ...(extra || {}) }; }
@@ -220,9 +220,10 @@
 
   registry.register({
     type: "marketing.banner", version: 1, label: "Banner", category: "marketing", icon: "gallery-horizontal-end",
-    propsSchema: { image: imageField("Imagem desktop", "content", { help: "Recomendado: 1920 x 900 px, WEBP ou JPG." }), mobileImage: imageField("Imagem mobile", "responsive", { help: "Recomendado: 900 x 1200 px para celulares." }), overlay: numberField("Overlay (%)", "style", { min: 0, max: 90 }), minHeight: textField("Altura minima", "layout", { maxLength: 20 }), focalPoint: selectField("Enquadramento", [option("left", "Esquerda"), option("center", "Centro"), option("right", "Direita")], "style") },
+    propsSchema: { image: imageField("Imagem desktop", "content", { help: "Recomendado: 1920 x 900 px, WEBP ou JPG." }), mobileImage: imageField("Imagem mobile", "responsive", { help: "Recomendado: 900 x 1200 px para celulares." }), overlay: numberField("Overlay (%)", "style", { min: 0, max: 90 }), widthMode: selectField("Ocupar", [option("full", "Tela inteira"), option("container", "Container")], "layout"), focalPoint: selectField("Enquadramento", [option("left", "Esquerda"), option("center", "Centro"), option("right", "Direita")], "style") },
     slots: { default: { categories: ["layout", "content", "marketing"] } }, styleCapabilities: ["layout", "spacing", "size", "background", "border", "effects", "responsive"],
-    defaults: { props: { image: "./assets/img/hero-family-fiber.jpg", mobileImage: "", overlay: 58, minHeight: "520px", focalPoint: "center" }, styles: { base: { normal: { minHeight: "520px", borderRadius: "token.radius.lg", overflow: "hidden" } } } },
+    defaults: { props: { image: "./assets/img/hero-family-fiber.jpg", mobileImage: "", overlay: 58, widthMode: "full", focalPoint: "center" }, styles: { base: { normal: { minHeight: "560px", overflow: "hidden" } }, md: { normal: { minHeight: "520px" } }, sm: { normal: { minHeight: "480px" } } } },
+    editor: { stage: true, dimensionControls: [{ key: "minHeight", label: "Altura do banner", units: { px: { min: 320, max: 960, step: 10, value: 560 }, vh: { min: 35, max: 100, step: 1, value: 64 } } }] },
     compose: function (builder) {
       const container = builder.append(builder.root, "layout.container", { name: "Conteudo do banner", styles: { base: { normal: { minHeight: "520px", display: "flex", alignItems: "center" } } } });
       const column = builder.append(container, "layout.column", { name: "Mensagem", styles: { base: { normal: { maxWidth: "660px" } } } });
@@ -230,18 +231,19 @@
       builder.append(column, "content.text", { name: "Descricao", props: { text: "Edite a imagem, a mensagem e a chamada diretamente no construtor.", tag: "p" }, styles: { base: { normal: { color: "#d8e6f4", fontSize: "18px" } } } });
       builder.append(column, "content.button", { name: "Botao", props: { text: "Conhecer planos", url: "#planos", target: "self", icon: "arrow-right", iconPosition: "right" } });
     },
-    render: function (context) { const root = element("section", "vb-banner"); root.style.setProperty("--vb-banner-image", 'url("' + cssImageValue(context.props.image, "./assets/img/hero-family-fiber.jpg") + '")'); root.style.setProperty("--vb-banner-mobile", 'url("' + cssImageValue(context.props.mobileImage || context.props.image, "./assets/img/hero-family-fiber.jpg") + '")'); root.style.setProperty("--vb-banner-overlay", String(Math.min(0.9, Math.max(0, Number(context.props.overlay || 0) / 100)))); root.style.backgroundPosition = ["left", "center", "right"].includes(context.props.focalPoint) ? context.props.focalPoint : "center"; const content = element("div", "vb-banner__content"); root.appendChild(content); return { element: root, slots: { default: content } }; },
+    render: function (context) { const root = element("section", "vb-banner"); root.dataset.widthMode = context.props.widthMode === "container" ? "container" : "full"; root.style.setProperty("--vb-banner-image", 'url("' + cssImageValue(context.props.image, "./assets/img/hero-family-fiber.jpg") + '")'); root.style.setProperty("--vb-banner-mobile", 'url("' + cssImageValue(context.props.mobileImage || context.props.image, "./assets/img/hero-family-fiber.jpg") + '")'); root.style.setProperty("--vb-banner-overlay", String(Math.min(0.9, Math.max(0, Number(context.props.overlay || 0) / 100)))); root.style.backgroundPosition = ["left", "center", "right"].includes(context.props.focalPoint) ? context.props.focalPoint : "center"; const content = element("div", "vb-banner__content"); root.appendChild(content); return { element: root, slots: { default: content } }; },
   });
 
   registry.register({
     type: "marketing.slider", version: 1, label: "Slider", category: "marketing", icon: "gallery-horizontal",
-    propsSchema: { autoplay: switchField("Autoplay", "behavior"), interval: numberField("Intervalo (ms)", "behavior", { min: 2500, max: 20000 }), loop: switchField("Loop", "behavior"), arrows: switchField("Setas", "behavior"), dots: switchField("Indicadores", "behavior"), pauseOnHover: switchField("Pausar no hover", "behavior"), transition: selectField("Animacao", [option("fade", "Fade"), option("slide", "Deslizar")], "effects") },
+    propsSchema: { widthMode: selectField("Ocupar", [option("full", "Tela inteira"), option("container", "Container")], "layout"), autoplay: switchField("Autoplay", "behavior"), interval: numberField("Intervalo (ms)", "behavior", { min: 2500, max: 20000 }), loop: switchField("Loop", "behavior"), arrows: switchField("Setas", "behavior"), dots: switchField("Indicadores", "behavior"), pauseOnHover: switchField("Pausar no hover", "behavior"), transition: selectField("Animacao", [option("fade", "Fade"), option("slide", "Deslizar")], "effects") },
     slots: { slides: { types: ["marketing.slide"], min: 1, max: 20 } }, styleCapabilities: ["spacing", "size", "background", "border", "effects", "responsive"],
-    defaults: { props: { autoplay: true, interval: 6500, loop: true, arrows: true, dots: true, pauseOnHover: true, transition: "fade" }, styles: { base: { normal: { minHeight: "620px", overflow: "hidden" } }, sm: { normal: { minHeight: "590px" } } } },
-    editor: { slotManager: { slot: "slides", label: "Slides", singular: "Slide", addType: "marketing.slide", imageProp: "image", variant: "slider" } },
+    defaults: { props: { widthMode: "full", autoplay: true, interval: 6500, loop: true, arrows: true, dots: true, pauseOnHover: true, transition: "fade" }, styles: { base: { normal: { minHeight: "620px", overflow: "hidden" } }, md: { normal: { minHeight: "560px" } }, sm: { normal: { minHeight: "520px" } } } },
+    editor: { stage: true, slotManager: { slot: "slides", label: "Slides", singular: "Slide", addType: "marketing.slide", imageProp: "image", variant: "slider" }, dimensionControls: [{ key: "minHeight", label: "Altura do slider", units: { px: { min: 360, max: 980, step: 10, value: 620 }, vh: { min: 40, max: 100, step: 1, value: 72 } } }] },
     compose: function (builder) { builder.append(builder.root, "marketing.slide", { name: "Slide 1" }, "slides"); builder.append(builder.root, "marketing.slide", { name: "Slide 2", props: { image: "./assets/img/banner-streaming-family.jpg", mobileImage: "./assets/img/banner-streaming-family.jpg", alt: "Entretenimento para toda a familia", overlay: 62, position: "center" } }, "slides"); },
     render: function (context) {
       const root = element("section", "vb-slider vb-slider--" + (context.props.transition === "slide" ? "slide" : "fade"));
+      root.dataset.widthMode = context.props.widthMode === "container" ? "container" : "full";
       root.dataset.autoplay = String(Boolean(context.props.autoplay)); root.dataset.interval = String(Math.max(2500, Number(context.props.interval || 6500))); root.dataset.loop = String(context.props.loop !== false); root.dataset.pause = String(context.props.pauseOnHover !== false);
       const track = element("div", "vb-slider__track"); root.appendChild(track);
       const controls = element("div", "vb-slider__controls");
@@ -256,14 +258,14 @@
     type: "marketing.slide", version: 1, label: "Slide", category: "marketing", icon: "panel-top", hidden: true,
     propsSchema: { image: imageField("Imagem desktop", "content", { help: "Recomendado: 1920 x 900 px, WEBP ou JPG." }), mobileImage: imageField("Imagem mobile", "responsive", { help: "Recomendado: 900 x 1200 px para celulares." }), alt: textField("Texto alternativo", "content"), overlay: numberField("Overlay (%)", "style", { min: 0, max: 90 }), position: selectField("Enquadramento", [option("left", "Esquerda"), option("center", "Centro"), option("right", "Direita")], "style") },
     slots: { default: { categories: ["layout", "content", "marketing"] } }, allowedParents: ["marketing.slider"], styleCapabilities: ["layout", "spacing", "size", "background", "responsive"],
-    defaults: { props: { image: "./assets/img/hero-family-fiber.jpg", mobileImage: "", alt: "", overlay: 62, position: "center" }, styles: { base: { normal: { minHeight: "620px" } }, sm: { normal: { minHeight: "590px" } } } },
+    defaults: { props: { image: "./assets/img/hero-family-fiber.jpg", mobileImage: "", alt: "", overlay: 62, position: "center" }, styles: {} },
     compose: function (builder) {
-      const container = builder.append(builder.root, "layout.container", { name: "Container do slide", styles: { base: { normal: { minHeight: "620px", display: "flex", alignItems: "center" } }, sm: { normal: { minHeight: "590px" } } } });
+      const container = builder.append(builder.root, "layout.container", { name: "Container do slide", styles: { base: { normal: { display: "flex", alignItems: "center" } } } });
       const column = builder.append(container, "layout.column", { name: "Conteudo do slide", styles: { base: { normal: { maxWidth: "720px" } } } });
       builder.append(column, "content.text", { name: "Chamada", props: { text: "Oferta em destaque", tag: "span" }, styles: { base: { normal: { color: "#80d8ff", fontSize: "14px", fontWeight: "700", textTransform: "uppercase" } } } });
       builder.append(column, "content.heading", { name: "Titulo", props: { text: "Internet para viver tudo o que importa", level: "1" }, styles: { base: { normal: { color: "#ffffff", fontSize: "62px", fontWeight: "700", lineHeight: "1.06" } }, md: { normal: { fontSize: "46px" } }, sm: { normal: { fontSize: "35px" } } } });
       builder.append(column, "content.text", { name: "Descricao", props: { text: "Troque este texto, a imagem e o botao sem sair do construtor.", tag: "p" }, styles: { base: { normal: { color: "#d8e6f4", fontSize: "18px", lineHeight: "1.65" } } } });
-      builder.append(column, "content.button", { name: "Botao", props: { text: "Conhecer planos", url: "#planos", target: "self", icon: "arrow-right", iconPosition: "right" }, styles: { base: { normal: { backgroundColor: "#ffffff", color: "#0758b8" } } } });
+      builder.append(column, "content.button", { name: "Botao", props: { text: "Conhecer planos", url: "#planos", target: "self", icon: "arrow-right", iconPosition: "right" } });
     },
     render: function (context) { const root = element("article", "vb-slide"); const picture = element("picture", "vb-slide__media"); const mobile = TB.safeMediaUrl(context.props.mobileImage, ""); if (mobile) { const source = element("source"); source.media = "(max-width: 767px)"; source.srcset = mobile; picture.appendChild(source); } const image = element("img"); image.src = TB.safeMediaUrl(context.props.image, "./assets/img/hero-family-fiber.jpg"); image.alt = TB.plainText(context.props.alt, 240); image.style.objectPosition = context.props.position || "center"; picture.appendChild(image); root.appendChild(picture); const shade = element("div", "vb-slide__shade"); shade.style.opacity = String(Math.min(0.9, Math.max(0, Number(context.props.overlay || 0) / 100))); root.appendChild(shade); const content = element("div", "vb-slide__content"); root.appendChild(content); return { element: root, slots: { default: content } }; },
   });
@@ -283,6 +285,7 @@
 
   registry.register({
     type: "marketing.testimonials", version: 1, label: "Depoimentos", category: "marketing", icon: "messages-square",
+    requiredModule: "testimonials",
     propsSchema: { limit: numberField("Quantidade", "content", { min: 1, max: 12 }), showCity: switchField("Mostrar cidade", "content") }, slots: {}, dataContract: "testimonials", styleCapabilities: ["spacing", "size", "responsive"],
     defaults: { props: { limit: 3, showCity: true }, styles: {} },
     render: function (context) { const root = element("div", "vb-testimonials"); (context.data.testimonials || []).slice(0, Math.max(1, Number(context.props.limit || 3))).forEach(function (item) { const card = element("article", "vb-testimonial"); const stars = element("div", "vb-testimonial__stars"); for (let index = 0; index < Math.min(5, Number(item.rating || 5)); index += 1) appendIcon(stars, "star"); const quote = element("blockquote"); quote.textContent = TB.plainText(item.text, 1000); const person = element("strong"); person.textContent = TB.plainText(item.name, 120) + (context.props.showCity && item.city ? " - " + TB.plainText(item.city, 120) : ""); card.append(stars, quote, person); root.appendChild(card); }); return { element: root, slots: {} }; },
@@ -290,6 +293,7 @@
 
   registry.register({
     type: "marketing.faq", version: 1, label: "Perguntas frequentes", category: "marketing", icon: "circle-help",
+    requiredModule: "faq",
     propsSchema: { limit: numberField("Quantidade", "content", { min: 1, max: 30 }), firstOpen: switchField("Primeira aberta", "behavior") }, slots: {}, dataContract: "faq", styleCapabilities: ["spacing", "size", "responsive"],
     defaults: { props: { limit: 6, firstOpen: true }, styles: {} },
     render: function (context) { const root = element("div", "vb-faq"); (context.data.faq || []).slice(0, Math.max(1, Number(context.props.limit || 6))).forEach(function (item, index) { const details = element("details", "vb-faq__item"); details.open = index === 0 && context.props.firstOpen !== false; const summary = element("summary"); summary.textContent = TB.plainText(item.question, 500); appendIcon(summary, "plus"); const answer = element("p"); answer.textContent = TB.plainText(item.answer, 3000); details.append(summary, answer); root.appendChild(details); }); return { element: root, slots: {} }; },
@@ -297,12 +301,13 @@
 
   registry.register({
     type: "commerce.plan-grid", version: 1, label: "Grade de planos", category: "commerce", icon: "badge-dollar-sign",
+    requiredModule: "plans",
     propsSchema: { categoryId: textField("Categoria inicial", "data", { maxLength: 80 }), limit: numberField("Limite", "data", { min: 1, max: 24 }), showFilters: switchField("Mostrar categorias", "content"), showCoupon: switchField("Permitir cupom", "content"), showFeatures: switchField("Mostrar beneficios", "content"), ctaLabel: textField("Texto do botao", "content", { maxLength: 120 }) }, slots: {}, dataContract: "catalog.plans", styleCapabilities: ["spacing", "size", "responsive"],
     defaults: { props: { categoryId: "internet", limit: 6, showFilters: true, showCoupon: true, showFeatures: true, ctaLabel: "Quero este plano" }, styles: {} },
     render: function (context) {
       const shell = element("div", "vb-plan-catalog");
       if (context.props.showFilters !== false) { const filters = element("div", "vb-plan-filters"); (context.data.categories || []).filter(function (category) { return category.active !== false; }).forEach(function (category) { const button = element("button"); button.type = "button"; button.dataset.vbPlanFilter = category.id; button.className = category.id === context.props.categoryId ? "is-active" : ""; button.textContent = TB.plainText(category.name, 80); filters.appendChild(button); }); shell.appendChild(filters); }
-      if (context.props.showCoupon !== false) { const coupon = element("form", "vb-coupon-form"); coupon.dataset.vbCouponForm = ""; const label = element("label"); label.textContent = "Tem um cupom?"; const input = element("input"); input.name = "coupon"; input.placeholder = "Digite o codigo"; input.maxLength = 24; const button = element("button"); button.type = "submit"; button.textContent = "Aplicar"; coupon.append(label, input, button); shell.appendChild(coupon); }
+      if (context.props.showCoupon !== false && !(context.data.modules && context.data.modules.promotions === false)) { const coupon = element("form", "vb-coupon-form"); coupon.dataset.vbCouponForm = ""; const label = element("label"); label.textContent = "Tem um cupom?"; const input = element("input"); input.name = "coupon"; input.placeholder = "Digite o codigo"; input.maxLength = 24; const button = element("button"); button.type = "submit"; button.textContent = "Aplicar"; coupon.append(label, input, button); shell.appendChild(coupon); }
       const root = element("div", "vb-plan-grid");
       let plans = (context.data.plans || []).filter(function (plan) { return plan.active !== false; });
       if (context.props.showFilters === false && context.props.categoryId && context.props.categoryId !== "all") plans = plans.filter(function (plan) { return plan.categoryId === context.props.categoryId; });
@@ -325,6 +330,7 @@
 
   registry.register({
     type: "commerce.product-grid", version: 1, label: "Grade de produtos", category: "commerce", icon: "shopping-bag",
+    requiredModule: "ecommerce",
     propsSchema: { limit: numberField("Quantidade", "data", { min: 1, max: 24 }), columns: numberField("Colunas", "layout", { min: 1, max: 6 }), showPrice: switchField("Mostrar preco", "content"), buttonLabel: textField("Botao", "content") }, slots: {}, dataContract: "catalog.products", styleCapabilities: ["spacing", "size", "responsive"],
     defaults: { props: { limit: 4, columns: 4, showPrice: true, buttonLabel: "Ver produto" }, styles: {} },
     render: function (context) { const root = element("div", "vb-product-grid"); const products = context.data.products || []; const source = products.length ? products : [{ id: "sample-router", name: "Roteador Wi-Fi 6", price: 399.9, image: "./assets/img/banner-business-fiber.jpg" }, { id: "sample-repeater", name: "Repetidor Mesh", price: 249.9, image: "./assets/img/banner-streaming-family.jpg" }]; source.slice(0, Number(context.props.limit || 4)).forEach(function (product) { const card = element("article", "vb-product-card"); const image = element("img"); image.src = TB.safeMediaUrl(product.image, "./assets/img/banner-business-fiber.jpg"); image.alt = TB.plainText(product.name, 160); image.loading = "lazy"; const title = element("h3"); title.textContent = TB.plainText(product.name, 160); card.append(image, title); if (context.props.showPrice !== false) { const price = element("strong"); price.textContent = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(product.price || 0)); card.appendChild(price); } const button = element("button"); button.type = "button"; button.disabled = !products.length; button.textContent = products.length ? TB.plainText(context.props.buttonLabel, 80) : "Roadmap e-commerce"; card.appendChild(button); root.appendChild(card); }); return { element: root, slots: {} }; },
@@ -388,6 +394,7 @@
 
   registry.register({
     type: "domain.app-grid", version: 1, label: "Aplicativos inclusos", category: "domain", icon: "app-window",
+    requiredModule: "apps",
     propsSchema: { limit: numberField("Quantidade", "data", { min: 1, max: 24 }), showCategory: switchField("Mostrar categoria", "content") }, slots: {}, dataContract: "apps",
     styleCapabilities: ["spacing", "size", "responsive"], defaults: { props: { limit: 8, showCategory: true }, styles: {} },
     render: function (context) {
@@ -403,6 +410,7 @@
 
   registry.register({
     type: "domain.support-grid", version: 1, label: "Atalhos de atendimento", category: "domain", icon: "headset",
+    requiredModule: "support",
     propsSchema: { limit: numberField("Quantidade", "data", { min: 1, max: 12 }), buttonLabel: textField("Texto padrao do botao", "content") }, slots: {}, dataContract: "supportCards",
     styleCapabilities: ["spacing", "size", "responsive"], defaults: { props: { limit: 4, buttonLabel: "Acessar" }, styles: {} },
     render: function (context) {
@@ -416,6 +424,7 @@
 
   registry.register({
     type: "domain.coverage", version: 1, label: "Mapa de cobertura", category: "domain", icon: "map-pinned",
+    requiredModule: "coverage",
     propsSchema: { title: textField("Titulo", "content"), text: textarea("Descricao", "content"), showList: switchField("Mostrar areas", "content"), mapHeight: textField("Altura do mapa", "layout", { maxLength: 20 }) }, slots: {}, dataContract: "coverage.areas", styleCapabilities: ["spacing", "size", "background", "border", "responsive"],
     defaults: { props: { title: "Consulte a disponibilidade na sua regiao", text: "Nossa rede esta em expansao. Fale com a equipe para confirmar seu endereco.", showList: true, mapHeight: "480px" }, styles: {} },
     render: function (context) { const root = element("div", "vb-coverage"); const copy = element("div", "vb-coverage__copy"); const heading = element("h2"); heading.textContent = TB.plainText(context.props.title, 240); const text = element("p"); text.textContent = TB.plainText(context.props.text, 1200); copy.append(heading, text); if (context.props.showList) { const list = element("div", "vb-coverage__areas"); const source = window.FLCoverage ? window.FLCoverage.effectiveAreas(context.data) : context.data.regions || []; source.slice(0, 12).forEach(function (area) { const chip = element("span"); appendIcon(chip, "map-pin"); const label = element("b"); label.textContent = TB.plainText(area.name || area.city, 160); chip.appendChild(label); list.appendChild(chip); }); copy.appendChild(list); } const map = element("div", "vb-coverage__map"); map.dataset.vbCoverageMap = ""; map.style.height = /^\d+(?:px|rem|vh)$/.test(context.props.mapHeight) ? context.props.mapHeight : "480px"; root.append(copy, map); return { element: root, slots: {}, mount: "coverage" }; },

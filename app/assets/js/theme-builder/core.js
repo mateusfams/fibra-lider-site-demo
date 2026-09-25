@@ -189,6 +189,17 @@
     return next;
   }
 
+  function mergeStyles(defaultStyles, overrideStyles) {
+    const base = normalizeStyles(defaultStyles);
+    const overrides = normalizeStyles(overrideStyles);
+    ["base", "md", "sm"].forEach(function (breakpoint) {
+      ["normal", "hover", "focus", "active", "disabled"].forEach(function (state) {
+        base[breakpoint][state] = { ...base[breakpoint][state], ...overrides[breakpoint][state] };
+      });
+    });
+    return base;
+  }
+
   function createNode(type, overrides) {
     const definition = registry.require(type);
     const defaults = typeof definition.defaults === "function" ? definition.defaults() : clone(definition.defaults || {});
@@ -202,7 +213,7 @@
       name: patch.name || definition.label,
       props: { ...(defaults.props || {}), ...(patch.props || {}) },
       bindings: { ...(defaults.bindings || {}), ...(patch.bindings || {}) },
-      styles: normalizeStyles({ ...(defaults.styles || {}), ...(patch.styles || {}) }),
+      styles: mergeStyles(defaults.styles, patch.styles),
       visibility: { base: true, md: true, sm: true, ...(defaults.visibility || {}), ...(patch.visibility || {}) },
       slots: { ...slots, ...(clone(defaults.slots || {})), ...(clone(patch.slots || {})) },
       meta: { locked: false, ...(defaults.meta || {}), ...(patch.meta || {}) },

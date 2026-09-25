@@ -249,6 +249,12 @@ try:
     driver.switch_to.default_content()
     check(after_drag_undo == before, "Undo did not restore a visual drag insertion")
 
+    driver.execute_script("document.querySelector('[data-vb-component=\"layout.section\"]').click()")
+    time.sleep(0.5)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    stage_section = driver.find_element(By.CSS_SELECTOR, ".vb-section.is-vb-selected")
+    driver.execute_script("arguments[0].click()", stage_section.find_element(By.CSS_SELECTOR, ".vb-container"))
+    driver.switch_to.default_content()
     driver.execute_script("document.querySelector('[data-vb-component=\"marketing.slider\"]').click()")
     time.sleep(0.9)
     driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
@@ -256,7 +262,39 @@ try:
     slider_id = inserted_slider.get_attribute("data-vb-node")
     check(len(inserted_slider.find_elements(By.CSS_SELECTOR, ".vb-slide")) == 2, "Slider recipe did not create editable slides")
     slider_order = [item.get_attribute("data-vb-node") for item in inserted_slider.find_elements(By.CSS_SELECTOR, ".vb-slide")]
+    slider_metrics = driver.execute_script(
+        "var slider=arguments[0],button=slider.querySelector('.vb-slide.is-active .vb-button'),box=slider.getBoundingClientRect(),style=getComputedStyle(button),sliderStyle=getComputedStyle(slider);"
+        "return {width:box.width,viewport:document.documentElement.clientWidth,height:box.height,minHeight:sliderStyle.minHeight,transform:sliderStyle.transform,parent:slider.parentElement.className,buttonBackground:style.backgroundColor,buttonColor:style.color};",
+        inserted_slider,
+    )
     driver.switch_to.default_content()
+    check(slider_metrics["width"] >= slider_metrics["viewport"] - 2, "Inserted slider did not expand to the preview width: " + repr(slider_metrics))
+    check(slider_metrics["height"] >= 600, "Inserted slider lost the polished hero height: " + repr(slider_metrics))
+    check(slider_metrics["buttonBackground"] != "rgba(0, 0, 0, 0)" and slider_metrics["buttonColor"] == "rgb(255, 255, 255)", "Inserted slider CTA lost its default styling: " + repr(slider_metrics))
+    stage_styles = driver.execute_script(
+        "var env=FLThemeBuilder.storage.loadWorkspace(FL.getState()),doc=env.workspace.documents[env.workspace.activeDocumentId],slider=doc.nodes[arguments[0]],parent=FLThemeBuilder.parentOf(doc,slider.id),container=doc.nodes[parent.parentId],sectionRef=FLThemeBuilder.parentOf(doc,container.id),section=doc.nodes[sectionRef.parentId];"
+        "return {containerWidth:container.styles.base.normal.width,containerMaxWidth:container.styles.base.normal.maxWidth,paddingTop:section.styles.base.normal.paddingTop,paddingBottom:section.styles.base.normal.paddingBottom};",
+        slider_id,
+    )
+    check(stage_styles == {"containerWidth": "100%", "containerMaxWidth": "100%", "paddingTop": "0", "paddingBottom": "0"}, "Empty section was not converted to a full-width stage: " + repr(stage_styles))
+    merged_recipe = driver.execute_script(
+        "var tree=FLThemeBuilder.createComponentSubtree('marketing.slider'),nodes=Object.values(tree.nodes),container=nodes.find(function(node){return node.type==='layout.container';}),button=nodes.find(function(node){return node.type==='content.button';});"
+        "return {containerWidth:container.styles.base.normal.width,containerDisplay:container.styles.base.normal.display,buttonBackground:button.styles.base.normal.backgroundColor,buttonHover:button.styles.base.hover.backgroundColor};"
+    )
+    check(merged_recipe["containerWidth"] and merged_recipe["containerDisplay"] == "flex" and merged_recipe["buttonBackground"] == "token.color.primary" and merged_recipe["buttonHover"], "Component composition discarded default styles: " + repr(merged_recipe))
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="layout"]').click()
+    height_range = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-vb-dimension="minHeight"]')))
+    driver.execute_script("arguments[0].value='700';arguments[0].dispatchEvent(new Event('input',{bubbles:true}))", height_range)
+    time.sleep(0.25)
+    driver.switch_to.frame(driver.find_element(By.ID, "vb-preview-frame"))
+    live_height = driver.find_elements(By.CSS_SELECTOR, ".vb-slider")[-1].rect["height"]
+    driver.switch_to.default_content()
+    check(live_height >= 695, "Visual height slider did not update the preview in real time")
+    driver.execute_script("arguments[0].dispatchEvent(new Event('change',{bubbles:true}))", height_range)
+    time.sleep(0.35)
+    driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
+    time.sleep(0.35)
+    driver.find_element(By.CSS_SELECTOR, '[data-vb-inspector-tab="content"]').click()
     check(len(driver.find_elements(By.CSS_SELECTOR, ".vb-slot-manager article")) == 2, "Slider manager was not rendered")
     driver.find_elements(By.CSS_SELECTOR, ".vb-slide-deck__main")[0].click()
     wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, ".vb-slide-content button")) >= 3)
@@ -270,6 +308,8 @@ try:
     check(reordered_ids == list(reversed(slider_order)), "Slider manager did not reorder slides")
     driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
     time.sleep(1.1)
+    driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
+    time.sleep(0.35)
     driver.execute_script("document.querySelector('[data-vb-action=undo]').click()")
     time.sleep(0.5)
 
@@ -416,6 +456,14 @@ try:
     driver.execute_script("document.querySelector('#visual-theme-root .coverage-section').scrollIntoView({block:'center'})")
     wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, "#visual-theme-root .coverage-section .leaflet-overlay-pane path")) > 0)
     wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, "#visual-theme-root .coverage-section .coverage-place-marker")) > 0)
+    coverage_polygons = driver.find_elements(By.CSS_SELECTOR, "#visual-theme-root .coverage-section .leaflet-coverageAreas-pane .coverage-area-polygon")
+    check(len(coverage_polygons) >= 50, "Public map did not render the KMZ coverage boundaries")
+    check(float(coverage_polygons[0].get_attribute("fill-opacity")) >= 0.48, "Public KMZ area is still visually too faint")
+    coverage_canvas = driver.execute_script(
+        "var paths=Array.from(document.querySelectorAll('#visual-theme-root .coverage-section .leaflet-coverageAreas-pane .coverage-area-polygon')),svg=paths[0].ownerSVGElement;"
+        "return {svgWidth:svg.getBoundingClientRect().width,largestWidth:Math.max.apply(null,paths.map(function(path){return path.getBoundingClientRect().width;}))};"
+    )
+    check(coverage_canvas["svgWidth"] > 300 and coverage_canvas["largestWidth"] > 25, "Leaflet SVG was clipped by global icon sizing: " + repr(coverage_canvas))
     coverage = driver.find_element(By.CSS_SELECTOR, "#visual-theme-root .coverage-section")
     check("OLT" not in coverage.text.upper(), "Technical KMZ names leaked into the public coverage section")
     if CAPTURE_DIR:
@@ -509,9 +557,19 @@ try:
     wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-panel=coverage]"))).click()
     wait.until(EC.presence_of_element_located((By.ID, "admin-regional-map")))
     wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, "#admin-regional-map .coverage-place-marker")) > 0)
+    admin_polygons = driver.find_elements(By.CSS_SELECTOR, "#admin-regional-map .leaflet-coverageAreas-pane .coverage-area-polygon")
+    check(len(admin_polygons) >= 50, "Admin map did not render the complete KMZ boundary layer")
     check("OLT" not in driver.find_element(By.ID, "admin-regional-map").text.upper(), "Technical KMZ names leaked into the admin map")
     if CAPTURE_DIR:
         driver.save_screenshot(os.path.join(CAPTURE_DIR, "admin-coverage-desktop.png"))
+
+    driver.find_element(By.CSS_SELECTOR, '[data-panel="settings"]').click()
+    wait.until(lambda browser: len(browser.find_elements(By.CSS_SELECTOR, ".module-control__item")) == 8)
+    coverage_toggle = driver.find_element(By.CSS_SELECTOR, '[data-bind="modules.coverage"]')
+    driver.execute_script("arguments[0].click()", coverage_toggle)
+    wait.until(lambda browser: browser.execute_script("return FL.getState().modules.coverage") is False)
+    driver.execute_script("arguments[0].click()", driver.find_element(By.CSS_SELECTOR, '[data-bind="modules.coverage"]'))
+    wait.until(lambda browser: browser.execute_script("return FL.getState().modules.coverage") is True)
 
     errors = [entry for entry in driver.get_log("browser") if entry["level"] == "SEVERE"]
     check(not errors, "Browser console contains errors: " + repr(errors[:5]))

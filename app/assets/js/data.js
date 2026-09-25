@@ -12,7 +12,7 @@
 
   const defaultState = {
     meta: {
-      version: "1.11.0-mvp",
+      version: "1.12.0-mvp",
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
       status: "published",
@@ -215,7 +215,8 @@
       defaultState: "SP",
       centerLat: -22.835,
       centerLng: -47.19,
-      importedAreaOpacity: 0.3,
+      importedAreaOpacity: 0.55,
+      layerStyleVersion: 2,
       maxImportMb: 5,
     },
     coverageFiles: [],
@@ -230,6 +231,16 @@
       canvasZoom: 100,
       showSectionLabels: true,
       previewTheme: "light",
+    },
+    modules: {
+      plans: true,
+      apps: true,
+      coverage: true,
+      testimonials: true,
+      faq: true,
+      support: true,
+      promotions: true,
+      ecommerce: false,
     },
     mediaLibrary: [
       { id: "media-hero-family", name: "Familia conectada", url: "./assets/img/hero-family-fiber.jpg", type: "image/jpeg", width: 1774, height: 887, bytes: 224939, originalBytes: 224939, usage: "Banner", createdAt: "2026-09-21" },
@@ -503,9 +514,13 @@
       stored = clone(defaultState);
     }
     const next = { ...clone(defaultState), ...stored };
-    ["meta", "brand", "theme", "slider", "content", "whatsapp", "leadSettings", "seo", "integrations", "footer", "dashboardTargets", "coverageSettings", "mediaSettings", "builderSettings"].forEach(function (key) {
+    ["meta", "brand", "theme", "slider", "content", "whatsapp", "leadSettings", "seo", "integrations", "footer", "dashboardTargets", "coverageSettings", "mediaSettings", "builderSettings", "modules"].forEach(function (key) {
       next[key] = { ...clone(defaultState[key]), ...(stored[key] || {}) };
     });
+    if (!stored.coverageSettings || Number(stored.coverageSettings.layerStyleVersion || 0) < 2) {
+      if (stored.coverageSettings && Number(stored.coverageSettings.importedAreaOpacity) === .3) next.coverageSettings.importedAreaOpacity = .55;
+      next.coverageSettings.layerStyleVersion = 2;
+    }
     ["navigation", "banners", "categories", "plans", "benefits", "apps", "regions", "coverageFiles", "testimonials", "faq", "supportCards", "coupons", "popupCampaigns", "leads", "whatsappTemplates", "whatsappCampaigns", "pageBlocks", "pages", "mediaLibrary", "auditLog"].forEach(function (key) {
       next[key] = Array.isArray(stored[key]) ? stored[key] : clone(defaultState[key]);
     });

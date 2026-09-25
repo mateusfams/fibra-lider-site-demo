@@ -449,6 +449,8 @@
     publicMap.createPane("coverageGlow");
     publicMap.getPane("coverageGlow").style.zIndex = 390;
     publicMap.getPane("coverageGlow").style.pointerEvents = "none";
+    publicMap.createPane("coverageAreas");
+    publicMap.getPane("coverageAreas").style.zIndex = 430;
     const bounds = [];
     regions.forEach(function (region) {
       const point = [Number(region.lat), Number(region.lng)];
@@ -469,13 +471,14 @@
       const color = file.color || state.theme.mapAccent || state.theme.primary;
       file.features.forEach(function (feature, featureIndex) {
         const label = window.FLCoverage ? FLCoverage.publicFeatureName(feature, featureIndex) : feature.name;
+        const layerStyles = window.FLCoverage ? FLCoverage.mapLayerStyles(state.coverageSettings, color) : null;
         if (feature.type === "polygon") {
-          window.L.polygon(feature.coordinates, { pane: "coverageGlow", color, fillColor: color, fillOpacity: 0.1, opacity: 0.28, weight: 10, interactive: false }).addTo(publicMap);
-          const polygon = window.L.polygon(feature.coordinates, { color, fillColor: color, fillOpacity: Number(state.coverageSettings.importedAreaOpacity || 0.3), weight: 2.5 }).addTo(publicMap);
+          window.L.polygon(feature.coordinates, layerStyles ? layerStyles.glow : { pane: "coverageGlow", color, fillColor: color, fillOpacity: 0.1, opacity: 0.28, weight: 10, interactive: false }).addTo(publicMap);
+          const polygon = window.L.polygon(feature.coordinates, layerStyles ? layerStyles.area : { pane: "coverageAreas", color, fillColor: color, fillOpacity: 0.42, weight: 2.5 }).addTo(publicMap);
           polygon.bindTooltip('<strong>' + escapeHtml(label) + '</strong><span>Area atendida pela ' + escapeHtml(state.brand.name) + '</span>', { direction: "top", className: "coverage-tooltip" });
           bounds.push.apply(bounds, feature.coordinates);
         } else if (feature.type === "line") {
-          window.L.polyline(feature.coordinates, { color, weight: 3, opacity: 0.85 }).addTo(publicMap).bindTooltip(escapeHtml(label));
+          window.L.polyline(feature.coordinates, layerStyles ? layerStyles.line : { pane: "coverageAreas", color, weight: 3, opacity: 0.85 }).addTo(publicMap).bindTooltip(escapeHtml(label));
           bounds.push.apply(bounds, feature.coordinates);
         } else if (feature.type === "point") {
           window.L.circleMarker(feature.coordinates, { radius: 6, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(publicMap).bindTooltip(escapeHtml(label));
@@ -620,7 +623,8 @@
     state.pageBlocks.forEach(function (block) {
       const section = $('[data-section="' + block.id + '"]');
       if (!section) return;
-      section.hidden = block.visible === false;
+      const requiredModule = { plans: "plans", apps: "apps", coverage: "coverage", testimonials: "testimonials", faq: "faq", support: "support" }[block.id];
+      section.hidden = block.visible === false || Boolean(requiredModule && state.modules && state.modules[requiredModule] === false);
       section.dataset.tone = block.tone || "light";
       section.dataset.spacing = block.spacing || "normal";
       section.dataset.container = block.container || "normal";
@@ -717,6 +721,7 @@
   }
 
   function scheduleCampaign() {
+    if (state.modules && state.modules.promotions === false) return;
     const today = new Date().toISOString().slice(0, 10);
     const campaign = state.popupCampaigns.find(function (item) {
       return item.active && (!item.startsAt || item.startsAt <= today) && (!item.expiresAt || item.expiresAt >= today);

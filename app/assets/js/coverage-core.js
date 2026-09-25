@@ -122,6 +122,16 @@
     return { manual: manual, imported: imported, effective: effectiveAreas(state), files: activeFiles, geometries: activeFiles.reduce(function (sum, file) { return sum + (file.features || []).length; }, 0), coordinates: activeFiles.reduce(function (sum, file) { return sum + Number(file.coordinateCount || 0); }, 0) };
   }
 
+  function mapLayerStyles(settings, color) {
+    const configured = Number(settings && settings.importedAreaOpacity);
+    const fillOpacity = Math.min(.75, Math.max(.12, Number.isFinite(configured) ? configured : .55));
+    return {
+      glow: { pane: "coverageGlow", color: color, fillColor: color, fillOpacity: .08, opacity: .3, weight: 10, interactive: false, className: "coverage-area-glow" },
+      area: { pane: "coverageAreas", color: color, fillColor: color, fillOpacity: fillOpacity, opacity: 1, weight: 3, lineCap: "round", lineJoin: "round", className: "coverage-area-polygon" },
+      line: { pane: "coverageAreas", color: color, opacity: .92, weight: 4, lineCap: "round", lineJoin: "round", className: "coverage-area-line" },
+    };
+  }
+
   function nominatimLocation(payload) {
     const address = payload && payload.address || {};
     return { neighborhood: address.neighbourhood || address.suburb || address.quarter || address.residential || "", district: address.city_district || "", road: address.road || address.pedestrian || address.footway || "", city: address.city || address.town || address.municipality || address.village || "", state: address.state || "", postcode: address.postcode || "", provider: "nominatim" };
@@ -177,5 +187,5 @@
     return { ...source, features: features, geocodingStatus: "complete", geocodedAt: new Date().toISOString(), geocodingRequests: requests };
   }
 
-  window.FLCoverage = { normalize, slug, isTechnicalName, centroid, distanceKm, publicFeatureName, prepareFeatures, importedAreas, manualAreas, effectiveAreas, inventory, reverseGeocode, enrichFile };
+  window.FLCoverage = { normalize, slug, isTechnicalName, centroid, distanceKm, publicFeatureName, prepareFeatures, importedAreas, manualAreas, effectiveAreas, inventory, mapLayerStyles, reverseGeocode, enrichFile };
 })();

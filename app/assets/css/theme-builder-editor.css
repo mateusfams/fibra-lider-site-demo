@@ -319,6 +319,20 @@ html[data-admin-theme="dark"] .theme-studio-body .vb-studio {
 .vb-range-field > span { display: flex; justify-content: space-between; }
 .vb-range-field output { color: var(--vb-editor-ink); font-variant-numeric: tabular-nums; }
 .vb-range-field input { accent-color: var(--vb-editor-primary); width: 100%; }
+
+.vb-dimension-panel > header { align-items: flex-start; display: flex; justify-content: space-between; margin-bottom: 14px; }
+.vb-dimension-panel > header h3 { margin-bottom: 4px; }
+.vb-dimension-panel > header small { color: var(--vb-editor-muted); display: block; font-size: 9px; line-height: 1.45; max-width: 210px; }
+.vb-dimension-panel > header > svg { color: var(--vb-editor-primary); height: 17px; width: 17px; }
+.vb-dimension-control { background: color-mix(in srgb, var(--vb-editor-primary) 5%, var(--vb-editor-panel)); border: 1px solid color-mix(in srgb, var(--vb-editor-primary) 18%, var(--vb-editor-line)); border-radius: 6px; display: grid; gap: 10px; padding: 12px; }
+.vb-dimension-control + .vb-dimension-control { margin-top: 10px; }
+.vb-dimension-control__head { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
+.vb-dimension-control__head span { color: var(--vb-editor-ink); font-size: 10px; font-weight: 750; }
+.vb-dimension-control__head output { background: var(--vb-editor-panel); border: 1px solid var(--vb-editor-line); border-radius: 4px; color: var(--vb-editor-primary); font-size: 10px; font-variant-numeric: tabular-nums; font-weight: 800; min-width: 58px; padding: 4px 6px; text-align: center; }
+.vb-dimension-control > input[type="range"] { accent-color: var(--vb-editor-primary); cursor: ew-resize; margin: 0; width: 100%; }
+.vb-dimension-units { display: flex; gap: 4px; }
+.vb-dimension-units button { background: transparent; border: 1px solid var(--vb-editor-line); border-radius: 4px; color: var(--vb-editor-muted); cursor: pointer; font: inherit; font-size: 9px; font-weight: 750; min-height: 25px; padding: 3px 9px; text-transform: uppercase; }
+.vb-dimension-units button.is-active { background: var(--vb-editor-primary); border-color: var(--vb-editor-primary); color: #fff; }
 .vb-box-control { border: 1px solid var(--vb-editor-line); margin: 12px 0; padding: 9px; }
 .vb-box-control legend { color: var(--vb-editor-muted); font-size: 9px; font-weight: 750; padding: 0 5px; }
 .vb-box-control > div { display: grid; gap: 5px; grid-template-columns: repeat(4, minmax(0, 1fr)); }

@@ -26,6 +26,7 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`. O editor visual pos
 - Preview e Home publicada renderizados pelo mesmo documento visual, sem uma segunda pagina divergente.
 - Template Home canonico com o mesmo markup, CSS, secoes, responsividade e fluxos do `index.html`, protegido por comparacao visual desktop/mobile.
 - Banners, sliders, slides e formularios criados e editados integralmente dentro do Theme Builder.
+- Sliders e banners adicionados em secoes vazias ocupam automaticamente toda a largura e oferecem altura visual por arraste em desktop, tablet e celular.
 - Hero configuravel como banner estatico ou slider, com miniaturas, escolha do destaque, imagens desktop/mobile, textos, botoes, ordenacao e reproducao editados no mesmo fluxo visual.
 - Workspaces de paginas com Home, paginas internas, header e footer no mesmo modelo versionado.
 - Estilos por breakpoint e estado, tokens globais, biblioteca de midia, secoes salvas, undo/redo e autosave.
@@ -35,12 +36,14 @@ Acesse `admin.html` com a senha de demonstracao `lider2026`. O editor visual pos
 - Construtor de paginas internas e Central de Midia otimizada.
 - Gestao de planos, categorias, aplicativos, beneficios e descontos estruturados.
 - Cobertura em modo automatico, hibrido, manual ou importado por KMZ, CEP, cidade, bairro, regiao e raio.
+- Malha KMZ exibida com seus contornos reais, preenchimento da marca e marcadores publicos de rua/bairro.
 - Tratamento de nomes tecnicos do KMZ para bairros, cidades e vias, com marcadores da marca e rotulos progressivos por zoom.
 - Leads e WhatsApp em workspaces separados, com funil, atribuicao, templates e campanhas manuais segmentadas por plano, etapa, origem e regiao.
 - Campanhas e cupons separados, SEO tecnico/local ampliado e central de Integracoes e APIs.
 - Navegacao por dominios, listagens com busca/filtros/ordenacao/paginacao e acoes em massa.
 - Confirmacoes destrutivas acessiveis, validacao inline e trilha local de atividade administrativa.
 - Temas claro e escuro.
+- Recursos ativaveis por empresa, incluindo planos, cobertura, apps, promocoes e a base isolada do futuro e-commerce.
 
 ## Importante
 

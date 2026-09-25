@@ -130,6 +130,7 @@
       if (!node) return null;
       const definition = TB.registry.get(node.type);
       if (!definition) return null;
+      if (definition.requiredModule && this.data.modules && this.data.modules[definition.requiredModule] === false) return null;
       const context = {
         node: node,
         props: resolveProps(node, this.data),
@@ -655,6 +656,8 @@
         map.createPane("coverageGlow");
         map.getPane("coverageGlow").style.zIndex = 390;
         map.getPane("coverageGlow").style.pointerEvents = "none";
+        map.createPane("coverageAreas");
+        map.getPane("coverageAreas").style.zIndex = 430;
         const bounds = [];
         regions.forEach(function (area) {
           const latitude = Number(area.lat);
@@ -675,12 +678,13 @@
           const color = file.color || accent;
           (file.features || []).forEach(function (feature, index) {
             const label = window.FLCoverage ? window.FLCoverage.publicFeatureName(feature, index) : feature.name;
+            const layerStyles = window.FLCoverage ? window.FLCoverage.mapLayerStyles(settings, color) : null;
             if (feature.type === "polygon") {
-              window.L.polygon(feature.coordinates, { pane: "coverageGlow", color: color, fillColor: color, fillOpacity: .1, opacity: .28, weight: 10, interactive: false }).addTo(map);
-              window.L.polygon(feature.coordinates, { color: color, fillColor: color, fillOpacity: Number(settings.importedAreaOpacity || .3), weight: 2.5 }).addTo(map).bindTooltip('<strong>' + TB.escapeHtml(label) + '</strong><span>Area atendida pela ' + TB.escapeHtml(this.data.brand && this.data.brand.name || "empresa") + '</span>', { direction: "top", className: "coverage-tooltip" });
+              window.L.polygon(feature.coordinates, layerStyles ? layerStyles.glow : { pane: "coverageGlow", color: color, fillColor: color, fillOpacity: .1, opacity: .28, weight: 10, interactive: false }).addTo(map);
+              window.L.polygon(feature.coordinates, layerStyles ? layerStyles.area : { pane: "coverageAreas", color: color, fillColor: color, fillOpacity: .42, weight: 2.5 }).addTo(map).bindTooltip('<strong>' + TB.escapeHtml(label) + '</strong><span>Area atendida pela ' + TB.escapeHtml(this.data.brand && this.data.brand.name || "empresa") + '</span>', { direction: "top", className: "coverage-tooltip" });
               bounds.push.apply(bounds, feature.coordinates);
             }
-            else if (feature.type === "line") { window.L.polyline(feature.coordinates, { color: color, opacity: .85, weight: 3 }).addTo(map).bindTooltip(TB.plainText(label, 180)); bounds.push.apply(bounds, feature.coordinates); }
+            else if (feature.type === "line") { window.L.polyline(feature.coordinates, layerStyles ? layerStyles.line : { pane: "coverageAreas", color: color, opacity: .85, weight: 3 }).addTo(map).bindTooltip(TB.plainText(label, 180)); bounds.push.apply(bounds, feature.coordinates); }
             else if (feature.type === "point") { window.L.circleMarker(feature.coordinates, { radius: 6, color: "#ffffff", fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map).bindTooltip(TB.plainText(label, 180)); bounds.push(feature.coordinates); }
           }, this);
           if (window.FLCoverage) window.FLCoverage.importedAreas([file]).forEach(function (area) {
